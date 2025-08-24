@@ -1,12 +1,43 @@
 {
   "name": "pei-site-app",
   "version": "0.0.0",
+  "main": "dist/electron/main.js",
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "electron": "electron .",
+    "electron-dev": "concurrently \"ng serve\" \"wait-on http://localhost:4200 && electron .\"",
+    "electron-build": "ng build --configuration=electron && electron .",
+    "dist": "ng build --configuration=electron && electron-builder",
+    "dist-win": "ng build --configuration=electron && electron-builder --win",
+    "electron:build": "tsc -p electron/tsconfig.json",
+    "electron:serve": "npm run electron:build && electron .",
+    "electron:dev": "concurrently \"ng serve\" \"npm run electron:build -- --watch\" \"wait-on http://localhost:4200 && electron .\"",
+    "electron:pack": "npm run build:electron && electron-builder --dir",
+    "electron:dist": "npm run build:electron && electron-builder"
+  },
+  "build": {
+    "appId": "com.example.myelectronapp",
+    "productName": "My Electron App",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "node_modules/**/*",
+      "!node_modules/**/*.md"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "src/assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   },
   "private": true,
   "dependencies": {
