@@ -1,5 +1,6 @@
-import { app, BrowserWindow, Menu, shell } from 'electron';
+import { app, BrowserWindow, Menu, shell, ipcMain, dialog } from 'electron';
 import * as path from 'path';
+import * as fs from 'fs';
 import { isDev } from './utils';
 
 let mainWindow: BrowserWindow | null;
@@ -134,5 +135,62 @@ app.on('window-all-closed', () => {
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
+  }
+});
+
+
+// IPC handlers
+ipcMain.handle('dialog:openFile', async () => {
+  if (!mainWindow) return { canceled: true };
+  
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openFile'],
+    filters: [
+      { name: 'All Files', extensions: ['*'] },
+      { name: 'Text Files', extensions: ['txt', 'md', 'json', 'js', 'ts', 'html', 'css'] },
+      { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp'] },
+      { name: 'Documents', extensions: ['pdf', 'doc', 'docx', 'rtf'] },
+      { name: 'Media', extensions: ['mp4', 'avi', 'mov', 'mp3', 'wav', 'flac'] },
+      { name: 'Archives', extensions: ['zip', 'rar', '7z', 'tar', 'gz'] }
+    ]
+  });
+  
+  if (!result.canceled && result.filePaths.length > 0) {
+    try {
+      const filePath = result.filePaths[0];
+      const stats = fs.statSync(filePath);
+      return {
+        ...result,
+        fileSize: stats.size,
+        lastModified: stats.mtime.toISOString()
+      };
+    } catch (error) {
+      console.error('Error getting file stats:', error);
+      return result;
+    }
+  }
+  
+  return result;
+});
+
+ipcMain.handle('window:minimize', () => {
+  if (mainWindow) {
+    mainWindow.minimize();
+  }
+});
+
+ipcMain.handle('window:maximize', () => {
+  if (mainWindow) {
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      mainWindow.maximize();
+    }
+  }
+});
+
+ipcMain.handle('window:close', () => {
+  if (mainWindow) {
+    mainWindow.close();
   }
 });
