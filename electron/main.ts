@@ -25,7 +25,7 @@ function createWindow(): void {
   // Load the app
   if (isDev()) {
     mainWindow.loadURL('http://localhost:4200');
-    mainWindow.webContents.openDevTools();
+    // mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile(path.join(__dirname, '../index.html'));
   }

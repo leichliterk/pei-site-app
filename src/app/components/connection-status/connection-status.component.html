@@ -1,0 +1,15 @@
+<div class="connection-status" [ngClass]="getStatusClass()">
+  <div class="status-indicator" (click)="onRetryConnection()" 
+       title="Click to refresh connection status">
+    <div class="status-dot" [ngClass]="getStatusClass()"></div>
+    <span class="status-text">{{ getStatusText() }}</span>
+  </div>
+  
+  <div class="status-details">
+    <span class="last-checked">Last checked: {{ connectionState.lastChecked | date:'short' }}</span>
+    
+    @if (connectionState.status === ConnectionStatus.ERROR && connectionState.errorMessage) {
+      <div class="error-message">{{ connectionState.errorMessage }}</div>
+    }
+  </div>
+</div>

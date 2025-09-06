@@ -1,8 +1,10 @@
 import { Component } from '@angular/core';
 import { ElectronService } from './services/electron.service';
+import { ConnectionStatusComponent } from './components/connection-status/connection-status.component';
 
 @Component({
   selector: 'app-root',
+  imports: [ConnectionStatusComponent],
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss']
 })
