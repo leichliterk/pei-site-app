@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, interval, catchError, of, switchMap } from 'rxjs';
-import { ApiService } from './api.service';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { environment } from '../../environments/environment';
 
 export enum ConnectionStatus {
   CONNECTED = 'connected',
@@ -26,8 +27,9 @@ export class ConnectionStatusService {
 
   private checkInterval = 15000; // Check every 15 seconds
   private isChecking = false;
+  private readonly connStatusUrl = 'http://localhost:443/api/data/conn-status';
 
-  constructor(private apiService: ApiService) {
+  constructor(private http: HttpClient) {
     this.startPeriodicCheck();
   }
 
@@ -46,10 +48,24 @@ export class ConnectionStatusService {
     this.updateStatus(ConnectionStatus.CONNECTING); // Don't pass errorMessage, preserve existing one
 
     try {
-      const result = await this.apiService.getData().pipe(
-        catchError(error => {
+      const requestBody = {
+        siteNumber: environment.siteNumber
+      };
+      
+      const result = await this.http.put(this.connStatusUrl, requestBody).pipe(
+        catchError((error: HttpErrorResponse) => {
           console.error('Connection check failed:', error);
-          this.updateStatus(ConnectionStatus.ERROR, error.message);
+          let errorMessage = 'Unknown error occurred';
+          
+          if (error.error instanceof ErrorEvent) {
+            // Client-side error
+            errorMessage = `Error: ${error.error.message}`;
+          } else {
+            // Server-side error
+            errorMessage = `Error Code: ${error.status}\nMessage: ${error.message}`;
+          }
+          
+          this.updateStatus(ConnectionStatus.ERROR, errorMessage);
           this.isChecking = false;
           return of(null);
         })
