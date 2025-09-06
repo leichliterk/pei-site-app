@@ -17,6 +17,7 @@ export class ConnectionStatusComponent implements OnInit, OnDestroy {
 
   ConnectionStatus = ConnectionStatus;
   private destroy$ = new Subject<void>();
+  private hasBeenConnected = false;
 
   constructor(private connectionStatusService: ConnectionStatusService) {}
 
@@ -25,6 +26,16 @@ export class ConnectionStatusComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe(state => {
         this.connectionState = state;
+        
+        // Track when connection first becomes successful
+        if (state.status === ConnectionStatus.CONNECTED) {
+          this.hasBeenConnected = true;
+        }
+        
+        // Reset flag if connection fails
+        if (state.status === ConnectionStatus.ERROR || state.status === ConnectionStatus.DISCONNECTED) {
+          this.hasBeenConnected = false;
+        }
       });
   }
 
@@ -38,6 +49,11 @@ export class ConnectionStatusComponent implements OnInit, OnDestroy {
   }
 
   getStatusText(): string {
+    // Once connected successfully, keep showing "Connected" unless there's an actual failure
+    if (this.hasBeenConnected && this.connectionState.status === ConnectionStatus.CONNECTING) {
+      return 'Connected to Server';
+    }
+    
     switch (this.connectionState.status) {
       case ConnectionStatus.CONNECTED:
         return 'Connected to Server';

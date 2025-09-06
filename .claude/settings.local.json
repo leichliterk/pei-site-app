@@ -4,7 +4,10 @@
       "Bash(npm run electron:build:*)",
       "Bash(npm run:*)",
       "Bash(taskkill:*)",
-      "Bash(ng generate:*)"
+      "Bash(ng generate:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tailwindcss:*)",
+      "Bash(npm uninstall:*)"
     ],
     "deny": [],
     "ask": []

@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { ElectronService } from './services/electron.service';
 import { ConnectionStatusComponent } from './components/connection-status/connection-status.component';
+import { environment } from '../environments/environment';
 
 @Component({
   selector: 'app-root',
@@ -12,6 +13,7 @@ export class AppComponent {
   selectedFile: any = null;
   isLoading = false;
   error: string | null = null;
+  environment = environment;
 
   constructor(public electronService: ElectronService) {}
 
