@@ -1,0 +1,24 @@
+<div class="settings-container">
+  <h2>Settings</h2>
+
+  <div class="setting-group">
+    <h3>Connection Monitoring</h3>
+    <div class="setting-item">
+      <label class="toggle-container">
+        <span class="setting-label">Auto-check connection status</span>
+        <div class="toggle-wrapper">
+          <input
+            type="checkbox"
+            id="connection-timer-toggle"
+            class="toggle-input"
+            [checked]="isTimerRunning"
+            (change)="toggleConnectionTimer()">
+          <span class="toggle-slider"></span>
+        </div>
+      </label>
+      <p class="setting-description">
+        Automatically check connection status every 15 seconds
+      </p>
+    </div>
+  </div>
+</div>

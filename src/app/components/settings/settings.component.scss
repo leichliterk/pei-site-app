@@ -1,0 +1,166 @@
+// Import the same color variables as the main app
+$primary-blue: #1565C0;
+$secondary-blue: #42A5F5;
+$accent-orange: #FF8F00;
+$dark-gray: #263238;
+$light-gray: #ECEFF1;
+$white: #FFFFFF;
+
+.settings-container {
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 2rem;
+  background: transparent;
+
+  h2 {
+    margin: 0 0 2rem 0;
+    color: $white;
+    font-size: 2rem;
+    font-weight: 600;
+    text-align: center;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  }
+}
+
+.setting-group {
+  margin-bottom: 2rem;
+  padding: 2rem;
+  background: rgba($white, 0.15);
+  backdrop-filter: blur(15px);
+  border-radius: 16px;
+  border: 1px solid rgba($white, 0.2);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+
+  h3 {
+    margin: 0 0 1.5rem 0;
+    color: $white;
+    font-size: 1.3rem;
+    font-weight: 600;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  }
+}
+
+.setting-item {
+  margin-bottom: 1rem;
+  transition: all 0.3s ease;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+
+  &.highlight {
+    background: rgba($white, 0.25);
+    border-radius: 8px;
+    padding: 0.5rem;
+    margin: -0.5rem;
+    box-shadow: 0 0 12px rgba($white, 0.4);
+    animation: highlight-pulse 2s ease-out;
+  }
+}
+
+.toggle-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+
+  .setting-label {
+    color: $white;
+    font-size: 1.1rem;
+    font-weight: 500;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  }
+}
+
+.toggle-wrapper {
+  position: relative;
+  display: inline-block;
+  width: 60px;
+  height: 32px;
+}
+
+.toggle-input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+
+  &:checked + .toggle-slider {
+    background: linear-gradient(135deg, $primary-blue 0%, $secondary-blue 100%);
+
+    &:before {
+      transform: translateX(28px);
+    }
+  }
+
+  &:focus + .toggle-slider {
+    box-shadow: 0 0 8px rgba($primary-blue, 0.4);
+  }
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #ccc;
+  border-radius: 32px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &:before {
+    position: absolute;
+    content: "";
+    height: 24px;
+    width: 24px;
+    left: 4px;
+    bottom: 4px;
+    background: $white;
+    border-radius: 50%;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+
+  &:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+}
+
+.setting-description {
+  margin: 0.75rem 0 0 0;
+  color: rgba($white, 0.8);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes highlight-pulse {
+  0% {
+    background: rgba($white, 0.35);
+    box-shadow: 0 0 20px rgba($white, 0.6);
+  }
+  50% {
+    background: rgba($white, 0.3);
+    box-shadow: 0 0 16px rgba($white, 0.5);
+  }
+  100% {
+    background: rgba($white, 0.25);
+    box-shadow: 0 0 12px rgba($white, 0.4);
+  }
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .settings-container {
+    margin: 1rem;
+    padding: 1.5rem;
+    border-radius: 16px;
+  }
+
+  .toggle-container {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+}

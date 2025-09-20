@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, interval, catchError, of, switchMap } from 'rxjs';
+import { BehaviorSubject, Observable, interval, catchError, of, switchMap, Subscription } from 'rxjs';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { environment } from '../../environments/environment';
 
@@ -28,6 +28,8 @@ export class ConnectionStatusService {
   private checkInterval = 15000; // Check every 15 seconds
   private isChecking = false;
   private readonly connStatusUrl = 'http://localhost:443/api/data/conn-status';
+  private timerSubscription?: Subscription;
+  private _isTimerRunning$ = new BehaviorSubject<boolean>(true);
 
   constructor(private http: HttpClient) {
     this.startPeriodicCheck();
@@ -39,6 +41,14 @@ export class ConnectionStatusService {
 
   get currentStatus(): ConnectionState {
     return this.connectionState$.value;
+  }
+
+  get isTimerRunning$(): Observable<boolean> {
+    return this._isTimerRunning$.asObservable();
+  }
+
+  get isTimerRunning(): boolean {
+    return this._isTimerRunning$.value;
   }
 
   async checkConnection(): Promise<void> {
@@ -87,12 +97,37 @@ export class ConnectionStatusService {
     this.checkConnection();
 
     // Set up periodic checks
-    interval(this.checkInterval).pipe(
+    this.timerSubscription = interval(this.checkInterval).pipe(
       switchMap(() => {
         this.checkConnection();
         return of(null);
       })
     ).subscribe();
+  }
+
+  startTimer(): void {
+    if (!this._isTimerRunning$.value) {
+      this._isTimerRunning$.next(true);
+      this.startPeriodicCheck();
+    }
+  }
+
+  stopTimer(): void {
+    if (this._isTimerRunning$.value) {
+      this._isTimerRunning$.next(false);
+      if (this.timerSubscription) {
+        this.timerSubscription.unsubscribe();
+        this.timerSubscription = undefined;
+      }
+    }
+  }
+
+  toggleTimer(): void {
+    if (this._isTimerRunning$.value) {
+      this.stopTimer();
+    } else {
+      this.startTimer();
+    }
   }
 
   private updateStatus(status: ConnectionStatus, errorMessage?: string): void {

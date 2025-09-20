@@ -1,11 +1,12 @@
 import { Component } from '@angular/core';
+import { Router, RouterOutlet } from '@angular/router';
 import { ElectronService } from './services/electron.service';
 import { ConnectionStatusComponent } from './components/connection-status/connection-status.component';
 import { environment } from '../environments/environment';
 
 @Component({
   selector: 'app-root',
-  imports: [ConnectionStatusComponent],
+  imports: [ConnectionStatusComponent, RouterOutlet],
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss']
 })
@@ -15,7 +16,7 @@ export class AppComponent {
   error: string | null = null;
   environment = environment;
 
-  constructor(public electronService: ElectronService) {}
+  constructor(public electronService: ElectronService, private router: Router) {}
 
   async openFile() {
     if (!this.electronService.isElectronApp) {
@@ -82,5 +83,13 @@ export class AppComponent {
 
   clearError() {
     this.error = null;
+  }
+
+  navigateToSettings() {
+    this.router.navigate(['/settings']);
+  }
+
+  navigateToHome() {
+    this.router.navigate(['/home']);
   }
 }
