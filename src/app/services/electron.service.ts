@@ -45,4 +45,18 @@ export class ElectronService {
       window.electronAPI.close();
     }
   }
+
+  async getSiteNumber(): Promise<number | null> {
+    if (this.isElectron) {
+      return window.electronAPI.getSiteNumber();
+    }
+    return null;
+  }
+
+  async setSiteNumber(siteNumber: number): Promise<boolean> {
+    if (this.isElectron) {
+      return window.electronAPI.setSiteNumber(siteNumber);
+    }
+    return false;
+  }
 }

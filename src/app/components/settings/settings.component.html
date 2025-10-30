@@ -2,6 +2,19 @@
   <h2>Settings</h2>
 
   <div class="setting-group">
+    <h3>Site Configuration</h3>
+    <div class="setting-item">
+      <div class="site-number-container">
+        <span class="setting-label">Current Site Number: {{ siteNumber }}</span>
+        <button class="edit-button" (click)="editSiteNumber()">Edit Site Number</button>
+      </div>
+      <p class="setting-warning">
+        <strong>Warning:</strong> Changing the site number will fundamentally impact data collection. All future data will be associated with the new site number.
+      </p>
+    </div>
+  </div>
+
+  <div class="setting-group">
     <h3>Connection Monitoring</h3>
     <div class="setting-item">
       <label class="toggle-container">
@@ -19,6 +32,51 @@
       <p class="setting-description">
         Automatically check connection status every 15 seconds
       </p>
+    </div>
+  </div>
+</div>
+
+<!-- Dialog overlay -->
+<div class="dialog-overlay" *ngIf="showDialog" (click)="closeDialog()">
+  <div class="dialog-container" (click)="$event.stopPropagation()">
+    <div class="dialog-header">
+      <h3>Edit Site Number</h3>
+      <button class="close-button" (click)="closeDialog()">&times;</button>
+    </div>
+
+    <div class="dialog-body">
+      <div class="dialog-warning">
+        <strong>Warning:</strong> Changing the site number will fundamentally impact data collection.
+      </div>
+
+      <div class="form-group">
+        <label for="new-site-number">New Site Number:</label>
+        <input
+          type="number"
+          id="new-site-number"
+          [(ngModel)]="newSiteNumberInput"
+          class="form-input"
+          placeholder="Enter new site number">
+      </div>
+
+      <div class="form-group">
+        <label for="confirmation-phrase">Type "change site number" to confirm:</label>
+        <input
+          type="text"
+          id="confirmation-phrase"
+          [(ngModel)]="confirmationPhrase"
+          class="form-input"
+          placeholder="change site number">
+      </div>
+
+      <div class="error-message" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </div>
+    </div>
+
+    <div class="dialog-footer">
+      <button class="cancel-button" (click)="closeDialog()">Cancel</button>
+      <button class="confirm-button" [disabled]="!isFormValid" (click)="confirmSiteNumberChange()">Confirm</button>
     </div>
   </div>
 </div>

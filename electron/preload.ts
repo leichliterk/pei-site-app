@@ -8,10 +8,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   minimize: () => ipcRenderer.invoke('window:minimize'),
   maximize: () => ipcRenderer.invoke('window:maximize'),
   close: () => ipcRenderer.invoke('window:close'),
-  
+
+  // Settings persistence
+  getSiteNumber: () => ipcRenderer.invoke('settings:getSiteNumber'),
+  setSiteNumber: (siteNumber: number) => ipcRenderer.invoke('settings:setSiteNumber', siteNumber),
+
   // Example of exposing a method to send messages to main process
   sendMessage: (message: string) => ipcRenderer.invoke('app:message', message),
-  
+
   // Example of listening to messages from main process
   onMessage: (callback: (message: string) => void) => {
     ipcRenderer.on('app:message', (event, message) => callback(message));
@@ -27,6 +31,8 @@ declare global {
       minimize: () => Promise<void>;
       maximize: () => Promise<void>;
       close: () => Promise<void>;
+      getSiteNumber: () => Promise<number | null>;
+      setSiteNumber: (siteNumber: number) => Promise<boolean>;
       sendMessage: (message: string) => Promise<any>;
       onMessage: (callback: (message: string) => void) => void;
     };

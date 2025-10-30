@@ -4,6 +4,8 @@ export interface IElectronAPI {
   minimize: () => Promise<void>;
   maximize: () => Promise<void>;
   close: () => Promise<void>;
+  getSiteNumber: () => Promise<number | null>;
+  setSiteNumber: (siteNumber: number) => Promise<boolean>;
   sendMessage: (message: string) => Promise<any>;
   onMessage: (callback: (message: string) => void) => void;
 }

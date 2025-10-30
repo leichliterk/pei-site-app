@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { Router, RouterOutlet } from '@angular/router';
 import { ElectronService } from './services/electron.service';
 import { ConnectionStatusComponent } from './components/connection-status/connection-status.component';
@@ -10,13 +10,21 @@ import { environment } from '../environments/environment';
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss']
 })
-export class AppComponent {
+export class AppComponent implements OnInit {
   selectedFile: any = null;
   isLoading = false;
   error: string | null = null;
   environment = environment;
 
   constructor(public electronService: ElectronService, private router: Router) {}
+
+  async ngOnInit(): Promise<void> {
+    // Load saved site number from Electron store
+    const savedSiteNumber = await this.electronService.getSiteNumber();
+    if (savedSiteNumber !== null) {
+      environment.siteNumber = savedSiteNumber;
+    }
+  }
 
   async openFile() {
     if (!this.electronService.isElectronApp) {

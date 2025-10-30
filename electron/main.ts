@@ -194,3 +194,36 @@ ipcMain.handle('window:close', () => {
     mainWindow.close();
   }
 });
+
+// Settings persistence handlers
+const userDataPath = app.getPath('userData');
+const settingsFilePath = path.join(userDataPath, 'settings.json');
+
+ipcMain.handle('settings:getSiteNumber', async () => {
+  try {
+    if (fs.existsSync(settingsFilePath)) {
+      const data = fs.readFileSync(settingsFilePath, 'utf8');
+      const settings = JSON.parse(data);
+      return settings.siteNumber;
+    }
+  } catch (error) {
+    console.error('Error reading site number:', error);
+  }
+  return null;
+});
+
+ipcMain.handle('settings:setSiteNumber', async (_event, siteNumber: number) => {
+  try {
+    let settings: any = {};
+    if (fs.existsSync(settingsFilePath)) {
+      const data = fs.readFileSync(settingsFilePath, 'utf8');
+      settings = JSON.parse(data);
+    }
+    settings.siteNumber = siteNumber;
+    fs.writeFileSync(settingsFilePath, JSON.stringify(settings, null, 2), 'utf8');
+    return true;
+  } catch (error) {
+    console.error('Error writing site number:', error);
+    return false;
+  }
+});
