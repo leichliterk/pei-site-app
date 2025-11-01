@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, interval, catchError, of, switchMap, Subscription } from 'rxjs';
+import { BehaviorSubject, Observable, interval, catchError, of, switchMap, Subscription, firstValueFrom } from 'rxjs';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { environment } from '../../environments/environment';
+import { ElectronService } from './electron.service';
 
 export enum ConnectionStatus {
   CONNECTED = 'connected',
@@ -16,6 +17,11 @@ export interface ConnectionState {
   errorMessage?: string;
 }
 
+interface QueuedFailure {
+  timestamp: string;
+  details: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -27,12 +33,36 @@ export class ConnectionStatusService {
 
   private checkInterval = 15000; // Check every 15 seconds
   private isChecking = false;
-  private readonly connStatusUrl = 'http://localhost:443/api/data/conn-status';
+  private readonly healthCheckUrl = `${environment.apiUrl}/log-connection`;
   private timerSubscription?: Subscription;
-  private _isTimerRunning$ = new BehaviorSubject<boolean>(true);
+  private _isTimerRunning$ = new BehaviorSubject<boolean>(false);
+  private readonly QUEUE_STORAGE_KEY = 'connection_failure_queue';
+  private failureQueue: QueuedFailure[] = [];
+  private siteNumber: number = environment.siteNumber;
 
-  constructor(private http: HttpClient) {
-    this.startPeriodicCheck();
+  constructor(
+    private http: HttpClient,
+    private electronService: ElectronService
+  ) {
+    this.loadFailureQueue();
+    this.loadSiteNumber();
+    this.loadTimerState();
+  }
+
+  /**
+   * Load site number from Electron persistent storage
+   */
+  private async loadSiteNumber(): Promise<void> {
+    try {
+      const savedSiteNumber = await this.electronService.getSiteNumber();
+      if (savedSiteNumber !== null) {
+        this.siteNumber = savedSiteNumber;
+      }
+    } catch (error) {
+      console.error('Failed to load site number from persistent storage:', error);
+      // Fall back to environment default
+      this.siteNumber = environment.siteNumber;
+    }
   }
 
   get status$(): Observable<ConnectionState> {
@@ -51,52 +81,157 @@ export class ConnectionStatusService {
     return this._isTimerRunning$.value;
   }
 
+  /**
+   * Load failure queue from localStorage
+   */
+  private loadFailureQueue(): void {
+    try {
+      const stored = localStorage.getItem(this.QUEUE_STORAGE_KEY);
+      if (stored) {
+        this.failureQueue = JSON.parse(stored);
+      }
+    } catch (error) {
+      console.error('Failed to load failure queue from localStorage:', error);
+      this.failureQueue = [];
+    }
+  }
+
+  /**
+   * Save failure queue to localStorage
+   */
+  private saveFailureQueue(): void {
+    try {
+      localStorage.setItem(this.QUEUE_STORAGE_KEY, JSON.stringify(this.failureQueue));
+    } catch (error) {
+      console.error('Failed to save failure queue to localStorage:', error);
+    }
+  }
+
+  /**
+   * Add a failure to the queue
+   */
+  private queueFailure(details: string): void {
+    const failure: QueuedFailure = {
+      timestamp: new Date().toISOString(),
+      details
+    };
+    this.failureQueue.push(failure);
+    this.saveFailureQueue();
+  }
+
+  /**
+   * Clear the failure queue
+   */
+  private clearFailureQueue(): void {
+    this.failureQueue = [];
+    this.saveFailureQueue();
+  }
+
+  /**
+   * Load timer state from localStorage
+   */
+  private loadTimerState(): void {
+    try {
+      const stored = localStorage.getItem('connection_timer_enabled');
+      const isEnabled = stored === 'true';
+      this._isTimerRunning$.next(isEnabled);
+
+      if (isEnabled) {
+        this.startPeriodicCheck();
+      }
+    } catch (error) {
+      console.error('Failed to load timer state:', error);
+    }
+  }
+
+  /**
+   * Save timer state to localStorage
+   */
+  private saveTimerState(enabled: boolean): void {
+    try {
+      localStorage.setItem('connection_timer_enabled', enabled.toString());
+    } catch (error) {
+      console.error('Failed to save timer state:', error);
+    }
+  }
+
+  /**
+   * Perform a connection check
+   */
   async checkConnection(): Promise<void> {
     if (this.isChecking) return;
-    
+
     this.isChecking = true;
-    this.updateStatus(ConnectionStatus.CONNECTING); // Don't pass errorMessage, preserve existing one
+    this.updateStatus(ConnectionStatus.CONNECTING);
 
     try {
-      const requestBody = {
-        siteNumber: environment.siteNumber
+      const requestBody: any = {
+        site_id: this.siteNumber,
+        status: 'success',
+        timestamp: new Date().toISOString(),
+        details: 'Connection check successful'
       };
-      
-      const result = await this.http.put(this.connStatusUrl, requestBody).pipe(
-        catchError((error: HttpErrorResponse) => {
-          console.error('Connection check failed:', error);
-          let errorMessage = 'Unknown error occurred';
-          
-          if (error.error instanceof ErrorEvent) {
-            // Client-side error
-            errorMessage = `Error: ${error.error.message}`;
-          } else {
-            // Server-side error
-            errorMessage = `Error Code: ${error.status}\nMessage: ${error.message}`;
-          }
-          
-          this.updateStatus(ConnectionStatus.ERROR, errorMessage);
-          this.isChecking = false;
-          return of(null);
-        })
-      ).toPromise();
 
-      // Only set as connected if we got a valid result (not null from catchError)
+      // Include queued failures if any exist
+      if (this.failureQueue.length > 0) {
+        requestBody.queuedFailures = [...this.failureQueue];
+      }
+
+      const result = await firstValueFrom(
+        this.http.post(this.healthCheckUrl, requestBody).pipe(
+          catchError((error: HttpErrorResponse) => {
+            console.error('Connection check failed:', error);
+            let errorMessage = 'Unknown error occurred';
+
+            if (error.error instanceof ErrorEvent) {
+              // Client-side error
+              errorMessage = `Client Error: ${error.error.message}`;
+            } else if (error.status === 0) {
+              // Network error
+              errorMessage = 'Network error: Unable to reach server';
+            } else {
+              // Server-side error
+              errorMessage = `Server Error ${error.status}: ${error.message}`;
+            }
+
+            // Queue this failure
+            this.queueFailure(errorMessage);
+
+            this.updateStatus(ConnectionStatus.ERROR, errorMessage);
+            this.isChecking = false;
+            return of(null);
+          })
+        )
+      );
+
+      // Success - log was recorded and queued failures were sent
       if (result !== null) {
-        this.updateStatus(ConnectionStatus.CONNECTED, undefined); // Clear error message
+        // Clear the queue since failures were successfully logged
+        this.clearFailureQueue();
+        this.updateStatus(ConnectionStatus.CONNECTED);
       }
     } catch (error: any) {
-      this.updateStatus(ConnectionStatus.ERROR, error.message);
+      const errorMessage = error?.message || 'Unexpected error occurred';
+      this.queueFailure(errorMessage);
+      this.updateStatus(ConnectionStatus.ERROR, errorMessage);
     } finally {
       this.isChecking = false;
     }
   }
 
+  /**
+   * Start periodic connection checks
+   */
   private startPeriodicCheck(): void {
+    // Stop any existing timer
+    if (this.timerSubscription) {
+      this.timerSubscription.unsubscribe();
+    }
+
     // Initial check
     this.checkConnection();
 
-    // Set up periodic checks
+    // Set up periodic checks every 15 seconds
     this.timerSubscription = interval(this.checkInterval).pipe(
       switchMap(() => {
         this.checkConnection();
@@ -105,23 +240,36 @@ export class ConnectionStatusService {
     ).subscribe();
   }
 
+  /**
+   * Start the connection timer
+   */
   startTimer(): void {
     if (!this._isTimerRunning$.value) {
       this._isTimerRunning$.next(true);
+      this.saveTimerState(true);
       this.startPeriodicCheck();
     }
   }
 
+  /**
+   * Stop the connection timer
+   */
   stopTimer(): void {
     if (this._isTimerRunning$.value) {
       this._isTimerRunning$.next(false);
+      this.saveTimerState(false);
       if (this.timerSubscription) {
         this.timerSubscription.unsubscribe();
         this.timerSubscription = undefined;
       }
+      // Update status to disconnected when timer stops
+      this.updateStatus(ConnectionStatus.DISCONNECTED);
     }
   }
 
+  /**
+   * Toggle the connection timer on/off
+   */
   toggleTimer(): void {
     if (this._isTimerRunning$.value) {
       this.stopTimer();
@@ -130,6 +278,9 @@ export class ConnectionStatusService {
     }
   }
 
+  /**
+   * Update the connection status
+   */
   private updateStatus(status: ConnectionStatus, errorMessage?: string): void {
     const currentState = this.connectionState$.value;
     const newState: ConnectionState = {
@@ -138,19 +289,34 @@ export class ConnectionStatusService {
       errorMessage: errorMessage !== undefined ? errorMessage : currentState.errorMessage
     };
 
-    // Only emit if something meaningful changed (status or error message)
-    if (currentState.status !== status || currentState.errorMessage !== newState.errorMessage) {
-      this.connectionState$.next(newState);
-    } else {
-      // Only update timestamp for connection attempts without changing other state
-      this.connectionState$.next({
-        ...currentState,
-        lastChecked: new Date()
-      });
+    // Clear error message when connecting successfully
+    if (status === ConnectionStatus.CONNECTED) {
+      newState.errorMessage = undefined;
+    }
+
+    this.connectionState$.next(newState);
+  }
+
+  /**
+   * Manually retry connection
+   */
+  retryConnection(): void {
+    if (this._isTimerRunning$.value) {
+      this.checkConnection();
     }
   }
 
-  retryConnection(): void {
-    this.checkConnection();
+  /**
+   * Get the current failure queue (for debugging/monitoring)
+   */
+  getFailureQueue(): QueuedFailure[] {
+    return [...this.failureQueue];
+  }
+
+  /**
+   * Get the failure queue size
+   */
+  getFailureQueueSize(): number {
+    return this.failureQueue.length;
   }
 }
