@@ -59,4 +59,32 @@ export class ElectronService {
     }
     return false;
   }
+
+  async getTenantId(): Promise<string | null> {
+    if (this.isElectron) {
+      return window.electronAPI.getTenantId();
+    }
+    return null;
+  }
+
+  async setTenantId(tenantId: string): Promise<boolean> {
+    if (this.isElectron) {
+      return window.electronAPI.setTenantId(tenantId);
+    }
+    return false;
+  }
+
+  async getStartupEnabled(): Promise<boolean> {
+    if (this.isElectron) {
+      return window.electronAPI.getStartupEnabled();
+    }
+    return false;
+  }
+
+  async setStartupEnabled(enabled: boolean): Promise<boolean> {
+    if (this.isElectron) {
+      return window.electronAPI.setStartupEnabled(enabled);
+    }
+    return false;
+  }
 }

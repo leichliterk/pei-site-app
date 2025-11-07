@@ -17,24 +17,29 @@
     "electron:dev": "npm run electron:build && concurrently \"ng serve\" \"wait-on http://localhost:4200 && electron .\"",
     "electron:build": "tsc -p electron/tsconfig.json",
     "electron:pack": "npm run build:electron && electron-builder --dir",
-    "electron:dist": "npm run build:electron && electron-builder"
+    "electron:dist": "npm run build:electron && electron-builder",
+    "electron:build:win": "ng build --configuration=electron && npm run electron:build && electron-builder --win",
+    "electron:build:msi": "npm run electron:build:win && node build-msi.js"
   },
   "build": {
-    "appId": "com.example.myelectronapp",
-    "productName": "My Electron App",
+    "appId": "com.example.pei-site-app",
+    "productName": "PEI Site App",
     "directories": {
       "output": "release"
     },
     "files": [
       "dist/**/*",
-      "node_modules/**/*",
-      "!node_modules/**/*.md"
+      "!dist/electron/**/*.map"
     ],
+    "extraResources": [],
     "win": {
       "target": "nsis",
-      "icon": "src/assets/icon.ico"
+      "icon": "src/assets/icon.ico",
+      "signAndEditExecutable": false
     },
-    "electronLanguages": ["en-US"],
+    "electronLanguages": [
+      "en-US"
+    ],
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
@@ -62,6 +67,7 @@
     "concurrently": "^9.2.0",
     "electron": "^37.3.1",
     "electron-builder": "^26.0.12",
+    "electron-wix-msi": "^5.1.3",
     "jasmine-core": "~5.6.0",
     "karma": "~6.4.0",
     "karma-chrome-launcher": "~3.2.0",

@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
+     xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+
+  <Product Id="*"
+           Name="PEI Site App"
+           Language="1033"
+           Version="1.0.0.0"
+           Manufacturer="Your Company Name"
+           UpgradeCode="PUT-GUID-HERE">
+
+    <Package InstallerVersion="200"
+             Compressed="yes"
+             InstallScope="perMachine" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- Custom properties to store user input -->
+    <Property Id="TENANT_ID" Secure="yes">
+      <RegistrySearch Id="TenantIdSearch"
+                     Root="HKLM"
+                     Key="Software\[Manufacturer]\[ProductName]"
+                     Name="TenantId"
+                     Type="raw" />
+    </Property>
+
+    <Property Id="SITE_ID" Secure="yes">
+      <RegistrySearch Id="SiteIdSearch"
+                     Root="HKLM"
+                     Key="Software\[Manufacturer]\[ProductName]"
+                     Name="SiteId"
+                     Type="raw" />
+    </Property>
+
+    <!-- UI Configuration -->
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    <UIRef Id="WixUI_InstallDir" />
+    <UIRef Id="WixUI_ErrorProgressText" />
+
+    <!-- Custom UI Dialog -->
+    <UI>
+      <Dialog Id="ConfigurationDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Configuration Settings" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="Please enter your Tenant ID and Site ID." />
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="!(loc.InstallDirDlgBannerBitmap)" />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+
+        <Control Id="TenantIdLabel" Type="Text" X="20" Y="60" Width="100" Height="13" TabSkip="no" Text="&amp;Tenant ID:" />
+        <Control Id="TenantIdEdit" Type="Edit" X="20" Y="75" Width="320" Height="18" Property="TENANT_ID" />
+
+        <Control Id="SiteIdLabel" Type="Text" X="20" Y="100" Width="100" Height="13" TabSkip="no" Text="&amp;Site ID:" />
+        <Control Id="SiteIdEdit" Type="Edit" X="20" Y="115" Width="320" Height="18" Property="SITE_ID" />
+
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)">
+          <Publish Event="DoAction" Value="SaveConfigAction">1</Publish>
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg">1</Publish>
+        </Control>
+      </Dialog>
+
+      <InstallUISequence>
+        <Show Dialog="ConfigurationDlg" After="LicenseAgreementDlg">NOT Installed</Show>
+      </InstallUISequence>
+    </UI>
+
+    <!-- Custom action to save configuration -->
+    <CustomAction Id="SaveConfigAction"
+                  Return="check"
+                  Execute="immediate"
+                  Script="vbscript">
+      <![CDATA[
+        Set objShell = CreateObject("WScript.Shell")
+        objShell.RegWrite "HKLM\Software\[Manufacturer]\[ProductName]\TenantId", Session.Property("TENANT_ID"), "REG_SZ"
+        objShell.RegWrite "HKLM\Software\[Manufacturer]\[ProductName]\SiteId", Session.Property("SITE_ID"), "REG_SZ"
+      ]]>
+    </CustomAction>
+
+    <!-- Directory structure -->
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFilesFolder">
+        <Directory Id="INSTALLFOLDER" Name="PEI Site App" />
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ApplicationProgramsFolder" Name="PEI Site App"/>
+      </Directory>
+    </Directory>
+
+    <!-- Component to store registry values -->
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="RegistryEntries" Guid="*">
+        <RegistryKey Root="HKLM" Key="Software\[Manufacturer]\[ProductName]">
+          <RegistryValue Type="string" Name="TenantId" Value="[TENANT_ID]" KeyPath="yes"/>
+          <RegistryValue Type="string" Name="SiteId" Value="[SITE_ID]"/>
+        </RegistryKey>
+      </Component>
+    </DirectoryRef>
+
+    <!-- Feature definition -->
+    <Feature Id="ProductFeature" Title="PEI Site App" Level="1">
+      <ComponentRef Id="RegistryEntries" />
+    </Feature>
+  </Product>
+</Wix>

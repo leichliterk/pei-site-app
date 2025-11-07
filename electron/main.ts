@@ -3,6 +3,9 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { isDev } from './utils';
 
+// Windows registry module for startup management
+const { execSync } = require('child_process');
+
 let mainWindow: BrowserWindow | null;
 
 function createWindow(): void {
@@ -199,6 +202,89 @@ ipcMain.handle('window:close', () => {
 const userDataPath = app.getPath('userData');
 const settingsFilePath = path.join(userDataPath, 'settings.json');
 
+// Helper function to read Windows registry (Windows only)
+function readWindowsRegistry(key: string, valueName: string): string | null {
+  if (process.platform !== 'win32') return null;
+
+  try {
+    const result = execSync(`reg query "${key}" /v ${valueName}`, { encoding: 'utf8' });
+    const match = result.match(/REG_SZ\s+(.+)/);
+    return match ? match[1].trim() : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+// Helper function to check if app is set to start with Windows
+function getStartupEnabled(): boolean {
+  if (process.platform !== 'win32') return false;
+
+  try {
+    const appName = 'PDS Site App'; // Should match ProductName in installer
+    const result = execSync(`reg query "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" /v "${appName}"`, { encoding: 'utf8' });
+    return result.includes('pds-site-app.exe');
+  } catch (error) {
+    return false;
+  }
+}
+
+// Helper function to enable/disable startup with Windows
+function setStartupEnabled(enabled: boolean): boolean {
+  if (process.platform !== 'win32') return false;
+
+  try {
+    const appName = 'PDS Site App'; // Should match ProductName in installer
+    const exePath = process.execPath;
+
+    if (enabled) {
+      // Add to startup
+      execSync(`reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" /v "${appName}" /t REG_SZ /d "\\"${exePath}\\"" /f`, { encoding: 'utf8' });
+    } else {
+      // Remove from startup
+      execSync(`reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" /v "${appName}" /f`, { encoding: 'utf8' });
+    }
+    return true;
+  } catch (error) {
+    console.error('Error setting startup preference:', error);
+    return false;
+  }
+}
+
+// Initialize settings from installer registry on first run
+function initializeSettingsFromInstaller() {
+  try {
+    // Check if settings file already exists
+    if (fs.existsSync(settingsFilePath)) {
+      const data = fs.readFileSync(settingsFilePath, 'utf8');
+      const settings = JSON.parse(data);
+      // If settings already have values, don't overwrite
+      if (settings.tenantId || settings.siteNumber) {
+        return;
+      }
+    }
+
+    // Try to read from Windows registry (MSI installer values)
+    const tenantId = readWindowsRegistry('HKLM\\Software\\PEI Data Systems\\PDS Site App', 'TenantId');
+    const siteId = readWindowsRegistry('HKLM\\Software\\PEI Data Systems\\PDS Site App', 'SiteId');
+
+    if (tenantId || siteId) {
+      const settings: any = {};
+      if (tenantId) settings.tenantId = tenantId;
+      if (siteId) settings.siteNumber = parseInt(siteId, 10);
+
+      fs.writeFileSync(settingsFilePath, JSON.stringify(settings, null, 2), 'utf8');
+      console.log('Settings initialized from installer configuration');
+    }
+  } catch (error) {
+    console.error('Error initializing settings from installer:', error);
+  }
+}
+
+// Initialize settings on app startup
+app.on('ready', () => {
+  initializeSettingsFromInstaller();
+});
+
 ipcMain.handle('settings:getSiteNumber', async () => {
   try {
     if (fs.existsSync(settingsFilePath)) {
@@ -226,4 +312,42 @@ ipcMain.handle('settings:setSiteNumber', async (_event, siteNumber: number) => {
     console.error('Error writing site number:', error);
     return false;
   }
+});
+
+ipcMain.handle('settings:getTenantId', async () => {
+  try {
+    if (fs.existsSync(settingsFilePath)) {
+      const data = fs.readFileSync(settingsFilePath, 'utf8');
+      const settings = JSON.parse(data);
+      return settings.tenantId;
+    }
+  } catch (error) {
+    console.error('Error reading tenant ID:', error);
+  }
+  return null;
+});
+
+ipcMain.handle('settings:setTenantId', async (_event, tenantId: string) => {
+  try {
+    let settings: any = {};
+    if (fs.existsSync(settingsFilePath)) {
+      const data = fs.readFileSync(settingsFilePath, 'utf8');
+      settings = JSON.parse(data);
+    }
+    settings.tenantId = tenantId;
+    fs.writeFileSync(settingsFilePath, JSON.stringify(settings, null, 2), 'utf8');
+    return true;
+  } catch (error) {
+    console.error('Error writing tenant ID:', error);
+    return false;
+  }
+});
+
+// Startup preference handlers
+ipcMain.handle('settings:getStartupEnabled', async () => {
+  return getStartupEnabled();
+});
+
+ipcMain.handle('settings:setStartupEnabled', async (_event, enabled: boolean) => {
+  return setStartupEnabled(enabled);
 });

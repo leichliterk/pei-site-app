@@ -12,6 +12,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Settings persistence
   getSiteNumber: () => ipcRenderer.invoke('settings:getSiteNumber'),
   setSiteNumber: (siteNumber: number) => ipcRenderer.invoke('settings:setSiteNumber', siteNumber),
+  getTenantId: () => ipcRenderer.invoke('settings:getTenantId'),
+  setTenantId: (tenantId: string) => ipcRenderer.invoke('settings:setTenantId', tenantId),
+  getStartupEnabled: () => ipcRenderer.invoke('settings:getStartupEnabled'),
+  setStartupEnabled: (enabled: boolean) => ipcRenderer.invoke('settings:setStartupEnabled', enabled),
 
   // Example of exposing a method to send messages to main process
   sendMessage: (message: string) => ipcRenderer.invoke('app:message', message),
@@ -33,6 +37,10 @@ declare global {
       close: () => Promise<void>;
       getSiteNumber: () => Promise<number | null>;
       setSiteNumber: (siteNumber: number) => Promise<boolean>;
+      getTenantId: () => Promise<string | null>;
+      setTenantId: (tenantId: string) => Promise<boolean>;
+      getStartupEnabled: () => Promise<boolean>;
+      setStartupEnabled: (enabled: boolean) => Promise<boolean>;
       sendMessage: (message: string) => Promise<any>;
       onMessage: (callback: (message: string) => void) => void;
     };
