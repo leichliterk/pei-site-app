@@ -3,10 +3,12 @@ import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { Subject, takeUntil, combineLatest } from 'rxjs';
 import { ConnectionStatusService, ConnectionStatus, ConnectionState } from '../../services/connection-status.service';
+import { TagModule } from 'primeng/tag';
+import { TooltipModule } from 'primeng/tooltip';
 
 @Component({
   selector: 'app-connection-status',
-  imports: [CommonModule],
+  imports: [CommonModule, TagModule, TooltipModule],
   templateUrl: './connection-status.component.html',
   styleUrl: './connection-status.component.scss'
 })
@@ -56,31 +58,8 @@ export class ConnectionStatusComponent implements OnInit, OnDestroy {
 
   onStatusClick(): void {
     if (!this.isTimerRunning) {
-      // Navigate to settings when heartbeat is stopped
-      this.router.navigate(['/settings']).then(() => {
-        // Focus on the specific connection timer toggle after navigation
-        setTimeout(() => {
-          const toggleInput = document.getElementById('connection-timer-toggle') as HTMLInputElement;
-          if (toggleInput) {
-            const settingItem = toggleInput.closest('.setting-item') as HTMLElement;
-            if (settingItem) {
-              // Add highlight effect
-              settingItem.classList.add('highlight');
-
-              // Scroll into view
-              settingItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-              // Focus on the toggle
-              toggleInput.focus();
-
-              // Remove highlight after animation
-              setTimeout(() => {
-                settingItem.classList.remove('highlight');
-              }, 2000);
-            }
-          }
-        }, 200);
-      });
+      // Navigate to settings Heartbeat tab when heartbeat is stopped
+      this.router.navigate(['/settings'], { queryParams: { tab: '1' } });
     } else {
       // Normal retry connection behavior
       this.connectionStatusService.retryConnection();
@@ -118,5 +97,47 @@ export class ConnectionStatusComponent implements OnInit, OnDestroy {
       return 'status-stopped';
     }
     return `status-${this.connectionState.status}`;
+  }
+
+  getTagSeverity(): 'success' | 'info' | 'warn' | 'danger' | 'secondary' | 'contrast' | undefined {
+    if (!this.isTimerRunning) {
+      return 'danger';
+    }
+
+    if (this.hasBeenConnected && this.connectionState.status === ConnectionStatus.CONNECTING) {
+      return 'success';
+    }
+
+    switch (this.connectionState.status) {
+      case ConnectionStatus.CONNECTED:
+        return 'success';
+      case ConnectionStatus.CONNECTING:
+        return 'info';
+      case ConnectionStatus.DISCONNECTED:
+        return 'warn';
+      case ConnectionStatus.ERROR:
+        return 'danger';
+      default:
+        return 'secondary';
+    }
+  }
+
+  getTagIcon(): string {
+    if (!this.isTimerRunning) {
+      return 'pi pi-stop-circle';
+    }
+
+    switch (this.connectionState.status) {
+      case ConnectionStatus.CONNECTED:
+        return 'pi pi-check-circle';
+      case ConnectionStatus.CONNECTING:
+        return 'pi pi-spin pi-spinner';
+      case ConnectionStatus.DISCONNECTED:
+        return 'pi pi-minus-circle';
+      case ConnectionStatus.ERROR:
+        return 'pi pi-exclamation-circle';
+      default:
+        return 'pi pi-question-circle';
+    }
   }
 }

@@ -1,13 +1,16 @@
 import { Component, OnInit } from '@angular/core';
 import { Router, RouterOutlet } from '@angular/router';
 import { ElectronService } from './services/electron.service';
-import { ConnectionStatusComponent } from './components/connection-status/connection-status.component';
 import { FtpSyncService } from './services/ftp-sync.service';
 import { environment } from '../environments/environment';
+import { ButtonModule } from 'primeng/button';
+import { ToolbarModule } from 'primeng/toolbar';
+import { TooltipModule } from 'primeng/tooltip';
+import { MessageModule } from 'primeng/message';
 
 @Component({
   selector: 'app-root',
-  imports: [ConnectionStatusComponent, RouterOutlet],
+  imports: [RouterOutlet, ButtonModule, ToolbarModule, TooltipModule, MessageModule],
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss']
 })

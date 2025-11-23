@@ -1,15 +1,35 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { ConnectionStatusService } from '../../services/connection-status.service';
 import { ElectronService, FtpSettings } from '../../services/electron.service';
 import { FtpSyncService } from '../../services/ftp-sync.service';
 import { Subscription } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
+// PrimeNG imports
+import { InputTextModule } from 'primeng/inputtext';
+import { InputNumberModule } from 'primeng/inputnumber';
+import { ButtonModule } from 'primeng/button';
+import { ToggleSwitchModule } from 'primeng/toggleswitch';
+import { DialogModule } from 'primeng/dialog';
+import { MessageModule } from 'primeng/message';
+import { TabsModule } from 'primeng/tabs';
+
 @Component({
   selector: 'app-settings',
-  imports: [CommonModule, FormsModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    InputTextModule,
+    InputNumberModule,
+    ButtonModule,
+    ToggleSwitchModule,
+    DialogModule,
+    MessageModule,
+    TabsModule
+  ],
   templateUrl: './settings.component.html',
   styleUrl: './settings.component.scss'
 })
@@ -21,6 +41,9 @@ export class SettingsComponent implements OnInit, OnDestroy {
   confirmationPhrase = '';
   errorMessage = '';
   private subscription?: Subscription;
+
+  // Tab selection
+  activeTab = '0';
 
   // FTP Settings
   ftpHost = '';
@@ -43,10 +66,18 @@ export class SettingsComponent implements OnInit, OnDestroy {
   constructor(
     private connectionService: ConnectionStatusService,
     private electronService: ElectronService,
-    private ftpSyncService: FtpSyncService
+    private ftpSyncService: FtpSyncService,
+    private route: ActivatedRoute
   ) {}
 
   async ngOnInit(): Promise<void> {
+    // Check for tab query parameter
+    this.route.queryParams.subscribe(params => {
+      if (params['tab']) {
+        this.activeTab = params['tab'];
+      }
+    });
+
     this.subscription = this.connectionService.isTimerRunning$.subscribe(
       isRunning => this.isTimerRunning = isRunning
     );
