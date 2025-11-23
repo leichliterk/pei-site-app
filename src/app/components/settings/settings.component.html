@@ -1,7 +1,7 @@
 <div class="h-full p-4">
   <h2 class="text-2xl font-semibold text-gray-800 mb-4">Settings</h2>
 
-  <p-tabs [(value)]="activeTab" orientation="vertical" styleClass="h-full">
+  <p-tabs [(value)]="activeTab" orientation="vertical">
     <p-tablist>
       <p-tab value="0">
         <i class="pi pi-building mr-2"></i>
@@ -20,10 +20,9 @@
     <p-tabpanels>
       <!-- Site Configuration Tab -->
       <p-tabpanel value="0">
-        <div class="p-4 space-y-4">
-          <h3 class="text-lg font-medium text-gray-800 mb-4">Site Configuration</h3>
+        <div class="flex flex-col p-4 space-y-4">
 
-          <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center justify-between">
             <span class="text-gray-700">Current Site Number: <strong class="text-lg">{{ siteNumber }}</strong></span>
             <p-button
               label="Edit Site Number"
@@ -35,6 +34,7 @@
 
           <p-message
             severity="warn"
+            icon="pi pi-exclamation-triangle"
             text="Changing the site number will fundamentally impact data collection. All future data will be associated with the new site number."
             styleClass="w-full" />
         </div>
@@ -54,6 +54,32 @@
               [(ngModel)]="isTimerRunning"
               (onChange)="toggleConnectionTimer()"
               inputId="connection-timer-toggle" />
+          </div>
+
+          <!-- Last Connection Attempt Results -->
+          <div class="border rounded-lg p-4 bg-gray-50">
+            <h4 class="text-sm font-medium text-gray-700 mb-3">Last Connection Attempt</h4>
+            <div class="flex flex-col gap-2">
+              <div class="flex items-center justify-between">
+                <span class="text-gray-600">Status:</span>
+                <p-tag
+                  [severity]="getConnectionTagSeverity()"
+                  [icon]="getConnectionTagIcon()"
+                  [value]="getConnectionStatusText()" />
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-gray-600">Last Checked:</span>
+                <span class="text-gray-800">{{ connectionState.lastChecked | date:'medium' }}</span>
+              </div>
+              @if (connectionState.errorMessage) {
+                <div class="mt-2">
+                  <p-message
+                    severity="error"
+                    [text]="connectionState.errorMessage"
+                    styleClass="w-full" />
+                </div>
+              }
+            </div>
           </div>
         </div>
       </p-tabpanel>
@@ -159,6 +185,8 @@
         [(ngModel)]="newSiteNumberInput"
         inputId="new-site-number"
         placeholder="Enter new site number"
+        [useGrouping]="false"
+        [maxFractionDigits]="0"
         styleClass="w-full" />
     </div>
 

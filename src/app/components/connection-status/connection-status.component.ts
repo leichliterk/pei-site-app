@@ -22,6 +22,7 @@ export class ConnectionStatusComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
   private hasBeenConnected = false;
   isTimerRunning = true;
+  lastSuccessfulConnection: Date | null = null;
 
   constructor(
     private connectionStatusService: ConnectionStatusService,
@@ -42,6 +43,7 @@ export class ConnectionStatusComponent implements OnInit, OnDestroy {
         // Track when connection first becomes successful
         if (state.status === ConnectionStatus.CONNECTED) {
           this.hasBeenConnected = true;
+          this.lastSuccessfulConnection = new Date();
         }
 
         // Reset flag if connection fails
@@ -57,13 +59,8 @@ export class ConnectionStatusComponent implements OnInit, OnDestroy {
   }
 
   onStatusClick(): void {
-    if (!this.isTimerRunning) {
-      // Navigate to settings Heartbeat tab when heartbeat is stopped
-      this.router.navigate(['/settings'], { queryParams: { tab: '1' } });
-    } else {
-      // Normal retry connection behavior
-      this.connectionStatusService.retryConnection();
-    }
+    // Always navigate to settings Heartbeat tab
+    this.router.navigate(['/settings'], { queryParams: { tab: '1' } });
   }
 
   getStatusText(): string {
@@ -139,5 +136,12 @@ export class ConnectionStatusComponent implements OnInit, OnDestroy {
       default:
         return 'pi pi-question-circle';
     }
+  }
+
+  getLastConnectionTime(): string {
+    if (!this.lastSuccessfulConnection) {
+      return 'Never';
+    }
+    return this.lastSuccessfulConnection.toLocaleTimeString();
   }
 }

@@ -2,11 +2,12 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import { ConnectionStatusService } from '../../services/connection-status.service';
+import { ConnectionStatusService, ConnectionStatus, ConnectionState } from '../../services/connection-status.service';
 import { ElectronService, FtpSettings } from '../../services/electron.service';
 import { FtpSyncService } from '../../services/ftp-sync.service';
 import { Subscription } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { TagModule } from 'primeng/tag';
 
 // PrimeNG imports
 import { InputTextModule } from 'primeng/inputtext';
@@ -28,7 +29,8 @@ import { TabsModule } from 'primeng/tabs';
     ToggleSwitchModule,
     DialogModule,
     MessageModule,
-    TabsModule
+    TabsModule,
+    TagModule
   ],
   templateUrl: './settings.component.html',
   styleUrl: './settings.component.scss'
@@ -41,6 +43,14 @@ export class SettingsComponent implements OnInit, OnDestroy {
   confirmationPhrase = '';
   errorMessage = '';
   private subscription?: Subscription;
+  private connectionSubscription?: Subscription;
+
+  // Connection status
+  connectionState: ConnectionState = {
+    status: ConnectionStatus.DISCONNECTED,
+    lastChecked: new Date()
+  };
+  ConnectionStatus = ConnectionStatus;
 
   // Tab selection
   activeTab = '0';
@@ -82,6 +92,10 @@ export class SettingsComponent implements OnInit, OnDestroy {
       isRunning => this.isTimerRunning = isRunning
     );
 
+    this.connectionSubscription = this.connectionService.status$.subscribe(
+      state => this.connectionState = state
+    );
+
     // Load saved site number from Electron store
     const savedSiteNumber = await this.electronService.getSiteNumber();
     if (savedSiteNumber !== null) {
@@ -107,10 +121,58 @@ export class SettingsComponent implements OnInit, OnDestroy {
     if (this.subscription) {
       this.subscription.unsubscribe();
     }
+    if (this.connectionSubscription) {
+      this.connectionSubscription.unsubscribe();
+    }
   }
 
   toggleConnectionTimer(): void {
     this.connectionService.toggleTimer();
+  }
+
+  getConnectionStatusText(): string {
+    switch (this.connectionState.status) {
+      case ConnectionStatus.CONNECTED:
+        return 'Connected';
+      case ConnectionStatus.CONNECTING:
+        return 'Connecting...';
+      case ConnectionStatus.DISCONNECTED:
+        return 'Disconnected';
+      case ConnectionStatus.ERROR:
+        return 'Error';
+      default:
+        return 'Unknown';
+    }
+  }
+
+  getConnectionTagSeverity(): 'success' | 'info' | 'warn' | 'danger' | 'secondary' {
+    switch (this.connectionState.status) {
+      case ConnectionStatus.CONNECTED:
+        return 'success';
+      case ConnectionStatus.CONNECTING:
+        return 'info';
+      case ConnectionStatus.DISCONNECTED:
+        return 'warn';
+      case ConnectionStatus.ERROR:
+        return 'danger';
+      default:
+        return 'secondary';
+    }
+  }
+
+  getConnectionTagIcon(): string {
+    switch (this.connectionState.status) {
+      case ConnectionStatus.CONNECTED:
+        return 'pi pi-check-circle';
+      case ConnectionStatus.CONNECTING:
+        return 'pi pi-spin pi-spinner';
+      case ConnectionStatus.DISCONNECTED:
+        return 'pi pi-minus-circle';
+      case ConnectionStatus.ERROR:
+        return 'pi pi-exclamation-circle';
+      default:
+        return 'pi pi-question-circle';
+    }
   }
 
   editSiteNumber(): void {

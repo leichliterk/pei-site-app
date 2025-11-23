@@ -1,8 +1,11 @@
-<p-tag
-  [severity]="getTagSeverity()"
-  [icon]="getTagIcon()"
-  [value]="getStatusText()"
-  (click)="onStatusClick()"
-  [pTooltip]="!isTimerRunning ? 'Click to go to settings' : 'Click to refresh connection status'"
-  tooltipPosition="bottom"
-  class="cursor-pointer select-none" />
+<div class="flex flex-row justify-between items-center gap-4">
+  <p-tag
+    [severity]="getTagSeverity()"
+    [icon]="getTagIcon()"
+    [value]="getStatusText()"
+    (click)="onStatusClick()"
+    pTooltip="Click to go to settings"
+    tooltipPosition="bottom"
+    class="cursor-pointer select-none" />
+  <span class="text-sm text-gray-500">{{ getLastConnectionTime() }}</span>
+</div>
