@@ -3,6 +3,6 @@
   [icon]="getTagIcon()"
   [value]="getStatusText()"
   (click)="onStatusClick()"
-  [pTooltip]="!isTimerRunning ? 'Click to go to settings' : 'Click to refresh connection status'"
+  [pTooltip]="getTooltip()"
   tooltipPosition="bottom"
   class="cursor-pointer select-none" />

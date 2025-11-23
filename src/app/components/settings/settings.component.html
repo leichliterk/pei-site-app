@@ -1,163 +1,194 @@
-<div class="settings-container">
-  <h2>Settings</h2>
+<div class="h-full p-4">
+  <h2 class="text-2xl font-semibold text-gray-800 mb-4">Settings</h2>
 
-  <div class="setting-group">
-    <h3>Site Configuration</h3>
-    <div class="setting-item">
-      <div class="site-number-container">
-        <span class="setting-label">Current Site Number: {{ siteNumber }}</span>
-        <button class="edit-button" (click)="editSiteNumber()">Edit Site Number</button>
-      </div>
-      <p class="setting-warning">
-        <strong>Warning:</strong> Changing the site number will fundamentally impact data collection. All future data will be associated with the new site number.
-      </p>
-    </div>
-  </div>
+  <p-tabs [(value)]="activeTab" orientation="vertical" styleClass="h-full">
+    <p-tablist>
+      <p-tab value="0">
+        <i class="pi pi-building mr-2"></i>
+        Site Configuration
+      </p-tab>
+      <p-tab value="1">
+        <i class="pi pi-heart mr-2"></i>
+        Heartbeat
+      </p-tab>
+      <p-tab value="2">
+        <i class="pi pi-server mr-2"></i>
+        FTP
+      </p-tab>
+    </p-tablist>
 
-  <div class="setting-group">
-    <h3>Connection Monitoring</h3>
-    <div class="setting-item">
-      <label class="toggle-container">
-        <span class="setting-label">Auto-check connection status</span>
-        <div class="toggle-wrapper">
-          <input
-            type="checkbox"
-            id="connection-timer-toggle"
-            class="toggle-input"
-            [checked]="isTimerRunning"
-            (change)="toggleConnectionTimer()">
-          <span class="toggle-slider"></span>
+    <p-tabpanels>
+      <!-- Site Configuration Tab -->
+      <p-tabpanel value="0">
+        <div class="p-4 space-y-4">
+          <h3 class="text-lg font-medium text-gray-800 mb-4">Site Configuration</h3>
+
+          <div class="flex items-center justify-between mb-4">
+            <span class="text-gray-700">Current Site Number: <strong class="text-lg">{{ siteNumber }}</strong></span>
+            <p-button
+              label="Edit Site Number"
+              icon="pi pi-pencil"
+              severity="secondary"
+              [outlined]="true"
+              (click)="editSiteNumber()" />
+          </div>
+
+          <p-message
+            severity="warn"
+            text="Changing the site number will fundamentally impact data collection. All future data will be associated with the new site number."
+            styleClass="w-full" />
         </div>
-      </label>
-      <p class="setting-description">
-        Automatically check connection status every 15 seconds
-      </p>
-    </div>
-  </div>
+      </p-tabpanel>
 
-  <div class="setting-group">
-    <h3>FTP Sync Configuration</h3>
+      <!-- Heartbeat Tab -->
+      <p-tabpanel value="1">
+        <div class="p-4 space-y-4">
+          <h3 class="text-lg font-medium text-gray-800 mb-4">Connection Monitoring</h3>
 
-    <div class="setting-item">
-      <label class="toggle-container">
-        <span class="setting-label">Enable FTP Auto-Sync</span>
-        <div class="toggle-wrapper">
-          <input
-            type="checkbox"
-            id="ftp-enabled-toggle"
-            class="toggle-input"
-            [checked]="ftpEnabled"
-            (change)="toggleFtpEnabled()">
-          <span class="toggle-slider"></span>
+          <div class="flex items-center justify-between">
+            <div>
+              <span class="text-gray-700 font-medium">Auto-check connection status</span>
+              <p class="text-sm text-gray-500 mt-1">Automatically check connection status every 15 seconds</p>
+            </div>
+            <p-toggleswitch
+              [(ngModel)]="isTimerRunning"
+              (onChange)="toggleConnectionTimer()"
+              inputId="connection-timer-toggle" />
+          </div>
         </div>
-      </label>
-      <p class="setting-description">
-        Automatically sync files from FTP server on schedule
-      </p>
-    </div>
+      </p-tabpanel>
 
-    <div class="setting-item">
-      <div class="form-group">
-        <label for="ftp-host">FTP Server Address</label>
-        <input
-          type="text"
-          id="ftp-host"
-          [(ngModel)]="ftpHost"
-          class="form-input"
-          placeholder="e.g., 192.168.1.100">
-      </div>
-    </div>
+      <!-- FTP Tab -->
+      <p-tabpanel value="2">
+        <div class="p-4 space-y-4">
+          <h3 class="text-lg font-medium text-gray-800 mb-4">FTP Sync Configuration</h3>
 
-    <div class="setting-item">
-      <div class="form-group">
-        <label for="ftp-path">FTP Folder Path</label>
-        <input
-          type="text"
-          id="ftp-path"
-          [(ngModel)]="ftpPath"
-          class="form-input"
-          placeholder="e.g., /data/exports">
-      </div>
-    </div>
+          <!-- Enable Toggle -->
+          <div class="flex items-center justify-between pb-4 border-b">
+            <div>
+              <span class="text-gray-700 font-medium">Enable FTP Auto-Sync</span>
+              <p class="text-sm text-gray-500 mt-1">Automatically sync files from FTP server on schedule</p>
+            </div>
+            <p-toggleswitch
+              [(ngModel)]="ftpEnabled"
+              (onChange)="saveFtpSettings()"
+              inputId="ftp-enabled-toggle" />
+          </div>
 
-    <div class="setting-item">
-      <div class="form-group">
-        <label for="ftp-schedule">Sync Interval (minutes)</label>
-        <input
-          type="number"
-          id="ftp-schedule"
-          [(ngModel)]="ftpScheduleMinutes"
-          class="form-input"
-          min="1"
-          max="1440"
-          placeholder="15">
-      </div>
-    </div>
+          <!-- FTP Host -->
+          <div class="flex flex-col gap-2">
+            <label for="ftp-host" class="text-sm font-medium text-gray-700">FTP Server Address</label>
+            <input
+              pInputText
+              id="ftp-host"
+              [(ngModel)]="ftpHost"
+              placeholder="e.g., 192.168.1.100"
+              class="w-full" />
+          </div>
 
-    <div class="setting-item ftp-buttons">
-      <button
-        class="edit-button test-btn"
-        (click)="testFtpConnection()"
-        [disabled]="isFtpTesting || !ftpHost">
-        {{ isFtpTesting ? 'Testing...' : 'Test Connection' }}
-      </button>
-      <button
-        class="edit-button save-btn"
-        (click)="saveFtpSettings()"
-        [disabled]="isFtpSaving">
-        {{ isFtpSaving ? 'Saving...' : 'Save Settings' }}
-      </button>
-    </div>
+          <!-- FTP Path -->
+          <div class="flex flex-col gap-2">
+            <label for="ftp-path" class="text-sm font-medium text-gray-700">FTP Folder Path</label>
+            <input
+              pInputText
+              id="ftp-path"
+              [(ngModel)]="ftpPath"
+              placeholder="e.g., /data/exports"
+              class="w-full" />
+          </div>
 
-    <div class="setting-item" *ngIf="ftpTestMessage">
-      <div class="ftp-message" [class.success]="ftpTestSuccess === true" [class.error]="ftpTestSuccess === false">
-        {{ ftpTestMessage }}
-      </div>
-    </div>
-  </div>
+          <!-- Sync Interval -->
+          <div class="flex flex-col gap-2">
+            <label for="ftp-schedule" class="text-sm font-medium text-gray-700">Sync Interval (minutes)</label>
+            <p-inputNumber
+              [(ngModel)]="ftpScheduleMinutes"
+              inputId="ftp-schedule"
+              [min]="1"
+              [max]="1440"
+              [showButtons]="true"
+              styleClass="w-full" />
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="flex gap-3 pt-4">
+            <p-button
+              label="Test Connection"
+              icon="pi pi-wifi"
+              severity="secondary"
+              [outlined]="true"
+              [loading]="isFtpTesting"
+              [disabled]="!ftpHost"
+              (click)="testFtpConnection()" />
+            <p-button
+              label="Save Settings"
+              icon="pi pi-save"
+              [loading]="isFtpSaving"
+              (click)="saveFtpSettings()" />
+          </div>
+
+          <!-- Status Message -->
+          @if (ftpTestMessage) {
+            <p-message
+              [severity]="ftpTestSuccess === true ? 'success' : 'error'"
+              [text]="ftpTestMessage"
+              styleClass="w-full" />
+          }
+        </div>
+      </p-tabpanel>
+    </p-tabpanels>
+  </p-tabs>
 </div>
 
-<!-- Dialog overlay -->
-<div class="dialog-overlay" *ngIf="showDialog" (click)="closeDialog()">
-  <div class="dialog-container" (click)="$event.stopPropagation()">
-    <div class="dialog-header">
-      <h3>Edit Site Number</h3>
-      <button class="close-button" (click)="closeDialog()">&times;</button>
+<!-- Edit Site Number Dialog -->
+<p-dialog
+  header="Edit Site Number"
+  [(visible)]="showDialog"
+  [modal]="true"
+  [closable]="true"
+  [style]="{ width: '450px' }">
+
+  <p-message
+    severity="warn"
+    text="Changing the site number will fundamentally impact data collection."
+    styleClass="w-full mb-4" />
+
+  <div class="space-y-4">
+    <div class="flex flex-col gap-2">
+      <label for="new-site-number" class="text-sm font-medium text-gray-700">New Site Number</label>
+      <p-inputNumber
+        [(ngModel)]="newSiteNumberInput"
+        inputId="new-site-number"
+        placeholder="Enter new site number"
+        styleClass="w-full" />
     </div>
 
-    <div class="dialog-body">
-      <div class="dialog-warning">
-        <strong>Warning:</strong> Changing the site number will fundamentally impact data collection.
-      </div>
-
-      <div class="form-group">
-        <label for="new-site-number">New Site Number:</label>
-        <input
-          type="number"
-          id="new-site-number"
-          [(ngModel)]="newSiteNumberInput"
-          class="form-input"
-          placeholder="Enter new site number">
-      </div>
-
-      <div class="form-group">
-        <label for="confirmation-phrase">Type "change site number" to confirm:</label>
-        <input
-          type="text"
-          id="confirmation-phrase"
-          [(ngModel)]="confirmationPhrase"
-          class="form-input"
-          placeholder="change site number">
-      </div>
-
-      <div class="error-message" *ngIf="errorMessage">
-        {{ errorMessage }}
-      </div>
+    <div class="flex flex-col gap-2">
+      <label for="confirmation-phrase" class="text-sm font-medium text-gray-700">
+        Type "change site number" to confirm
+      </label>
+      <input
+        pInputText
+        id="confirmation-phrase"
+        [(ngModel)]="confirmationPhrase"
+        placeholder="change site number"
+        class="w-full" />
     </div>
 
-    <div class="dialog-footer">
-      <button class="cancel-button" (click)="closeDialog()">Cancel</button>
-      <button class="confirm-button" [disabled]="!isFormValid" (click)="confirmSiteNumberChange()">Confirm</button>
-    </div>
+    @if (errorMessage) {
+      <p-message severity="error" [text]="errorMessage" styleClass="w-full" />
+    }
   </div>
-</div>
+
+  <ng-template pTemplate="footer">
+    <p-button
+      label="Cancel"
+      severity="secondary"
+      [text]="true"
+      (click)="closeDialog()" />
+    <p-button
+      label="Confirm"
+      icon="pi pi-check"
+      [disabled]="!isFormValid"
+      (click)="confirmSiteNumberChange()" />
+  </ng-template>
+</p-dialog>
