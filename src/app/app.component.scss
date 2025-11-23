@@ -10,7 +10,8 @@ $error-red: #F44336;
 $warning-amber: #FFC107;
 
 .app-container {
-  min-height: 100vh;
+  height: 100%;
+  overflow: hidden;
   background: linear-gradient(135deg, $primary-blue 0%, $secondary-blue 50%, $dark-gray 100%);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   position: relative;

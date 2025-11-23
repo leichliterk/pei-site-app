@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { Router, RouterOutlet } from '@angular/router';
 import { ElectronService } from './services/electron.service';
 import { ConnectionStatusComponent } from './components/connection-status/connection-status.component';
+import { FtpSyncService } from './services/ftp-sync.service';
 import { environment } from '../environments/environment';
 
 @Component({
@@ -16,7 +17,11 @@ export class AppComponent implements OnInit {
   error: string | null = null;
   environment = environment;
 
-  constructor(public electronService: ElectronService, private router: Router) {}
+  constructor(
+    public electronService: ElectronService,
+    private router: Router,
+    private ftpSyncService: FtpSyncService  // Inject to initialize the service
+  ) {}
 
   async ngOnInit(): Promise<void> {
     // Load saved site number from Electron store

@@ -406,6 +406,42 @@ $white: #FFFFFF;
   }
 }
 
+// FTP specific styles
+.ftp-buttons {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+
+  .test-btn,
+  .save-btn {
+    flex: 1;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+}
+
+.ftp-message {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  margin-top: 0.5rem;
+
+  &.success {
+    background: rgba(#4CAF50, 0.15);
+    border-left: 4px solid #4CAF50;
+    color: #4CAF50;
+  }
+
+  &.error {
+    background: rgba(#F44336, 0.15);
+    border-left: 4px solid #F44336;
+    color: #F44336;
+  }
+}
+
 // Responsive design
 @media (max-width: 768px) {
   .settings-container {

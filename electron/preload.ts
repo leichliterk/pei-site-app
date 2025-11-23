@@ -1,5 +1,33 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
+// FTP Settings interface
+interface FtpSettings {
+  host: string;
+  path: string;
+  scheduleMinutes: number;
+  enabled: boolean;
+}
+
+interface FtpSyncResult {
+  success: boolean;
+  downloaded: string[];
+  errors: string[];
+  totalChecked?: number;
+  message: string;
+}
+
+interface FtpTestResult {
+  success: boolean;
+  message: string;
+  fileCount?: number;
+}
+
+interface LocalFile {
+  name: string;
+  size: number;
+  modified: string;
+}
+
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -16,6 +44,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setTenantId: (tenantId: string) => ipcRenderer.invoke('settings:setTenantId', tenantId),
   getStartupEnabled: () => ipcRenderer.invoke('settings:getStartupEnabled'),
   setStartupEnabled: (enabled: boolean) => ipcRenderer.invoke('settings:setStartupEnabled', enabled),
+
+  // FTP Settings
+  getFtpSettings: () => ipcRenderer.invoke('settings:getFtpSettings'),
+  setFtpSettings: (settings: FtpSettings) => ipcRenderer.invoke('settings:setFtpSettings', settings),
+
+  // FTP Operations
+  ftpTestConnection: (host: string, path: string) => ipcRenderer.invoke('ftp:testConnection', host, path),
+  ftpSyncFiles: (host: string, path: string) => ipcRenderer.invoke('ftp:syncFiles', host, path),
+  ftpGetDownloadedFiles: () => ipcRenderer.invoke('ftp:getDownloadedFiles'),
+  ftpGetLocalFiles: () => ipcRenderer.invoke('ftp:getLocalFiles'),
+  ftpClearDownloadHistory: () => ipcRenderer.invoke('ftp:clearDownloadHistory'),
 
   // Example of exposing a method to send messages to main process
   sendMessage: (message: string) => ipcRenderer.invoke('app:message', message),
@@ -41,6 +80,15 @@ declare global {
       setTenantId: (tenantId: string) => Promise<boolean>;
       getStartupEnabled: () => Promise<boolean>;
       setStartupEnabled: (enabled: boolean) => Promise<boolean>;
+      // FTP Settings
+      getFtpSettings: () => Promise<FtpSettings | null>;
+      setFtpSettings: (settings: FtpSettings) => Promise<boolean>;
+      // FTP Operations
+      ftpTestConnection: (host: string, path: string) => Promise<FtpTestResult>;
+      ftpSyncFiles: (host: string, path: string) => Promise<FtpSyncResult>;
+      ftpGetDownloadedFiles: () => Promise<string[]>;
+      ftpGetLocalFiles: () => Promise<LocalFile[]>;
+      ftpClearDownloadHistory: () => Promise<boolean>;
       sendMessage: (message: string) => Promise<any>;
       onMessage: (callback: (message: string) => void) => void;
     };

@@ -2,6 +2,7 @@ import { app, BrowserWindow, Menu, shell, ipcMain, dialog } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import { isDev } from './utils';
+import * as ftp from 'basic-ftp';
 
 // Windows registry module for startup management
 const { execSync } = require('child_process');
@@ -51,79 +52,8 @@ function createWindow(): void {
     return { action: 'deny' };
   });
 
-  // Set application menu
-  createMenu();
-}
-
-function createMenu(): void {
-  const template = [
-    {
-      label: 'File',
-      submenu: [
-        {
-          label: 'New',
-          accelerator: 'CmdOrCtrl+N',
-          click: () => {
-            // Handle new file
-          }
-        },
-        {
-          label: 'Open',
-          accelerator: 'CmdOrCtrl+O',
-          click: () => {
-            // Handle open file
-          }
-        },
-        { type: 'separator' },
-        {
-          label: 'Exit',
-          accelerator: process.platform === 'darwin' ? 'Cmd+Q' : 'Ctrl+Q',
-          click: () => {
-            app.quit();
-          }
-        }
-      ]
-    },
-    {
-      label: 'Edit',
-      submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
-        { type: 'separator' },
-        { role: 'cut' },
-        { role: 'copy' },
-        { role: 'paste' }
-      ]
-    },
-    {
-      label: 'View',
-      submenu: [
-        { role: 'reload' },
-        { role: 'forceReload' },
-        { role: 'toggleDevTools' },
-        { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
-        { type: 'separator' },
-        { role: 'togglefullscreen' }
-      ]
-    },
-    {
-      label: 'Help',
-      submenu: [
-        {
-          label: 'About',
-          click: () => {
-            // Show about dialog
-          }
-        }
-      ]
-    }
-  ];
-
-  const menu = Menu.buildFromTemplate(template as any);
-  Menu.setApplicationMenu(menu);
+  // Remove the default application menu (File, Edit, etc.)
+  Menu.setApplicationMenu(null);
 }
 
 // App event listeners
@@ -350,4 +280,200 @@ ipcMain.handle('settings:getStartupEnabled', async () => {
 
 ipcMain.handle('settings:setStartupEnabled', async (_event, enabled: boolean) => {
   return setStartupEnabled(enabled);
+});
+
+// FTP Settings handlers
+ipcMain.handle('settings:getFtpSettings', async () => {
+  try {
+    if (fs.existsSync(settingsFilePath)) {
+      const data = fs.readFileSync(settingsFilePath, 'utf8');
+      const settings = JSON.parse(data);
+      return settings.ftp || null;
+    }
+  } catch (error) {
+    console.error('Error reading FTP settings:', error);
+  }
+  return null;
+});
+
+ipcMain.handle('settings:setFtpSettings', async (_event, ftpSettings: {
+  host: string;
+  path: string;
+  scheduleMinutes: number;
+  enabled: boolean;
+}) => {
+  try {
+    let settings: any = {};
+    if (fs.existsSync(settingsFilePath)) {
+      const data = fs.readFileSync(settingsFilePath, 'utf8');
+      settings = JSON.parse(data);
+    }
+    settings.ftp = ftpSettings;
+    fs.writeFileSync(settingsFilePath, JSON.stringify(settings, null, 2), 'utf8');
+    return true;
+  } catch (error) {
+    console.error('Error writing FTP settings:', error);
+    return false;
+  }
+});
+
+// Track downloaded files to avoid re-downloading
+const downloadedFilesPath = path.join(userDataPath, 'downloaded-files.json');
+
+function getDownloadedFiles(): string[] {
+  try {
+    if (fs.existsSync(downloadedFilesPath)) {
+      const data = fs.readFileSync(downloadedFilesPath, 'utf8');
+      return JSON.parse(data);
+    }
+  } catch (error) {
+    console.error('Error reading downloaded files list:', error);
+  }
+  return [];
+}
+
+function saveDownloadedFiles(files: string[]): void {
+  try {
+    fs.writeFileSync(downloadedFilesPath, JSON.stringify(files, null, 2), 'utf8');
+  } catch (error) {
+    console.error('Error saving downloaded files list:', error);
+  }
+}
+
+// Local download folder
+const ftpDownloadPath = path.join(userDataPath, 'ftp-downloads');
+
+// Ensure download directory exists
+function ensureDownloadDir(): void {
+  if (!fs.existsSync(ftpDownloadPath)) {
+    fs.mkdirSync(ftpDownloadPath, { recursive: true });
+  }
+}
+
+// FTP Operations
+ipcMain.handle('ftp:testConnection', async (_event, host: string, remotePath: string) => {
+  const client = new ftp.Client();
+  client.ftp.verbose = false;
+
+  try {
+    await client.access({
+      host: host,
+      user: 'anonymous',
+      password: 'anonymous@',
+      secure: false
+    });
+
+    // Try to access the specified path
+    await client.cd(remotePath);
+    const list = await client.list();
+
+    client.close();
+    return {
+      success: true,
+      message: `Connected successfully. Found ${list.length} items in ${remotePath}`,
+      fileCount: list.length
+    };
+  } catch (error: any) {
+    client.close();
+    return {
+      success: false,
+      message: error.message || 'Failed to connect to FTP server'
+    };
+  }
+});
+
+ipcMain.handle('ftp:syncFiles', async (_event, host: string, remotePath: string) => {
+  const client = new ftp.Client();
+  client.ftp.verbose = false;
+  ensureDownloadDir();
+
+  const downloadedFiles = getDownloadedFiles();
+  const newlyDownloaded: string[] = [];
+  const errors: string[] = [];
+
+  try {
+    await client.access({
+      host: host,
+      user: 'anonymous',
+      password: 'anonymous@',
+      secure: false
+    });
+
+    await client.cd(remotePath);
+    const list = await client.list();
+
+    // Filter for .txt files that haven't been downloaded yet
+    const txtFiles = list.filter(item =>
+      item.type === ftp.FileType.File &&
+      item.name.toLowerCase().endsWith('.txt') &&
+      !downloadedFiles.includes(item.name)
+    );
+
+    // Download each new file
+    for (const file of txtFiles) {
+      try {
+        const localFilePath = path.join(ftpDownloadPath, file.name);
+        await client.downloadTo(localFilePath, file.name);
+        newlyDownloaded.push(file.name);
+        downloadedFiles.push(file.name);
+      } catch (fileError: any) {
+        errors.push(`Failed to download ${file.name}: ${fileError.message}`);
+      }
+    }
+
+    // Save updated downloaded files list
+    saveDownloadedFiles(downloadedFiles);
+
+    client.close();
+    return {
+      success: true,
+      downloaded: newlyDownloaded,
+      errors: errors,
+      totalChecked: list.filter(i => i.name.toLowerCase().endsWith('.txt')).length,
+      message: newlyDownloaded.length > 0
+        ? `Downloaded ${newlyDownloaded.length} new file(s)`
+        : 'No new files to download'
+    };
+  } catch (error: any) {
+    client.close();
+    return {
+      success: false,
+      downloaded: newlyDownloaded,
+      errors: [...errors, error.message],
+      message: error.message || 'Failed to sync files from FTP server'
+    };
+  }
+});
+
+ipcMain.handle('ftp:getDownloadedFiles', async () => {
+  return getDownloadedFiles();
+});
+
+ipcMain.handle('ftp:getLocalFiles', async () => {
+  ensureDownloadDir();
+  try {
+    const files = fs.readdirSync(ftpDownloadPath);
+    return files.map(name => {
+      const filePath = path.join(ftpDownloadPath, name);
+      const stats = fs.statSync(filePath);
+      return {
+        name,
+        size: stats.size,
+        modified: stats.mtime.toISOString()
+      };
+    });
+  } catch (error) {
+    console.error('Error reading local files:', error);
+    return [];
+  }
+});
+
+ipcMain.handle('ftp:clearDownloadHistory', async () => {
+  try {
+    saveDownloadedFiles([]);
+    return true;
+  } catch (error) {
+    console.error('Error clearing download history:', error);
+    return false;
+  }
 });

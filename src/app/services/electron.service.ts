@@ -1,5 +1,32 @@
 import { Injectable } from '@angular/core';
 
+export interface FtpSettings {
+  host: string;
+  path: string;
+  scheduleMinutes: number;
+  enabled: boolean;
+}
+
+export interface FtpSyncResult {
+  success: boolean;
+  downloaded: string[];
+  errors: string[];
+  totalChecked?: number;
+  message: string;
+}
+
+export interface FtpTestResult {
+  success: boolean;
+  message: string;
+  fileCount?: number;
+}
+
+export interface LocalFile {
+  name: string;
+  size: number;
+  modified: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -84,6 +111,57 @@ export class ElectronService {
   async setStartupEnabled(enabled: boolean): Promise<boolean> {
     if (this.isElectron) {
       return window.electronAPI.setStartupEnabled(enabled);
+    }
+    return false;
+  }
+
+  // FTP Settings
+  async getFtpSettings(): Promise<FtpSettings | null> {
+    if (this.isElectron) {
+      return window.electronAPI.getFtpSettings();
+    }
+    return null;
+  }
+
+  async setFtpSettings(settings: FtpSettings): Promise<boolean> {
+    if (this.isElectron) {
+      return window.electronAPI.setFtpSettings(settings);
+    }
+    return false;
+  }
+
+  // FTP Operations
+  async ftpTestConnection(host: string, path: string): Promise<FtpTestResult> {
+    if (this.isElectron) {
+      return window.electronAPI.ftpTestConnection(host, path);
+    }
+    return { success: false, message: 'Not running in Electron' };
+  }
+
+  async ftpSyncFiles(host: string, path: string): Promise<FtpSyncResult> {
+    if (this.isElectron) {
+      return window.electronAPI.ftpSyncFiles(host, path);
+    }
+    return { success: false, downloaded: [], errors: ['Not running in Electron'], message: 'Not running in Electron' };
+  }
+
+  async ftpGetDownloadedFiles(): Promise<string[]> {
+    if (this.isElectron) {
+      return window.electronAPI.ftpGetDownloadedFiles();
+    }
+    return [];
+  }
+
+  async ftpGetLocalFiles(): Promise<LocalFile[]> {
+    if (this.isElectron) {
+      return window.electronAPI.ftpGetLocalFiles();
+    }
+    return [];
+  }
+
+  async ftpClearDownloadHistory(): Promise<boolean> {
+    if (this.isElectron) {
+      return window.electronAPI.ftpClearDownloadHistory();
     }
     return false;
   }

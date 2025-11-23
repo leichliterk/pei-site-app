@@ -2,7 +2,8 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ConnectionStatusService } from '../../services/connection-status.service';
-import { ElectronService } from '../../services/electron.service';
+import { ElectronService, FtpSettings } from '../../services/electron.service';
+import { FtpSyncService } from '../../services/ftp-sync.service';
 import { Subscription } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
@@ -21,6 +22,16 @@ export class SettingsComponent implements OnInit, OnDestroy {
   errorMessage = '';
   private subscription?: Subscription;
 
+  // FTP Settings
+  ftpHost = '';
+  ftpPath = '/';
+  ftpScheduleMinutes = 15;
+  ftpEnabled = false;
+  ftpTestMessage = '';
+  ftpTestSuccess: boolean | null = null;
+  isFtpTesting = false;
+  isFtpSaving = false;
+
   get isFormValid(): boolean {
     const inputStr = String(this.newSiteNumberInput);
     const parsedNumber = parseInt(inputStr, 10);
@@ -31,7 +42,8 @@ export class SettingsComponent implements OnInit, OnDestroy {
 
   constructor(
     private connectionService: ConnectionStatusService,
-    private electronService: ElectronService
+    private electronService: ElectronService,
+    private ftpSyncService: FtpSyncService
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -44,6 +56,19 @@ export class SettingsComponent implements OnInit, OnDestroy {
     if (savedSiteNumber !== null) {
       this.siteNumber = savedSiteNumber;
       environment.siteNumber = savedSiteNumber;
+    }
+
+    // Load FTP settings
+    await this.loadFtpSettings();
+  }
+
+  private async loadFtpSettings(): Promise<void> {
+    const ftpSettings = await this.electronService.getFtpSettings();
+    if (ftpSettings) {
+      this.ftpHost = ftpSettings.host || '';
+      this.ftpPath = ftpSettings.path || '/';
+      this.ftpScheduleMinutes = ftpSettings.scheduleMinutes || 15;
+      this.ftpEnabled = ftpSettings.enabled || false;
     }
   }
 
@@ -109,5 +134,63 @@ export class SettingsComponent implements OnInit, OnDestroy {
     }
 
     this.closeDialog();
+  }
+
+  // FTP Methods
+  async testFtpConnection(): Promise<void> {
+    if (!this.ftpHost) {
+      this.ftpTestMessage = 'Please enter an FTP host address';
+      this.ftpTestSuccess = false;
+      return;
+    }
+
+    this.isFtpTesting = true;
+    this.ftpTestMessage = '';
+    this.ftpTestSuccess = null;
+
+    try {
+      const result = await this.electronService.ftpTestConnection(this.ftpHost, this.ftpPath);
+      this.ftpTestMessage = result.message;
+      this.ftpTestSuccess = result.success;
+    } catch (error: any) {
+      this.ftpTestMessage = error.message || 'Failed to test connection';
+      this.ftpTestSuccess = false;
+    } finally {
+      this.isFtpTesting = false;
+    }
+  }
+
+  async saveFtpSettings(): Promise<void> {
+    this.isFtpSaving = true;
+
+    try {
+      const settings: FtpSettings = {
+        host: this.ftpHost,
+        path: this.ftpPath,
+        scheduleMinutes: this.ftpScheduleMinutes,
+        enabled: this.ftpEnabled
+      };
+
+      const success = await this.electronService.setFtpSettings(settings);
+      if (success) {
+        // Refresh the FTP sync service with new settings
+        await this.ftpSyncService.refreshSettings();
+        this.ftpTestMessage = 'FTP settings saved successfully';
+        this.ftpTestSuccess = true;
+      } else {
+        this.ftpTestMessage = 'Failed to save FTP settings';
+        this.ftpTestSuccess = false;
+      }
+    } catch (error: any) {
+      this.ftpTestMessage = error.message || 'Failed to save settings';
+      this.ftpTestSuccess = false;
+    } finally {
+      this.isFtpSaving = false;
+    }
+  }
+
+  async toggleFtpEnabled(): Promise<void> {
+    this.ftpEnabled = !this.ftpEnabled;
+    await this.saveFtpSettings();
   }
 }
