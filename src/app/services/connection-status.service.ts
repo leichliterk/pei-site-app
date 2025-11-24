@@ -319,4 +319,42 @@ export class ConnectionStatusService {
   getFailureQueueSize(): number {
     return this.failureQueue.length;
   }
+
+  /**
+   * Get connection logs from the server
+   */
+  async getConnectionLogs(): Promise<ConnectionLog[]> {
+    // Ensure we have the latest site number from storage
+    const siteNumber = await this.electronService.getSiteNumber() ?? this.siteNumber;
+    const url = `${environment.apiUrl}/site/getConnectionLogs/${siteNumber}?limit=250`;
+    try {
+      const result = await firstValueFrom(
+        this.http.get<ConnectionLogsResponse>(url).pipe(
+          catchError((error: HttpErrorResponse) => {
+            console.error('Failed to fetch connection logs:', error);
+            return of({ logs: [], count: 0, site_id: siteNumber, limit: 0 });
+          })
+        )
+      );
+      return result.logs;
+    } catch (error) {
+      console.error('Failed to fetch connection logs:', error);
+      return [];
+    }
+  }
+}
+
+export interface ConnectionLogsResponse {
+  site_id: number;
+  limit: number;
+  count: number;
+  logs: ConnectionLog[];
+}
+
+export interface ConnectionLog {
+  _id: string;
+  site_id: number;
+  status: string;
+  timestamp: string;
+  details?: string;
 }

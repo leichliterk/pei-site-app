@@ -57,6 +57,7 @@
     "@angular/router": "^20.2.1",
     "@primeng/themes": "^20.3.0",
     "basic-ftp": "^5.0.5",
+    "chart.js": "^4.5.1",
     "primeicons": "^7.0.0",
     "primeng": "^20.3.0",
     "rxjs": "~7.8.0",

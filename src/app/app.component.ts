@@ -108,4 +108,8 @@ export class AppComponent implements OnInit {
   navigateToHome() {
     this.router.navigate(['/home']);
   }
+
+  navigateToStatistics() {
+    this.router.navigate(['/statistics']);
+  }
 }
