@@ -19,7 +19,9 @@
     "electron:pack": "npm run build:electron && electron-builder --dir",
     "electron:dist": "npm run build:electron && electron-builder",
     "electron:build:win": "ng build --configuration=electron && npm run electron:build && electron-builder --win",
-    "electron:build:msi": "npm run electron:build:win && node build-msi.js"
+    "electron:build:msi": "npm run electron:build:win && node build-msi.js",
+    "electron:build:staging": "ng build --configuration=staging && npm run electron:build && electron-builder --win",
+    "electron:build:msi:staging": "npm run electron:build:staging && node build-msi.js staging"
   },
   "build": {
     "appId": "com.example.pei-site-app",

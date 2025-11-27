@@ -64,6 +64,20 @@
               "sourceMap": false,
               "namedChunks": false,
               "extractLicenses": true
+            },
+            "staging": {
+              "outputPath": "dist",
+              "baseHref": "./",
+              "optimization": true,
+              "sourceMap": false,
+              "namedChunks": false,
+              "extractLicenses": true,
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.staging.ts"
+                }
+              ]
             }
           },
           "defaultConfiguration": "production"

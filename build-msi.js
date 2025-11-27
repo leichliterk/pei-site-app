@@ -2,15 +2,23 @@ const { MSICreator } = require('electron-wix-msi');
 const path = require('path');
 
 async function buildMSI() {
+  // Check if staging environment is requested
+  const isStaging = process.argv.includes('staging');
+  const envSuffix = isStaging ? ' (Staging)' : '';
+  const outDirSuffix = isStaging ? '-staging' : '';
+
   // Add WiX to PATH if not already present
   const wixPath = 'C:\\Program Files (x86)\\WiX Toolset v3.14\\bin';
   if (!process.env.PATH.includes(wixPath)) {
     process.env.PATH = `${process.env.PATH};${wixPath}`;
     console.log(`Added WiX to PATH: ${wixPath}`);
   }
+
+  console.log(`Building MSI for ${isStaging ? 'STAGING' : 'PRODUCTION'} environment...`);
+
   // Find the built Electron app directory
   const APP_DIR = path.resolve(__dirname, 'release', 'win-unpacked');
-  const OUT_DIR = path.resolve(__dirname, 'release', 'msi');
+  const OUT_DIR = path.resolve(__dirname, 'release', `msi${outDirSuffix}`);
 
   // Create MSI Creator
   const msiCreator = new MSICreator({
@@ -19,10 +27,10 @@ async function buildMSI() {
 
     // App metadata
     exe: 'PEI Site App',
-    name: 'PEI Site App',
+    name: `PEI Site App${envSuffix}`,
     manufacturer: 'PEI Data Systems',
     version: '1.0.0',
-    description: 'PEI Site Application',
+    description: `PEI Site Application${envSuffix}`,
 
     // Explicitly skip icon extraction to avoid native dependencies
     appUserModelId: 'com.pei.site-app',
