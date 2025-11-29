@@ -32,6 +32,12 @@ export class AppComponent implements OnInit {
     if (savedSiteNumber !== null) {
       environment.siteNumber = savedSiteNumber;
     }
+
+    // Load saved site name from Electron store
+    const savedSiteName = await this.electronService.getSiteName();
+    if (savedSiteName !== null) {
+      environment.siteName = savedSiteName;
+    }
   }
 
   async openFile() {

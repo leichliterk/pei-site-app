@@ -5,6 +5,7 @@ import { ActivatedRoute } from '@angular/router';
 import { ConnectionStatusService, ConnectionStatus, ConnectionState } from '../../services/connection-status.service';
 import { ElectronService, FtpSettings } from '../../services/electron.service';
 import { FtpSyncService } from '../../services/ftp-sync.service';
+import { SiteService } from '../../services/site.service';
 import { Subscription } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { TagModule } from 'primeng/tag';
@@ -17,6 +18,8 @@ import { ToggleSwitchModule } from 'primeng/toggleswitch';
 import { DialogModule } from 'primeng/dialog';
 import { MessageModule } from 'primeng/message';
 import { TabsModule } from 'primeng/tabs';
+import { ToastModule } from 'primeng/toast';
+import { MessageService } from 'primeng/api';
 
 @Component({
   selector: 'app-settings',
@@ -30,8 +33,10 @@ import { TabsModule } from 'primeng/tabs';
     DialogModule,
     MessageModule,
     TabsModule,
-    TagModule
+    TagModule,
+    ToastModule
   ],
+  providers: [MessageService],
   templateUrl: './settings.component.html',
   styleUrl: './settings.component.scss'
 })
@@ -79,6 +84,8 @@ export class SettingsComponent implements OnInit, OnDestroy {
     private connectionService: ConnectionStatusService,
     private electronService: ElectronService,
     private ftpSyncService: FtpSyncService,
+    private siteService: SiteService,
+    private messageService: MessageService,
     private route: ActivatedRoute
   ) {}
 
@@ -227,6 +234,9 @@ export class SettingsComponent implements OnInit, OnDestroy {
       return;
     }
 
+    // Store old site number for API call
+    const oldSiteNumber = this.siteNumber;
+
     // Update site number
     console.log('Updating site number from', this.siteNumber, 'to', parsedNumber);
     this.siteNumber = parsedNumber;
@@ -238,6 +248,21 @@ export class SettingsComponent implements OnInit, OnDestroy {
       console.log('Site number saved to persistent storage successfully');
     } else {
       console.log('Failed to save site number to persistent storage (may be running in browser mode)');
+    }
+
+    // Update site ID on the server
+    if (this.tenantId && oldSiteNumber) {
+      this.siteService.updateSiteId(this.tenantId, oldSiteNumber.toString(), parsedNumber.toString()).subscribe({
+        next: (response) => {
+          console.log('Site ID updated successfully on server:', response);
+        },
+        error: (error) => {
+          console.error('Failed to update site ID on server:', error);
+          this.errorMessage = 'Site number saved locally, but failed to update on server. Please check your connection.';
+        }
+      });
+    } else {
+      console.warn('Cannot update site ID on server: missing tenant ID');
     }
 
     this.closeDialog();
@@ -302,9 +327,64 @@ export class SettingsComponent implements OnInit, OnDestroy {
   }
 
   async saveSiteName(): Promise<void> {
-    const success = await this.electronService.setSiteName(this.siteName);
-    if (!success) {
-      console.log('Failed to save site name to persistent storage (may be running in browser mode)');
+    try {
+      // Validate we have required information
+      if (!this.tenantId || !this.siteNumber) {
+        console.warn('Cannot update site name on server: missing tenant ID or site number');
+        this.messageService.add({
+          severity: 'warn',
+          summary: 'Missing Information',
+          detail: 'Cannot update on server: missing tenant ID or site number',
+          life: 4000
+        });
+        return;
+      }
+
+      // Update site name on the server first
+      this.siteService.updateSiteName(this.tenantId, this.siteNumber.toString(), this.siteName).subscribe({
+        next: async (response) => {
+          console.log('Site name updated successfully on server:', response);
+
+          // Update the environment variable so toolbar reflects the change
+          environment.siteName = this.siteName;
+
+          // Only update local storage after successful API call
+          const success = await this.electronService.setSiteName(this.siteName);
+          if (!success) {
+            console.log('Failed to save site name to persistent storage (may be running in browser mode)');
+            this.messageService.add({
+              severity: 'warn',
+              summary: 'Partial Success',
+              detail: 'Site name updated on server but failed to save locally',
+              life: 4000
+            });
+          } else {
+            this.messageService.add({
+              severity: 'success',
+              summary: 'Success',
+              detail: 'Site name updated successfully',
+              life: 3000
+            });
+          }
+        },
+        error: (error) => {
+          console.error('Failed to update site name on server:', error);
+          this.messageService.add({
+            severity: 'error',
+            summary: 'Update Failed',
+            detail: 'Failed to update site name on server',
+            life: 5000
+          });
+        }
+      });
+    } catch (error) {
+      console.error('Error saving site name:', error);
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'An unexpected error occurred while saving',
+        life: 5000
+      });
     }
   }
 
