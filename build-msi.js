@@ -223,6 +223,9 @@ async function buildMSI() {
 
     <!-- Property to control startup with Windows (default to yes) -->
     <Property Id="START_WITH_WINDOWS" Value="1" />
+
+    <!-- Property for Add/Remove Programs icon -->
+    <Property Id="ARPPRODUCTICON" Value="AppIcon.exe" />
 `;
 
     // Find the first <Directory or <DirectoryRef tag and insert properties before it
@@ -290,9 +293,15 @@ async function buildMSI() {
       iconDefinition
     );
 
+    // Update the DisplayIcon registry value to explicitly include icon index
+    wxsContent = wxsContent.replace(
+      /(<RegistryValue\s+Name="DisplayIcon"\s+Type="expandable"\s+Value=")(\[APPLICATIONROOTDIRECTORY\]PEI Site App\.exe)(")/,
+      '$1$2,0$3'
+    );
+
     // Write the modified content back
     fs.writeFileSync(wxsPath, wxsContent, 'utf8');
-    console.log('Modified WiX source file with custom properties, components, and shortcut icons');
+    console.log('Modified WiX source file with custom properties, components, shortcut icons, and DisplayIcon');
 
     // Step 3: Compile the MSI
     await msiCreator.compile();
