@@ -22,6 +22,7 @@
       <p-tabpanel value="0">
         <div class="flex flex-col p-4 space-y-4">
 
+          <!-- Site Number -->
           <div class="flex items-center justify-between">
             <span class="text-gray-700">Current Site Number: <strong class="text-lg">{{ siteNumber }}</strong></span>
             <p-button
@@ -37,6 +38,46 @@
             icon="pi pi-exclamation-triangle"
             text="Changing the site number will fundamentally impact data collection. All future data will be associated with the new site number."
             styleClass="w-full" />
+
+          <!-- Divider -->
+          <div class="border-t my-4"></div>
+
+          <!-- Tenant ID -->
+          <div class="flex flex-col gap-2">
+            <label for="tenant-id" class="text-sm font-medium text-gray-700">Tenant ID</label>
+            <div class="flex gap-2">
+              <input
+                pInputText
+                id="tenant-id"
+                [(ngModel)]="tenantId"
+                placeholder="Enter tenant ID"
+                class="flex-1" />
+              <p-button
+                label="Save"
+                icon="pi pi-save"
+                [outlined]="true"
+                (click)="saveTenantId()" />
+            </div>
+          </div>
+
+          <!-- Site Name -->
+          <div class="flex flex-col gap-2">
+            <label for="site-name" class="text-sm font-medium text-gray-700">Site Name</label>
+            <div class="flex gap-2">
+              <input
+                pInputText
+                id="site-name"
+                [(ngModel)]="siteName"
+                placeholder="Enter site name"
+                class="flex-1" />
+              <p-button
+                label="Save"
+                icon="pi pi-save"
+                [outlined]="true"
+                (click)="saveSiteName()" />
+            </div>
+          </div>
+
         </div>
       </p-tabpanel>
 

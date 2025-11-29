@@ -31,15 +31,22 @@
     },
     "files": [
       "dist/**/*",
-      "!dist/electron/**/*.map"
+      "!dist/electron/**/*.map",
+      "src/assets/icon.ico"
     ],
     "asarUnpack": [
       "dist/browser/**/*"
     ],
     "extraResources": [],
+    "extraFiles": [
+      {
+        "from": "src/assets/icon.ico",
+        "to": "icon.ico"
+      }
+    ],
     "win": {
       "target": "nsis",
-      "icon": "src/assets/icon.ico",
+      "icon": "build/icon.ico",
       "signAndEditExecutable": false
     },
     "electronLanguages": [
@@ -87,6 +94,7 @@
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.1.0",
     "postcss": "^8.5.6",
+    "rcedit": "^5.0.2",
     "tailwindcss": "^3.4.18",
     "typescript": "~5.9.2",
     "wait-on": "^8.0.4"

@@ -1,5 +1,7 @@
 const { MSICreator } = require('electron-wix-msi');
 const path = require('path');
+const { execSync } = require('child_process');
+const fs = require('fs');
 
 async function buildMSI() {
   // Check if staging environment is requested
@@ -19,6 +21,26 @@ async function buildMSI() {
   // Find the built Electron app directory
   const APP_DIR = path.resolve(__dirname, 'release', 'win-unpacked');
   const OUT_DIR = path.resolve(__dirname, 'release', `msi${outDirSuffix}`);
+
+  // Paths for icon embedding and MSI configuration
+  const exePath = path.join(APP_DIR, 'PEI Site App.exe');
+  const iconPath = path.resolve(__dirname, 'build', 'icon.ico');
+  const rceditPath = path.join(__dirname, 'node_modules', 'rcedit', 'bin', 'rcedit-x64.exe');
+
+  console.log('Embedding icon in executable...');
+  try {
+    if (fs.existsSync(exePath) && fs.existsSync(iconPath) && fs.existsSync(rceditPath)) {
+      execSync(`"${rceditPath}" "${exePath}" --set-icon "${iconPath}" --set-version-string "ProductName" "PEI Site App${envSuffix}" --set-version-string "FileDescription" "PEI Site Application${envSuffix}" --set-version-string "CompanyName" "PEI Data Systems"`, {
+        stdio: 'inherit'
+      });
+      console.log('Icon embedded successfully!');
+    } else {
+      console.log('Missing required files for icon embedding, skipping...');
+    }
+  } catch (error) {
+    console.error('Failed to embed icon:', error.message);
+    console.log('Continuing with MSI creation anyway...');
+  }
 
   // Create MSI Creator
   const appName = `PEI Site App${envSuffix}`;
@@ -66,40 +88,46 @@ async function buildMSI() {
           <DialogRef Id="UserExit" />
 
           <!-- Custom Configuration Dialog -->
-          <Dialog Id="ConfigurationDlg" Width="370" Height="270" Title="[ProductName] Configuration">
+          <Dialog Id="ConfigurationDlg" Width="370" Height="310" Title="[ProductName] Configuration">
             <Control Id="Title" Type="Text" X="15" Y="6" Width="300" Height="15" Transparent="yes" NoPrefix="yes">
               <Text>{\\WixUI_Font_Title}Application Configuration</Text>
             </Control>
 
             <Control Id="Description" Type="Text" X="25" Y="23" Width="320" Height="30" Transparent="yes" NoPrefix="yes">
-              <Text>Please enter your Tenant ID and Site ID. These values will be used to configure the application.</Text>
+              <Text>Please enter your Tenant ID, Site ID, and Site Name. These values will be used to configure the application.</Text>
             </Control>
 
             <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="!(loc.InstallDirDlgBannerBitmap)" />
             <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
 
             <!-- Tenant ID Input -->
-            <Control Id="TenantIdLabel" Type="Text" X="20" Y="70" Width="100" Height="15" TabSkip="no">
+            <Control Id="TenantIdLabel" Type="Text" X="20" Y="60" Width="100" Height="15" TabSkip="no">
               <Text>&amp;Tenant ID:</Text>
             </Control>
-            <Control Id="TenantIdEdit" Type="Edit" X="20" Y="85" Width="330" Height="18" Property="TENANT_ID" />
+            <Control Id="TenantIdEdit" Type="Edit" X="20" Y="75" Width="330" Height="18" Property="TENANT_ID" />
 
             <!-- Site ID Input -->
-            <Control Id="SiteIdLabel" Type="Text" X="20" Y="115" Width="100" Height="15" TabSkip="no">
+            <Control Id="SiteIdLabel" Type="Text" X="20" Y="100" Width="100" Height="15" TabSkip="no">
               <Text>&amp;Site ID:</Text>
             </Control>
-            <Control Id="SiteIdEdit" Type="Edit" X="20" Y="130" Width="330" Height="18" Property="SITE_ID" />
+            <Control Id="SiteIdEdit" Type="Edit" X="20" Y="115" Width="330" Height="18" Property="SITE_ID" />
+
+            <!-- Site Name Input -->
+            <Control Id="SiteNameLabel" Type="Text" X="20" Y="140" Width="100" Height="15" TabSkip="no">
+              <Text>Site &amp;Name:</Text>
+            </Control>
+            <Control Id="SiteNameEdit" Type="Edit" X="20" Y="155" Width="330" Height="18" Property="SITE_NAME" />
 
             <!-- Start with Windows Checkbox -->
-            <Control Id="StartWithWindowsCheckbox" Type="CheckBox" X="20" Y="160" Width="330" Height="17" Property="START_WITH_WINDOWS" CheckBoxValue="1">
+            <Control Id="StartWithWindowsCheckbox" Type="CheckBox" X="20" Y="185" Width="330" Height="17" Property="START_WITH_WINDOWS" CheckBoxValue="1">
               <Text>Start application automatically when Windows starts (recommended)</Text>
             </Control>
 
             <!-- Navigation buttons -->
-            <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
-            <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
-            <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)" />
-            <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+            <Control Id="BottomLine" Type="Line" X="0" Y="274" Width="370" Height="0" />
+            <Control Id="Back" Type="PushButton" X="180" Y="283" Width="56" Height="17" Text="!(loc.WixUIBack)" />
+            <Control Id="Next" Type="PushButton" X="236" Y="283" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)" />
+            <Control Id="Cancel" Type="PushButton" X="304" Y="283" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
               <Publish Event="SpawnDialog" Value="CancelDlg">1</Publish>
             </Control>
           </Dialog>
@@ -166,7 +194,7 @@ async function buildMSI() {
     const wxsPath = path.join(OUT_DIR, 'PEI Site App.wxs');
     let wxsContent = fs.readFileSync(wxsPath, 'utf8');
 
-    // Add custom properties for TENANT_ID and SITE_ID after the Product opening tag
+    // Add custom properties for TENANT_ID, SITE_ID, and SITE_NAME after the Product opening tag
     const propertiesXml = `
     <!-- Custom properties to store user input -->
     <Property Id="TENANT_ID" Secure="yes">
@@ -185,6 +213,14 @@ async function buildMSI() {
                      Type="raw" />
     </Property>
 
+    <Property Id="SITE_NAME" Secure="yes">
+      <RegistrySearch Id="SiteNameSearch"
+                     Root="HKLM"
+                     Key="Software\\PEI Data Systems\\[ProductName]"
+                     Name="SiteName"
+                     Type="raw" />
+    </Property>
+
     <!-- Property to control startup with Windows (default to yes) -->
     <Property Id="START_WITH_WINDOWS" Value="1" />
 `;
@@ -199,6 +235,7 @@ async function buildMSI() {
         <RegistryKey Root="HKLM" Key="Software\\PEI Data Systems\\[ProductName]" ForceCreateOnInstall="yes">
           <RegistryValue Type="string" Name="TenantId" Value="[TENANT_ID]" KeyPath="yes"/>
           <RegistryValue Type="string" Name="SiteId" Value="[SITE_ID]"/>
+          <RegistryValue Type="string" Name="SiteName" Value="[SITE_NAME]"/>
           <RegistryValue Type="string" Name="InstallPath" Value="[APPLICATIONROOTDIRECTORY]"/>
         </RegistryKey>
       </Component>
@@ -230,9 +267,32 @@ async function buildMSI() {
       `$1${componentRefXml}`
     );
 
+    // Add icon attribute to shortcuts
+    // For Start Menu shortcut
+    wxsContent = wxsContent.replace(
+      /(<Shortcut\s+Id="ApplicationStartMenuShortcut"[^>]*\n[^>]*\n[^>]*\n[^>]*)(WorkingDirectory="APPLICATIONROOTDIRECTORY">)/,
+      `$1WorkingDirectory="APPLICATIONROOTDIRECTORY"\n                  Icon="AppIcon.exe"\n                  IconIndex="0">`
+    );
+
+    // For Desktop shortcut
+    wxsContent = wxsContent.replace(
+      /(<Shortcut\s+Id="MyDesktopShortcut"[^>]*\n[^>]*\n[^>]*\n[^>]*)(WorkingDirectory="APPLICATIONROOTDIRECTORY")/,
+      `$1WorkingDirectory="APPLICATIONROOTDIRECTORY"\n                    Icon="AppIcon.exe"\n                    IconIndex="0"`
+    );
+
+    // Add Icon element definition before closing Product tag
+    const iconDefinition = `
+    <Icon Id="AppIcon.exe" SourceFile="${iconPath}" />
+  </Product>`;
+
+    wxsContent = wxsContent.replace(
+      /<\/Product>/,
+      iconDefinition
+    );
+
     // Write the modified content back
     fs.writeFileSync(wxsPath, wxsContent, 'utf8');
-    console.log('Modified WiX source file with custom properties and components');
+    console.log('Modified WiX source file with custom properties, components, and shortcut icons');
 
     // Step 3: Compile the MSI
     await msiCreator.compile();

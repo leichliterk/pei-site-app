@@ -38,6 +38,8 @@ import { TabsModule } from 'primeng/tabs';
 export class SettingsComponent implements OnInit, OnDestroy {
   isTimerRunning = false;
   siteNumber = environment.siteNumber;
+  siteName = '';
+  tenantId = '';
   showDialog = false;
   newSiteNumberInput = '';
   confirmationPhrase = '';
@@ -101,6 +103,18 @@ export class SettingsComponent implements OnInit, OnDestroy {
     if (savedSiteNumber !== null) {
       this.siteNumber = savedSiteNumber;
       environment.siteNumber = savedSiteNumber;
+    }
+
+    // Load saved site name from Electron store
+    const savedSiteName = await this.electronService.getSiteName();
+    if (savedSiteName !== null) {
+      this.siteName = savedSiteName;
+    }
+
+    // Load saved tenant ID from Electron store
+    const savedTenantId = await this.electronService.getTenantId();
+    if (savedTenantId !== null) {
+      this.tenantId = savedTenantId;
     }
 
     // Load FTP settings
@@ -285,5 +299,19 @@ export class SettingsComponent implements OnInit, OnDestroy {
   async toggleFtpEnabled(): Promise<void> {
     this.ftpEnabled = !this.ftpEnabled;
     await this.saveFtpSettings();
+  }
+
+  async saveSiteName(): Promise<void> {
+    const success = await this.electronService.setSiteName(this.siteName);
+    if (!success) {
+      console.log('Failed to save site name to persistent storage (may be running in browser mode)');
+    }
+  }
+
+  async saveTenantId(): Promise<void> {
+    const success = await this.electronService.setTenantId(this.tenantId);
+    if (!success) {
+      console.log('Failed to save tenant ID to persistent storage (may be running in browser mode)');
+    }
   }
 }

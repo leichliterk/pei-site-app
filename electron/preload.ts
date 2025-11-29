@@ -42,6 +42,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setSiteNumber: (siteNumber: number) => ipcRenderer.invoke('settings:setSiteNumber', siteNumber),
   getTenantId: () => ipcRenderer.invoke('settings:getTenantId'),
   setTenantId: (tenantId: string) => ipcRenderer.invoke('settings:setTenantId', tenantId),
+  getSiteName: () => ipcRenderer.invoke('settings:getSiteName'),
+  setSiteName: (siteName: string) => ipcRenderer.invoke('settings:setSiteName', siteName),
   getStartupEnabled: () => ipcRenderer.invoke('settings:getStartupEnabled'),
   setStartupEnabled: (enabled: boolean) => ipcRenderer.invoke('settings:setStartupEnabled', enabled),
 
@@ -78,6 +80,8 @@ declare global {
       setSiteNumber: (siteNumber: number) => Promise<boolean>;
       getTenantId: () => Promise<string | null>;
       setTenantId: (tenantId: string) => Promise<boolean>;
+      getSiteName: () => Promise<string | null>;
+      setSiteName: (siteName: string) => Promise<boolean>;
       getStartupEnabled: () => Promise<boolean>;
       setStartupEnabled: (enabled: boolean) => Promise<boolean>;
       // FTP Settings

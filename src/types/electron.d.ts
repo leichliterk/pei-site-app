@@ -35,6 +35,8 @@ export interface IElectronAPI {
   setSiteNumber: (siteNumber: number) => Promise<boolean>;
   getTenantId: () => Promise<string | null>;
   setTenantId: (tenantId: string) => Promise<boolean>;
+  getSiteName: () => Promise<string | null>;
+  setSiteName: (siteName: string) => Promise<boolean>;
   getStartupEnabled: () => Promise<boolean>;
   setStartupEnabled: (enabled: boolean) => Promise<boolean>;
   // FTP Settings

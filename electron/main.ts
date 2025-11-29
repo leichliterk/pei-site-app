@@ -221,7 +221,7 @@ function initializeSettingsFromInstaller() {
       const data = fs.readFileSync(settingsFilePath, 'utf8');
       const settings = JSON.parse(data);
       // If settings already have values, don't overwrite
-      if (settings.tenantId || settings.siteNumber) {
+      if (settings.tenantId || settings.siteNumber || settings.siteName) {
         return;
       }
     }
@@ -229,11 +229,13 @@ function initializeSettingsFromInstaller() {
     // Try to read from Windows registry (MSI installer values)
     const tenantId = readWindowsRegistry('HKLM\\Software\\PEI Data Systems\\PDS Site App', 'TenantId');
     const siteId = readWindowsRegistry('HKLM\\Software\\PEI Data Systems\\PDS Site App', 'SiteId');
+    const siteName = readWindowsRegistry('HKLM\\Software\\PEI Data Systems\\PDS Site App', 'SiteName');
 
-    if (tenantId || siteId) {
+    if (tenantId || siteId || siteName) {
       const settings: any = {};
       if (tenantId) settings.tenantId = tenantId;
       if (siteId) settings.siteNumber = parseInt(siteId, 10);
+      if (siteName) settings.siteName = siteName;
 
       fs.writeFileSync(settingsFilePath, JSON.stringify(settings, null, 2), 'utf8');
       console.log('Settings initialized from installer configuration');
@@ -302,6 +304,35 @@ ipcMain.handle('settings:setTenantId', async (_event, tenantId: string) => {
     return true;
   } catch (error) {
     console.error('Error writing tenant ID:', error);
+    return false;
+  }
+});
+
+ipcMain.handle('settings:getSiteName', async () => {
+  try {
+    if (fs.existsSync(settingsFilePath)) {
+      const data = fs.readFileSync(settingsFilePath, 'utf8');
+      const settings = JSON.parse(data);
+      return settings.siteName;
+    }
+  } catch (error) {
+    console.error('Error reading site name:', error);
+  }
+  return null;
+});
+
+ipcMain.handle('settings:setSiteName', async (_event, siteName: string) => {
+  try {
+    let settings: any = {};
+    if (fs.existsSync(settingsFilePath)) {
+      const data = fs.readFileSync(settingsFilePath, 'utf8');
+      settings = JSON.parse(data);
+    }
+    settings.siteName = siteName;
+    fs.writeFileSync(settingsFilePath, JSON.stringify(settings, null, 2), 'utf8');
+    return true;
+  } catch (error) {
+    console.error('Error writing site name:', error);
     return false;
   }
 });

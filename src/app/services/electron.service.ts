@@ -101,6 +101,20 @@ export class ElectronService {
     return false;
   }
 
+  async getSiteName(): Promise<string | null> {
+    if (this.isElectron) {
+      return window.electronAPI.getSiteName();
+    }
+    return null;
+  }
+
+  async setSiteName(siteName: string): Promise<boolean> {
+    if (this.isElectron) {
+      return window.electronAPI.setSiteName(siteName);
+    }
+    return false;
+  }
+
   async getStartupEnabled(): Promise<boolean> {
     if (this.isElectron) {
       return window.electronAPI.getStartupEnabled();
