@@ -189,13 +189,20 @@ export class ConnectionStatusService {
             } else if (error.status === 0) {
               // Network error
               errorMessage = 'Network error: Unable to reach server';
+            } else if (error.status === 413) {
+              // Payload too large - clear the queue to prevent infinite loop
+              console.warn('Payload too large (413). Clearing failure queue to prevent accumulation.');
+              this.clearFailureQueue();
+              errorMessage = 'Payload too large: Previous failure queue cleared';
             } else {
               // Server-side error
               errorMessage = `Server Error ${error.status}: ${error.message}`;
             }
 
-            // Queue this failure
-            this.queueFailure(errorMessage);
+            // Queue this failure (unless it was a 413 error where we just cleared the queue)
+            if (error.status !== 413) {
+              this.queueFailure(errorMessage);
+            }
 
             this.updateStatus(ConnectionStatus.ERROR, errorMessage);
             this.isChecking = false;

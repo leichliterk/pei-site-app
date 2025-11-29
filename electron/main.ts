@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, shell, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, Menu, shell, ipcMain, dialog, globalShortcut } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import { isDev } from './utils';
@@ -21,7 +21,7 @@ function createWindow(): void {
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js')
     },
-    icon: path.join(__dirname, '../src/assets/icon.png'), // Optional: app icon
+    icon: path.join(__dirname, '../src/assets/icon.ico'), // Application icon
     show: false, // Don't show until ready-to-show
     titleBarStyle: 'default'
   });
@@ -31,7 +31,11 @@ function createWindow(): void {
     mainWindow.loadURL('http://localhost:4300');
     // mainWindow.webContents.openDevTools();
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../index.html'));
+    // In production, files are unpacked from ASAR
+    // Use process.resourcesPath to get the correct base path
+    const unpackedPath = path.join(process.resourcesPath, 'app.asar.unpacked', 'dist', 'browser', 'index.html');
+    console.log('Loading from:', unpackedPath);
+    mainWindow.loadFile(unpackedPath);
   }
 
   // Show window when ready
@@ -57,12 +61,41 @@ function createWindow(): void {
 }
 
 // App event listeners
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  createWindow();
+
+  // Register global shortcut to toggle DevTools (F12)
+  globalShortcut.register('F12', () => {
+    if (mainWindow) {
+      if (mainWindow.webContents.isDevToolsOpened()) {
+        mainWindow.webContents.closeDevTools();
+      } else {
+        mainWindow.webContents.openDevTools();
+      }
+    }
+  });
+
+  // Also register Ctrl+Shift+I as an alternative
+  globalShortcut.register('CommandOrControl+Shift+I', () => {
+    if (mainWindow) {
+      if (mainWindow.webContents.isDevToolsOpened()) {
+        mainWindow.webContents.closeDevTools();
+      } else {
+        mainWindow.webContents.openDevTools();
+      }
+    }
+  });
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('will-quit', () => {
+  // Unregister all shortcuts
+  globalShortcut.unregisterAll();
 });
 
 app.on('activate', () => {
