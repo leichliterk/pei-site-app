@@ -24,44 +24,6 @@
       <p-tabpanel value="0">
         <div class="flex flex-col p-4 space-y-4">
 
-          <!-- Site Number -->
-          <div class="flex items-center justify-between">
-            <span class="text-gray-700">Current Site Number: <strong class="text-lg">{{ siteNumber }}</strong></span>
-            <p-button
-              label="Edit Site Number"
-              icon="pi pi-pencil"
-              severity="secondary"
-              [outlined]="true"
-              (click)="editSiteNumber()" />
-          </div>
-
-          <p-message
-            severity="warn"
-            icon="pi pi-exclamation-triangle"
-            text="Changing the site number will fundamentally impact data collection. All future data will be associated with the new site number."
-            styleClass="w-full" />
-
-          <!-- Divider -->
-          <div class="border-t my-4"></div>
-
-          <!-- Tenant ID -->
-          <div class="flex flex-col gap-2">
-            <label for="tenant-id" class="text-sm font-medium text-gray-700">Tenant ID</label>
-            <div class="flex gap-2">
-              <input
-                pInputText
-                id="tenant-id"
-                [(ngModel)]="tenantId"
-                placeholder="Enter tenant ID"
-                class="flex-1" />
-              <p-button
-                label="Save"
-                icon="pi pi-save"
-                [outlined]="true"
-                (click)="saveTenantId()" />
-            </div>
-          </div>
-
           <!-- Site Name -->
           <div class="flex flex-col gap-2">
             <label for="site-name" class="text-sm font-medium text-gray-700">Site Name</label>
@@ -79,6 +41,51 @@
                 (click)="saveSiteName()" />
             </div>
           </div>
+
+          <!-- Horizontal Rule -->
+          <div class="border-t my-6"></div>
+
+          <!-- Danger Zone Card -->
+          <p-card>
+            <ng-template pTemplate="header">
+              <div class="p-4 bg-red-50 border-b border-red-200">
+                <h3 class="text-lg font-semibold text-red-700 flex items-center gap-2">
+                  <i class="pi pi-exclamation-triangle"></i>
+                  Danger Zone
+                </h3>
+              </div>
+            </ng-template>
+            <ng-template pTemplate="content">
+              <p class="text-red-700 mb-4">
+                Actions in this section WILL impact data collection and may result in permanent data loss.
+              </p>
+              <p class="text-red-700 font-bold mb-4">
+                Proceed with caution!
+              </p>
+
+              <!-- Tenant ID -->
+              <div class="flex items-center justify-between mb-4">
+                <span class="text-gray-700">Current Tenant ID: <strong class="text-lg">{{ tenantId || 'Not Set' }}</strong></span>
+                <p-button
+                  label="Edit Tenant ID"
+                  icon="pi pi-pencil"
+                  severity="danger"
+                  [outlined]="true"
+                  (click)="editTenantId()" />
+              </div>
+
+              <!-- Site Number -->
+              <div class="flex items-center justify-between">
+                <span class="text-gray-700">Current Site Number: <strong class="text-lg">{{ siteNumber }}</strong></span>
+                <p-button
+                  label="Edit Site Number"
+                  icon="pi pi-pencil"
+                  severity="danger"
+                  [outlined]="true"
+                  (click)="editSiteNumber()" />
+              </div>
+            </ng-template>
+          </p-card>
 
         </div>
       </p-tabpanel>
@@ -208,6 +215,61 @@
   </p-tabs>
 </div>
 
+<!-- Edit Tenant ID Dialog -->
+<p-dialog
+  header="Edit Tenant ID"
+  [(visible)]="showTenantDialog"
+  [modal]="true"
+  [closable]="true"
+  [style]="{ width: '450px' }">
+
+  <p-message
+    severity="error"
+    text="Changing the tenant ID will affect which tenant this site belongs to."
+    styleClass="w-full mb-4" />
+
+  <div class="space-y-4">
+    <div class="flex flex-col gap-2">
+      <label for="new-tenant-id" class="text-sm font-medium text-gray-700">New Tenant ID</label>
+      <input
+        pInputText
+        id="new-tenant-id"
+        [(ngModel)]="newTenantIdInput"
+        placeholder="Enter new tenant ID"
+        class="w-full" />
+    </div>
+
+    <div class="flex flex-col gap-2">
+      <label for="tenant-confirmation-phrase" class="text-sm font-medium text-gray-700">
+        Type "change tenant id" to confirm
+      </label>
+      <input
+        pInputText
+        id="tenant-confirmation-phrase"
+        [(ngModel)]="tenantConfirmationPhrase"
+        placeholder="change tenant id"
+        class="w-full" />
+    </div>
+
+    @if (tenantErrorMessage) {
+      <p-message severity="error" [text]="tenantErrorMessage" styleClass="w-full" />
+    }
+  </div>
+
+  <ng-template pTemplate="footer">
+    <p-button
+      label="Cancel"
+      severity="secondary"
+      [text]="true"
+      (click)="closeTenantDialog()" />
+    <p-button
+      label="Confirm"
+      icon="pi pi-check"
+      [disabled]="!isTenantFormValid"
+      (click)="confirmTenantIdChange()" />
+  </ng-template>
+</p-dialog>
+
 <!-- Edit Site Number Dialog -->
 <p-dialog
   header="Edit Site Number"
@@ -217,7 +279,7 @@
   [style]="{ width: '450px' }">
 
   <p-message
-    severity="warn"
+    severity="error"
     text="Changing the site number will fundamentally impact data collection."
     styleClass="w-full mb-4" />
 

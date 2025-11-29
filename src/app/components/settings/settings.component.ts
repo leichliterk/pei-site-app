@@ -19,6 +19,7 @@ import { DialogModule } from 'primeng/dialog';
 import { MessageModule } from 'primeng/message';
 import { TabsModule } from 'primeng/tabs';
 import { ToastModule } from 'primeng/toast';
+import { CardModule } from 'primeng/card';
 import { MessageService } from 'primeng/api';
 
 @Component({
@@ -34,7 +35,8 @@ import { MessageService } from 'primeng/api';
     MessageModule,
     TabsModule,
     TagModule,
-    ToastModule
+    ToastModule,
+    CardModule
   ],
   providers: [MessageService],
   templateUrl: './settings.component.html',
@@ -49,6 +51,10 @@ export class SettingsComponent implements OnInit, OnDestroy {
   newSiteNumberInput = '';
   confirmationPhrase = '';
   errorMessage = '';
+  showTenantDialog = false;
+  newTenantIdInput = '';
+  tenantConfirmationPhrase = '';
+  tenantErrorMessage = '';
   private subscription?: Subscription;
   private connectionSubscription?: Subscription;
 
@@ -78,6 +84,12 @@ export class SettingsComponent implements OnInit, OnDestroy {
     const isNumberValid = !isNaN(parsedNumber) && inputStr.trim() !== '';
     const isPhraseValid = this.confirmationPhrase.toLowerCase() === 'change site number';
     return isNumberValid && isPhraseValid;
+  }
+
+  get isTenantFormValid(): boolean {
+    const isTenantIdValid = this.newTenantIdInput.trim() !== '';
+    const isPhraseValid = this.tenantConfirmationPhrase.toLowerCase() === 'change tenant id';
+    return isTenantIdValid && isPhraseValid;
   }
 
   constructor(
@@ -194,6 +206,57 @@ export class SettingsComponent implements OnInit, OnDestroy {
       default:
         return 'pi pi-question-circle';
     }
+  }
+
+  editTenantId(): void {
+    this.showTenantDialog = true;
+    this.newTenantIdInput = this.tenantId;
+    this.tenantConfirmationPhrase = '';
+    this.tenantErrorMessage = '';
+  }
+
+  closeTenantDialog(): void {
+    this.showTenantDialog = false;
+    this.newTenantIdInput = '';
+    this.tenantConfirmationPhrase = '';
+    this.tenantErrorMessage = '';
+  }
+
+  async confirmTenantIdChange(): Promise<void> {
+    console.log('Confirm tenant ID change clicked');
+    console.log('New tenant ID input:', this.newTenantIdInput);
+    console.log('Confirmation phrase:', this.tenantConfirmationPhrase);
+    console.log('Is form valid:', this.isTenantFormValid);
+
+    this.tenantErrorMessage = '';
+
+    // Validate tenant ID
+    if (this.newTenantIdInput.trim() === '') {
+      this.tenantErrorMessage = 'Please enter a valid tenant ID';
+      console.log('Validation failed: empty tenant ID');
+      return;
+    }
+
+    // Validate confirmation phrase
+    if (this.tenantConfirmationPhrase.toLowerCase() !== 'change tenant id') {
+      this.tenantErrorMessage = 'Please type "change tenant id" to confirm';
+      console.log('Validation failed: incorrect phrase');
+      return;
+    }
+
+    // Update tenant ID
+    console.log('Updating tenant ID from', this.tenantId, 'to', this.newTenantIdInput);
+    this.tenantId = this.newTenantIdInput;
+
+    // Persist to Electron store
+    const success = await this.electronService.setTenantId(this.tenantId);
+    if (success) {
+      console.log('Tenant ID saved to persistent storage successfully');
+    } else {
+      console.log('Failed to save tenant ID to persistent storage (may be running in browser mode)');
+    }
+
+    this.closeTenantDialog();
   }
 
   editSiteNumber(): void {
@@ -385,13 +448,6 @@ export class SettingsComponent implements OnInit, OnDestroy {
         detail: 'An unexpected error occurred while saving',
         life: 5000
       });
-    }
-  }
-
-  async saveTenantId(): Promise<void> {
-    const success = await this.electronService.setTenantId(this.tenantId);
-    if (!success) {
-      console.log('Failed to save tenant ID to persistent storage (may be running in browser mode)');
     }
   }
 }
