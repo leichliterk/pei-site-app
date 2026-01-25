@@ -6,6 +6,8 @@ import { CardModule } from 'primeng/card';
 import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
 import { WebSocketService, WebSocketStatus } from '../../services/websocket.service';
+import { SiteService, UptimeResponse } from '../../services/site.service';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-home',
@@ -18,9 +20,15 @@ export class HomeComponent implements OnInit, OnDestroy {
   WebSocketStatus = WebSocketStatus;
   connectedAt: Date | null = null;
   currentUptime: string = '--';
+  uptimeData: UptimeResponse | null = null;
+  uptimeLoading = false;
+  uptimeError: string | null = null;
   private destroy$ = new Subject<void>();
 
-  constructor(private webSocketService: WebSocketService) {}
+  constructor(
+    private webSocketService: WebSocketService,
+    private siteService: SiteService
+  ) {}
 
   ngOnInit(): void {
     this.webSocketService.connectionStatus$
@@ -41,6 +49,29 @@ export class HomeComponent implements OnInit, OnDestroy {
     interval(1000)
       .pipe(takeUntil(this.destroy$))
       .subscribe(() => this.updateUptime());
+
+    // Fetch last 7 days connection status
+    this.loadUptimeData();
+  }
+
+  private loadUptimeData(): void {
+    this.uptimeLoading = true;
+    this.uptimeError = null;
+
+    this.siteService.getUptime(environment.tenantId, environment.siteNumber, 7)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (data) => {
+          console.log('Uptime data:', data);
+          this.uptimeData = data;
+          this.uptimeLoading = false;
+        },
+        error: (err) => {
+          console.error('Failed to load uptime data:', err);
+          this.uptimeError = 'Failed to load uptime data';
+          this.uptimeLoading = false;
+        }
+      });
   }
 
   ngOnDestroy(): void {
