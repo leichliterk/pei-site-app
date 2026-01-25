@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { Router, RouterOutlet } from '@angular/router';
 import { ElectronService } from './services/electron.service';
 import { FtpSyncService } from './services/ftp-sync.service';
+import { WebSocketService } from './services/websocket.service';
 import { environment } from '../environments/environment';
 import { ButtonModule } from 'primeng/button';
 import { ToolbarModule } from 'primeng/toolbar';
@@ -23,7 +24,8 @@ export class AppComponent implements OnInit {
   constructor(
     public electronService: ElectronService,
     private router: Router,
-    private ftpSyncService: FtpSyncService  // Inject to initialize the service
+    private ftpSyncService: FtpSyncService,
+    private webSocketService: WebSocketService
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -38,6 +40,9 @@ export class AppComponent implements OnInit {
     if (savedSiteName !== null) {
       environment.siteName = savedSiteName;
     }
+
+    // Establish WebSocket connection
+    this.webSocketService.connect();
   }
 
   async openFile() {
@@ -113,9 +118,5 @@ export class AppComponent implements OnInit {
 
   navigateToHome() {
     this.router.navigate(['/home']);
-  }
-
-  navigateToStatistics() {
-    this.router.navigate(['/statistics']);
   }
 }

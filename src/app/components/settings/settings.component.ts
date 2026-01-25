@@ -2,13 +2,11 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import { ConnectionStatusService, ConnectionStatus, ConnectionState } from '../../services/connection-status.service';
 import { ElectronService, FtpSettings } from '../../services/electron.service';
 import { FtpSyncService } from '../../services/ftp-sync.service';
 import { SiteService } from '../../services/site.service';
 import { Subscription } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { TagModule } from 'primeng/tag';
 
 // PrimeNG imports
 import { InputTextModule } from 'primeng/inputtext';
@@ -34,7 +32,6 @@ import { MessageService } from 'primeng/api';
     DialogModule,
     MessageModule,
     TabsModule,
-    TagModule,
     ToastModule,
     CardModule
   ],
@@ -43,7 +40,6 @@ import { MessageService } from 'primeng/api';
   styleUrl: './settings.component.scss'
 })
 export class SettingsComponent implements OnInit, OnDestroy {
-  isTimerRunning = false;
   siteNumber = environment.siteNumber;
   siteName = '';
   tenantId = '';
@@ -56,14 +52,6 @@ export class SettingsComponent implements OnInit, OnDestroy {
   tenantConfirmationPhrase = '';
   tenantErrorMessage = '';
   private subscription?: Subscription;
-  private connectionSubscription?: Subscription;
-
-  // Connection status
-  connectionState: ConnectionState = {
-    status: ConnectionStatus.DISCONNECTED,
-    lastChecked: new Date()
-  };
-  ConnectionStatus = ConnectionStatus;
 
   // Tab selection
   activeTab = '0';
@@ -93,7 +81,6 @@ export class SettingsComponent implements OnInit, OnDestroy {
   }
 
   constructor(
-    private connectionService: ConnectionStatusService,
     private electronService: ElectronService,
     private ftpSyncService: FtpSyncService,
     private siteService: SiteService,
@@ -103,19 +90,11 @@ export class SettingsComponent implements OnInit, OnDestroy {
 
   async ngOnInit(): Promise<void> {
     // Check for tab query parameter
-    this.route.queryParams.subscribe(params => {
+    this.subscription = this.route.queryParams.subscribe(params => {
       if (params['tab']) {
         this.activeTab = params['tab'];
       }
     });
-
-    this.subscription = this.connectionService.isTimerRunning$.subscribe(
-      isRunning => this.isTimerRunning = isRunning
-    );
-
-    this.connectionSubscription = this.connectionService.status$.subscribe(
-      state => this.connectionState = state
-    );
 
     // Load saved site number from Electron store
     const savedSiteNumber = await this.electronService.getSiteNumber();
@@ -153,58 +132,6 @@ export class SettingsComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     if (this.subscription) {
       this.subscription.unsubscribe();
-    }
-    if (this.connectionSubscription) {
-      this.connectionSubscription.unsubscribe();
-    }
-  }
-
-  toggleConnectionTimer(): void {
-    this.connectionService.toggleTimer();
-  }
-
-  getConnectionStatusText(): string {
-    switch (this.connectionState.status) {
-      case ConnectionStatus.CONNECTED:
-        return 'Connected';
-      case ConnectionStatus.CONNECTING:
-        return 'Connecting...';
-      case ConnectionStatus.DISCONNECTED:
-        return 'Disconnected';
-      case ConnectionStatus.ERROR:
-        return 'Error';
-      default:
-        return 'Unknown';
-    }
-  }
-
-  getConnectionTagSeverity(): 'success' | 'info' | 'warn' | 'danger' | 'secondary' {
-    switch (this.connectionState.status) {
-      case ConnectionStatus.CONNECTED:
-        return 'success';
-      case ConnectionStatus.CONNECTING:
-        return 'info';
-      case ConnectionStatus.DISCONNECTED:
-        return 'warn';
-      case ConnectionStatus.ERROR:
-        return 'danger';
-      default:
-        return 'secondary';
-    }
-  }
-
-  getConnectionTagIcon(): string {
-    switch (this.connectionState.status) {
-      case ConnectionStatus.CONNECTED:
-        return 'pi pi-check-circle';
-      case ConnectionStatus.CONNECTING:
-        return 'pi pi-spin pi-spinner';
-      case ConnectionStatus.DISCONNECTED:
-        return 'pi pi-minus-circle';
-      case ConnectionStatus.ERROR:
-        return 'pi pi-exclamation-circle';
-      default:
-        return 'pi pi-question-circle';
     }
   }
 
