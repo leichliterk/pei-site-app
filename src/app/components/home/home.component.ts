@@ -1,6 +1,6 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Subject, takeUntil } from 'rxjs';
+import { Subject, takeUntil, interval } from 'rxjs';
 import { FtpStatusComponent } from "../ftp-status/ftp-status.component";
 import { CardModule } from 'primeng/card';
 import { TagModule } from 'primeng/tag';
@@ -16,6 +16,8 @@ import { WebSocketService, WebSocketStatus } from '../../services/websocket.serv
 export class HomeComponent implements OnInit, OnDestroy {
   wsStatus: WebSocketStatus = WebSocketStatus.DISCONNECTED;
   WebSocketStatus = WebSocketStatus;
+  connectedAt: Date | null = null;
+  currentUptime: string = '--';
   private destroy$ = new Subject<void>();
 
   constructor(private webSocketService: WebSocketService) {}
@@ -23,12 +25,49 @@ export class HomeComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.webSocketService.connectionStatus$
       .pipe(takeUntil(this.destroy$))
-      .subscribe(status => this.wsStatus = status);
+      .subscribe(status => {
+        const wasConnected = this.wsStatus === WebSocketStatus.CONNECTED;
+        this.wsStatus = status;
+
+        if (status === WebSocketStatus.CONNECTED && !wasConnected) {
+          this.connectedAt = new Date();
+        } else if (status !== WebSocketStatus.CONNECTED) {
+          this.connectedAt = null;
+          this.currentUptime = '--';
+        }
+      });
+
+    // Update uptime every second
+    interval(1000)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => this.updateUptime());
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  private updateUptime(): void {
+    if (!this.connectedAt || this.wsStatus !== WebSocketStatus.CONNECTED) {
+      this.currentUptime = '--';
+      return;
+    }
+
+    const now = new Date();
+    const diffMs = now.getTime() - this.connectedAt.getTime();
+    this.currentUptime = this.formatDuration(diffMs);
+  }
+
+  private formatDuration(ms: number): string {
+    const totalSeconds = Math.floor(ms / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${pad(days)}:${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
   }
 
   getStatusSeverity(): 'success' | 'info' | 'warn' | 'danger' | 'secondary' {

@@ -1,5 +1,7 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Router, RouterOutlet } from '@angular/router';
+import { CommonModule } from '@angular/common';
+import { Subject } from 'rxjs';
 import { ElectronService } from './services/electron.service';
 import { FtpSyncService } from './services/ftp-sync.service';
 import { WebSocketService } from './services/websocket.service';
@@ -11,15 +13,16 @@ import { MessageModule } from 'primeng/message';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, ButtonModule, ToolbarModule, TooltipModule, MessageModule],
+  imports: [CommonModule, RouterOutlet, ButtonModule, ToolbarModule, TooltipModule, MessageModule],
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss']
 })
-export class AppComponent implements OnInit {
+export class AppComponent implements OnInit, OnDestroy {
   selectedFile: any = null;
   isLoading = false;
   error: string | null = null;
   environment = environment;
+  private destroy$ = new Subject<void>();
 
   constructor(
     public electronService: ElectronService,
@@ -43,6 +46,11 @@ export class AppComponent implements OnInit {
 
     // Establish WebSocket connection
     this.webSocketService.connect();
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   async openFile() {
