@@ -5,13 +5,14 @@ import { FtpStatusComponent } from "../ftp-status/ftp-status.component";
 import { CardModule } from 'primeng/card';
 import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
+import { ChartModule } from 'primeng/chart';
 import { WebSocketService, WebSocketStatus } from '../../services/websocket.service';
 import { SiteService, UptimeResponse } from '../../services/site.service';
 import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-home',
-  imports: [CommonModule, FtpStatusComponent, CardModule, TagModule, TooltipModule],
+  imports: [CommonModule, FtpStatusComponent, CardModule, TagModule, TooltipModule, ChartModule],
   templateUrl: './home.component.html',
   styleUrl: './home.component.scss'
 })
@@ -25,12 +26,19 @@ export class HomeComponent implements OnInit, OnDestroy {
   uptimeError: string | null = null;
   private destroy$ = new Subject<void>();
 
+  // Connection history chart (last 5 minutes / 300 seconds)
+  connectionHistory: number[] = new Array(300).fill(0);
+  chartData: any;
+  chartOptions: any;
+
   constructor(
     private webSocketService: WebSocketService,
     private siteService: SiteService
   ) {}
 
   ngOnInit(): void {
+    this.initChart();
+
     this.webSocketService.connectionStatus$
       .pipe(takeUntil(this.destroy$))
       .subscribe(status => {
@@ -45,13 +53,96 @@ export class HomeComponent implements OnInit, OnDestroy {
         }
       });
 
-    // Update uptime every second
+    // Update uptime and chart every second
     interval(1000)
       .pipe(takeUntil(this.destroy$))
-      .subscribe(() => this.updateUptime());
+      .subscribe(() => {
+        this.updateUptime();
+        this.updateConnectionHistory();
+      });
 
     // Fetch last 7 days connection status
     this.loadUptimeData();
+  }
+
+  private initChart(): void {
+    this.chartOptions = {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: {
+        legend: {
+          display: false
+        },
+        tooltip: {
+          enabled: false
+        }
+      },
+      scales: {
+        x: {
+          display: true,
+          title: {
+            display: false
+          },
+          ticks: {
+            display: true,
+            maxTicksLimit: 6,
+            callback: (_value: number, index: number) => {
+              const secondsAgo = 300 - index;
+              if (secondsAgo === 300) return '-5m';
+              if (secondsAgo === 240) return '-4m';
+              if (secondsAgo === 180) return '-3m';
+              if (secondsAgo === 120) return '-2m';
+              if (secondsAgo === 60) return '-1m';
+              if (secondsAgo === 0) return 'Now';
+              return '';
+            }
+          },
+          grid: {
+            display: false
+          }
+        },
+        y: {
+          display: true,
+          min: 0,
+          max: 1,
+          ticks: {
+            stepSize: 1,
+            callback: (value: number) => value === 1 ? 'Up' : 'Down'
+          },
+          grid: {
+            display: false
+          }
+        }
+      }
+    };
+
+    this.updateChartData();
+  }
+
+  private updateConnectionHistory(): void {
+    const isConnected = this.wsStatus === WebSocketStatus.CONNECTED ? 1 : 0;
+    this.connectionHistory.shift();
+    this.connectionHistory.push(isConnected);
+    this.updateChartData();
+  }
+
+  private updateChartData(): void {
+    this.chartData = {
+      labels: Array.from({ length: 300 }, (_, i) => i),
+      datasets: [
+        {
+          data: [...this.connectionHistory],
+          fill: true,
+          backgroundColor: 'rgba(34, 197, 94, 0.2)',
+          borderColor: 'rgb(34, 197, 94)',
+          borderWidth: 2,
+          tension: 0,
+          pointRadius: 0,
+          stepped: true
+        }
+      ]
+    };
   }
 
   private loadUptimeData(): void {
