@@ -19,15 +19,13 @@ import { environment } from '../../../environments/environment';
 export class HomeComponent implements OnInit, OnDestroy {
   wsStatus: WebSocketStatus = WebSocketStatus.DISCONNECTED;
   WebSocketStatus = WebSocketStatus;
-  connectedAt: Date | null = null;
   currentUptime: string = '--';
   uptimeData: UptimeResponse | null = null;
   uptimeLoading = false;
   uptimeError: string | null = null;
   private destroy$ = new Subject<void>();
 
-  // Connection history chart (last 5 minutes / 300 seconds)
-  connectionHistory: number[] = new Array(300).fill(0);
+  // Chart data
   chartData: any;
   chartOptions: any;
 
@@ -36,19 +34,18 @@ export class HomeComponent implements OnInit, OnDestroy {
     private siteService: SiteService
   ) {}
 
+  get connectedAt(): Date | null {
+    return this.webSocketService.connectedAt;
+  }
+
   ngOnInit(): void {
     this.initChart();
 
     this.webSocketService.connectionStatus$
       .pipe(takeUntil(this.destroy$))
       .subscribe(status => {
-        const wasConnected = this.wsStatus === WebSocketStatus.CONNECTED;
         this.wsStatus = status;
-
-        if (status === WebSocketStatus.CONNECTED && !wasConnected) {
-          this.connectedAt = new Date();
-        } else if (status !== WebSocketStatus.CONNECTED) {
-          this.connectedAt = null;
+        if (status !== WebSocketStatus.CONNECTED) {
           this.currentUptime = '--';
         }
       });
@@ -58,7 +55,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe(() => {
         this.updateUptime();
-        this.updateConnectionHistory();
+        this.updateChartData();
       });
 
     // Fetch last 7 days connection status
@@ -120,19 +117,12 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.updateChartData();
   }
 
-  private updateConnectionHistory(): void {
-    const isConnected = this.wsStatus === WebSocketStatus.CONNECTED ? 1 : 0;
-    this.connectionHistory.shift();
-    this.connectionHistory.push(isConnected);
-    this.updateChartData();
-  }
-
   private updateChartData(): void {
     this.chartData = {
       labels: Array.from({ length: 300 }, (_, i) => i),
       datasets: [
         {
-          data: [...this.connectionHistory],
+          data: [...this.webSocketService.connectionHistory],
           fill: true,
           backgroundColor: 'rgba(34, 197, 94, 0.2)',
           borderColor: 'rgb(34, 197, 94)',
