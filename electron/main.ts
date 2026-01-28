@@ -62,6 +62,9 @@ function createWindow(): void {
 
 // App event listeners
 app.whenReady().then(() => {
+  // Initialize settings from installer BEFORE creating window
+  // This ensures Angular app has correct values when it loads
+  initializeSettingsFromInstaller();
   createWindow();
 
   // Register global shortcut to toggle DevTools (F12)
@@ -216,39 +219,47 @@ function setStartupEnabled(enabled: boolean): boolean {
 // Initialize settings from installer registry on first run
 function initializeSettingsFromInstaller() {
   try {
-    // Check if settings file already exists
-    if (fs.existsSync(settingsFilePath)) {
-      const data = fs.readFileSync(settingsFilePath, 'utf8');
-      const settings = JSON.parse(data);
-      // If settings already have values, don't overwrite
-      if (settings.tenantId || settings.siteNumber || settings.siteName) {
-        return;
-      }
-    }
-
     // Try to read from Windows registry (MSI installer values)
-    const tenantId = readWindowsRegistry('HKLM\\Software\\PEI Data Systems\\PDS Site App', 'TenantId');
-    const siteId = readWindowsRegistry('HKLM\\Software\\PEI Data Systems\\PDS Site App', 'SiteId');
-    const siteName = readWindowsRegistry('HKLM\\Software\\PEI Data Systems\\PDS Site App', 'SiteName');
+    // 32-bit MSI on 64-bit Windows writes to WOW6432Node, so check both paths
+    const registryPath64 = 'HKLM\\Software\\PEI Data Systems\\PEI Site App';
+    const registryPath32 = 'HKLM\\Software\\WOW6432Node\\PEI Data Systems\\PEI Site App';
 
+    // Try 32-bit path first (where 32-bit MSI writes on 64-bit Windows)
+    let tenantId = readWindowsRegistry(registryPath32, 'TenantId');
+    let siteId = readWindowsRegistry(registryPath32, 'SiteId');
+    let siteName = readWindowsRegistry(registryPath32, 'SiteName');
+
+    // Fall back to 64-bit path if not found
+    if (!tenantId) tenantId = readWindowsRegistry(registryPath64, 'TenantId');
+    if (!siteId) siteId = readWindowsRegistry(registryPath64, 'SiteId');
+    if (!siteName) siteName = readWindowsRegistry(registryPath64, 'SiteName');
+
+    console.log('Registry values found:', { tenantId, siteId, siteName });
+
+    // If registry has values, use them (MSI installation takes precedence)
     if (tenantId || siteId || siteName) {
-      const settings: any = {};
+      // Load existing settings to preserve other values (like FTP settings)
+      let settings: any = {};
+      if (fs.existsSync(settingsFilePath)) {
+        const data = fs.readFileSync(settingsFilePath, 'utf8');
+        settings = JSON.parse(data);
+      }
+
+      // Update with registry values (overwrite existing site config)
       if (tenantId) settings.tenantId = tenantId;
       if (siteId) settings.siteNumber = parseInt(siteId, 10);
       if (siteName) settings.siteName = siteName;
 
       fs.writeFileSync(settingsFilePath, JSON.stringify(settings, null, 2), 'utf8');
-      console.log('Settings initialized from installer configuration');
+      console.log('Settings initialized from installer configuration:', { tenantId, siteId, siteName });
     }
   } catch (error) {
     console.error('Error initializing settings from installer:', error);
   }
 }
 
-// Initialize settings on app startup
-app.on('ready', () => {
-  initializeSettingsFromInstaller();
-});
+// Note: initializeSettingsFromInstaller() is called in whenReady().then()
+// before createWindow() to ensure settings are ready when Angular loads
 
 ipcMain.handle('settings:getSiteNumber', async () => {
   try {

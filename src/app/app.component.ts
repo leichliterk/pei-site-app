@@ -31,20 +31,9 @@ export class AppComponent implements OnInit, OnDestroy {
     private webSocketService: WebSocketService
   ) {}
 
-  async ngOnInit(): Promise<void> {
-    // Load saved site number from Electron store
-    const savedSiteNumber = await this.electronService.getSiteNumber();
-    if (savedSiteNumber !== null) {
-      environment.siteNumber = savedSiteNumber;
-    }
-
-    // Load saved site name from Electron store
-    const savedSiteName = await this.electronService.getSiteName();
-    if (savedSiteName !== null) {
-      environment.siteName = savedSiteName;
-    }
-
-    // Establish WebSocket connection
+  ngOnInit(): void {
+    // Settings are loaded by APP_INITIALIZER before any component initializes
+    // Just establish WebSocket connection here
     this.webSocketService.connect();
   }
 

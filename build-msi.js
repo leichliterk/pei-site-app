@@ -64,91 +64,9 @@ async function buildMSI() {
     // MSI specific configuration
     upgradeCode: '57f48daa-3001-40a9-9dab-5a20450fd982', // Generate a new GUID for this
 
-    // UI configuration
+    // UI configuration - use WixUI_InstallDir as base
     ui: {
-      chooseDirectory: true,
-      template: `
-        <UI Id="UserInterface">
-          <TextStyle Id="WixUI_Font_Normal" FaceName="Tahoma" Size="8" />
-          <TextStyle Id="WixUI_Font_Bigger" FaceName="Tahoma" Size="12" />
-          <TextStyle Id="WixUI_Font_Title" FaceName="Tahoma" Size="9" Bold="yes" />
-          <Property Id="DefaultUIFont" Value="WixUI_Font_Normal" />
-          <Property Id="WixUI_Mode" Value="InstallDir" />
-          <Property Id="WIXUI_INSTALLDIR" Value="APPLICATIONROOTDIRECTORY" />
-
-          <DialogRef Id="BrowseDlg" />
-          <DialogRef Id="DiskCostDlg" />
-          <DialogRef Id="ErrorDlg" />
-          <DialogRef Id="FatalError" />
-          <DialogRef Id="FilesInUse" />
-          <DialogRef Id="MsiRMFilesInUse" />
-          <DialogRef Id="PrepareDlg" />
-          <DialogRef Id="ProgressDlg" />
-          <DialogRef Id="ResumeDlg" />
-          <DialogRef Id="UserExit" />
-
-          <!-- Custom Configuration Dialog -->
-          <Dialog Id="ConfigurationDlg" Width="370" Height="310" Title="[ProductName] Configuration">
-            <Control Id="Title" Type="Text" X="15" Y="6" Width="300" Height="15" Transparent="yes" NoPrefix="yes">
-              <Text>{\\WixUI_Font_Title}Application Configuration</Text>
-            </Control>
-
-            <Control Id="Description" Type="Text" X="25" Y="23" Width="320" Height="30" Transparent="yes" NoPrefix="yes">
-              <Text>Please enter your Tenant ID, Site ID, and Site Name. These values will be used to configure the application.</Text>
-            </Control>
-
-            <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="!(loc.InstallDirDlgBannerBitmap)" />
-            <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
-
-            <!-- Tenant ID Input -->
-            <Control Id="TenantIdLabel" Type="Text" X="20" Y="60" Width="100" Height="15" TabSkip="no">
-              <Text>&amp;Tenant ID:</Text>
-            </Control>
-            <Control Id="TenantIdEdit" Type="Edit" X="20" Y="75" Width="330" Height="18" Property="TENANT_ID" />
-
-            <!-- Site ID Input -->
-            <Control Id="SiteIdLabel" Type="Text" X="20" Y="100" Width="100" Height="15" TabSkip="no">
-              <Text>&amp;Site ID:</Text>
-            </Control>
-            <Control Id="SiteIdEdit" Type="Edit" X="20" Y="115" Width="330" Height="18" Property="SITE_ID" />
-
-            <!-- Site Name Input -->
-            <Control Id="SiteNameLabel" Type="Text" X="20" Y="140" Width="100" Height="15" TabSkip="no">
-              <Text>Site &amp;Name:</Text>
-            </Control>
-            <Control Id="SiteNameEdit" Type="Edit" X="20" Y="155" Width="330" Height="18" Property="SITE_NAME" />
-
-            <!-- Start with Windows Checkbox -->
-            <Control Id="StartWithWindowsCheckbox" Type="CheckBox" X="20" Y="185" Width="330" Height="17" Property="START_WITH_WINDOWS" CheckBoxValue="1">
-              <Text>Start application automatically when Windows starts (recommended)</Text>
-            </Control>
-
-            <!-- Navigation buttons -->
-            <Control Id="BottomLine" Type="Line" X="0" Y="274" Width="370" Height="0" />
-            <Control Id="Back" Type="PushButton" X="180" Y="283" Width="56" Height="17" Text="!(loc.WixUIBack)" />
-            <Control Id="Next" Type="PushButton" X="236" Y="283" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)" />
-            <Control Id="Cancel" Type="PushButton" X="304" Y="283" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
-              <Publish Event="SpawnDialog" Value="CancelDlg">1</Publish>
-            </Control>
-          </Dialog>
-
-          <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="ConfigurationDlg">NOT Installed</Publish>
-          <Publish Dialog="ConfigurationDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg">1</Publish>
-          <Publish Dialog="ConfigurationDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg">1</Publish>
-          <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="ConfigurationDlg">1</Publish>
-          <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg">1</Publish>
-          <Publish Dialog="InstallDirDlg" Control="ChangeFolder" Property="_BrowseProperty" Value="[WIXUI_INSTALLDIR]" Order="1">1</Publish>
-          <Publish Dialog="InstallDirDlg" Control="ChangeFolder" Event="SpawnDialog" Value="BrowseDlg" Order="2">1</Publish>
-          <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="InstallDirDlg" Order="1">NOT Installed</Publish>
-          <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="2">Installed</Publish>
-          <Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg">1</Publish>
-          <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg">1</Publish>
-          <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg">1</Publish>
-          <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg">1</Publish>
-          <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999">1</Publish>
-        </UI>
-        <UIRef Id="WixUI_Common" />
-      `,
+      chooseDirectory: true
       // images: {
       //   background: path.resolve(__dirname, 'installer', 'background.png'), // Optional: 493x312
       //   banner: path.resolve(__dirname, 'installer', 'banner.png'), // Optional: 493x58
@@ -200,7 +118,7 @@ async function buildMSI() {
     <Property Id="TENANT_ID" Secure="yes">
       <RegistrySearch Id="TenantIdSearch"
                      Root="HKLM"
-                     Key="Software\\PEI Data Systems\\[ProductName]"
+                     Key="Software\\PEI Data Systems\\PEI Site App"
                      Name="TenantId"
                      Type="raw" />
     </Property>
@@ -208,7 +126,7 @@ async function buildMSI() {
     <Property Id="SITE_ID" Secure="yes">
       <RegistrySearch Id="SiteIdSearch"
                      Root="HKLM"
-                     Key="Software\\PEI Data Systems\\[ProductName]"
+                     Key="Software\\PEI Data Systems\\PEI Site App"
                      Name="SiteId"
                      Type="raw" />
     </Property>
@@ -216,7 +134,7 @@ async function buildMSI() {
     <Property Id="SITE_NAME" Secure="yes">
       <RegistrySearch Id="SiteNameSearch"
                      Root="HKLM"
-                     Key="Software\\PEI Data Systems\\[ProductName]"
+                     Key="Software\\PEI Data Systems\\PEI Site App"
                      Name="SiteName"
                      Type="raw" />
     </Property>
@@ -232,10 +150,11 @@ async function buildMSI() {
     wxsContent = wxsContent.replace(/(\s+)(<Directory[\s>])/m, `$1${propertiesXml}$1$2`);
 
     // Add registry component as a new DirectoryRef section
+    // 32-bit MSI writes to WOW6432Node on 64-bit Windows - Electron app handles this
     const registryComponentXml = `
     <DirectoryRef Id="APPLICATIONROOTDIRECTORY">
       <Component Id="ConfigRegistryEntries" Guid="*">
-        <RegistryKey Root="HKLM" Key="Software\\PEI Data Systems\\[ProductName]" ForceCreateOnInstall="yes">
+        <RegistryKey Root="HKLM" Key="Software\\PEI Data Systems\\PEI Site App" ForceCreateOnInstall="yes">
           <RegistryValue Type="string" Name="TenantId" Value="[TENANT_ID]" KeyPath="yes"/>
           <RegistryValue Type="string" Name="SiteId" Value="[SITE_ID]"/>
           <RegistryValue Type="string" Name="SiteName" Value="[SITE_NAME]"/>
@@ -299,9 +218,103 @@ async function buildMSI() {
       '$1$2,0$3'
     );
 
+    // Completely replace the UI section with a custom one
+    // Using WixUI_Common as base and defining our own complete dialog flow
+    const customUiXml = `
+    <UI Id="CustomInstallUI">
+      <UIRef Id="WixUI_Common" />
+      <Property Id="WIXUI_INSTALLDIR" Value="APPLICATIONROOTDIRECTORY" />
+
+      <TextStyle Id="WixUI_Font_Normal" FaceName="Tahoma" Size="8" />
+      <TextStyle Id="WixUI_Font_Bigger" FaceName="Tahoma" Size="12" />
+      <TextStyle Id="WixUI_Font_Title" FaceName="Tahoma" Size="9" Bold="yes" />
+      <Property Id="DefaultUIFont" Value="WixUI_Font_Normal" />
+
+      <!-- Standard dialog references -->
+      <DialogRef Id="BrowseDlg" />
+      <DialogRef Id="DiskCostDlg" />
+      <DialogRef Id="ErrorDlg" />
+      <DialogRef Id="FatalError" />
+      <DialogRef Id="FilesInUse" />
+      <DialogRef Id="MsiRMFilesInUse" />
+      <DialogRef Id="PrepareDlg" />
+      <DialogRef Id="ProgressDlg" />
+      <DialogRef Id="ResumeDlg" />
+      <DialogRef Id="UserExit" />
+      <DialogRef Id="WelcomeDlg" />
+      <DialogRef Id="InstallDirDlg" />
+      <DialogRef Id="InvalidDirDlg" />
+      <DialogRef Id="VerifyReadyDlg" />
+      <DialogRef Id="ExitDialog" />
+
+      <!-- Custom Configuration Dialog -->
+      <Dialog Id="ConfigurationDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="!(loc.InstallDirDlgBannerBitmap)" />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="{\\WixUI_Font_Title}Site Configuration" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="Please enter your site configuration details." />
+
+        <!-- Tenant ID Input -->
+        <Control Id="TenantIdLabel" Type="Text" X="20" Y="55" Width="100" Height="15" NoPrefix="yes" Text="Tenant ID:" />
+        <Control Id="TenantIdEdit" Type="Edit" X="20" Y="70" Width="330" Height="18" Property="TENANT_ID" />
+
+        <!-- Site ID Input -->
+        <Control Id="SiteIdLabel" Type="Text" X="20" Y="95" Width="100" Height="15" NoPrefix="yes" Text="Site ID:" />
+        <Control Id="SiteIdEdit" Type="Edit" X="20" Y="110" Width="330" Height="18" Property="SITE_ID" />
+
+        <!-- Site Name Input -->
+        <Control Id="SiteNameLabel" Type="Text" X="20" Y="135" Width="100" Height="15" NoPrefix="yes" Text="Site Name:" />
+        <Control Id="SiteNameEdit" Type="Edit" X="20" Y="150" Width="330" Height="18" Property="SITE_NAME" />
+
+        <!-- Start with Windows Checkbox -->
+        <Control Id="StartWithWindowsCheckbox" Type="CheckBox" X="20" Y="180" Width="330" Height="17" Property="START_WITH_WINDOWS" CheckBoxValue="1" Text="Start application automatically when Windows starts" />
+
+        <!-- Navigation buttons -->
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)" />
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg">1</Publish>
+        </Control>
+      </Dialog>
+
+      <!-- Complete dialog flow for fresh install: Welcome -> Configuration -> InstallDir -> VerifyReady -->
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="ConfigurationDlg">NOT Installed</Publish>
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg">Installed AND PATCH</Publish>
+
+      <Publish Dialog="ConfigurationDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg">1</Publish>
+      <Publish Dialog="ConfigurationDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg">1</Publish>
+
+      <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="ConfigurationDlg">1</Publish>
+      <Publish Dialog="InstallDirDlg" Control="Next" Event="SetTargetPath" Value="[WIXUI_INSTALLDIR]" Order="1">1</Publish>
+      <Publish Dialog="InstallDirDlg" Control="Next" Event="DoAction" Value="WixUIValidatePath" Order="2">NOT WIXUI_DONTVALIDATEPATH</Publish>
+      <Publish Dialog="InstallDirDlg" Control="Next" Event="SpawnDialog" Value="InvalidDirDlg" Order="3"><![CDATA[NOT WIXUI_DONTVALIDATEPATH AND WIXUI_INSTALLDIR_VALID<>"1"]]></Publish>
+      <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Order="4">WIXUI_DONTVALIDATEPATH OR WIXUI_INSTALLDIR_VALID="1"</Publish>
+      <Publish Dialog="InstallDirDlg" Control="ChangeFolder" Property="_BrowseProperty" Value="[WIXUI_INSTALLDIR]" Order="1">1</Publish>
+      <Publish Dialog="InstallDirDlg" Control="ChangeFolder" Event="SpawnDialog" Value="BrowseDlg" Order="2">1</Publish>
+
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="InstallDirDlg" Order="1">NOT Installed</Publish>
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="2">Installed AND PATCH</Publish>
+
+      <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999">1</Publish>
+    </UI>
+    <UIRef Id="WixUI_ErrorProgressText" />
+`;
+
+    // Replace the entire UI section with our custom one
+    // Match UI sections with or without Id attribute, and also remove the following UIRef if present
+    const uiSectionRegex = /<UI[^>]*>[\s\S]*?<\/UI>\s*(?:<UIRef[^>]*\/>)?/;
+    if (uiSectionRegex.test(wxsContent)) {
+      wxsContent = wxsContent.replace(uiSectionRegex, customUiXml);
+      console.log('Replaced UI section with custom UI');
+    } else {
+      console.error('Could not find UI section in WXS file');
+    }
+
     // Write the modified content back
     fs.writeFileSync(wxsPath, wxsContent, 'utf8');
-    console.log('Modified WiX source file with custom properties, components, shortcut icons, and DisplayIcon');
+    console.log('Modified WiX source file with custom UI, properties, components, and icons');
 
     // Step 3: Compile the MSI
     await msiCreator.compile();
