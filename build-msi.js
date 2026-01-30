@@ -169,6 +169,11 @@ async function buildMSI() {
           <RegistryValue Type="string" Name="[ProductName]" Value="&quot;[APPLICATIONROOTDIRECTORY]app-1.0.0\\PEI Site App.exe&quot;" KeyPath="yes"/>
         </RegistryKey>
       </Component>
+
+      <!-- Install icon file for Add/Remove Programs display -->
+      <Component Id="AppIconFile" Guid="*">
+        <File Id="AppIconIco" Name="app-icon.ico" Source="${iconPath}" KeyPath="yes" />
+      </Component>
     </DirectoryRef>
 `;
 
@@ -181,7 +186,8 @@ async function buildMSI() {
     // Add ComponentRef to the main feature
     const componentRefXml = `
       <ComponentRef Id="ConfigRegistryEntries" />
-      <ComponentRef Id="StartupRegistryEntry" />`;
+      <ComponentRef Id="StartupRegistryEntry" />
+      <ComponentRef Id="AppIconFile" />`;
 
     // Find the Feature element and add our component references
     wxsContent = wxsContent.replace(
@@ -212,10 +218,11 @@ async function buildMSI() {
       iconDefinition
     );
 
-    // Update the DisplayIcon registry value to explicitly include icon index
+    // Update the DisplayIcon registry value to point to the installed .ico file
+    // This ensures Windows Settings shows the correct icon
     wxsContent = wxsContent.replace(
       /(<RegistryValue\s+Name="DisplayIcon"\s+Type="expandable"\s+Value=")(\[APPLICATIONROOTDIRECTORY\]PEI Site App\.exe)(")/,
-      '$1$2,0$3'
+      '$1[APPLICATIONROOTDIRECTORY]app-icon.ico$3'
     );
 
     // Completely replace the UI section with a custom one
