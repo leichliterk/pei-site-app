@@ -225,6 +225,24 @@ async function buildMSI() {
       '$1[APPLICATIONROOTDIRECTORY]app-icon.ico$3'
     );
 
+    // Fix the product name in Windows Settings - remove "(Machine)" suffix
+    // Override VisibleProductName to just be "PEI Site App"
+    wxsContent = wxsContent.replace(
+      /<Property Id="VisibleProductName" Value="[^"]*"/,
+      '<Property Id="VisibleProductName" Value="PEI Site App"'
+    );
+
+    // Remove the SetProperty actions that add "(User)" suffix
+    // These span multiple lines and contain CDATA sections
+    wxsContent = wxsContent.replace(
+      /<!--[^>]*change the product name[^>]*-->\s*<SetProperty Action="SetVisibleProductName"[\s\S]*?<\/SetProperty>/g,
+      ''
+    );
+    wxsContent = wxsContent.replace(
+      /<!--[^>]*MSI generaten entry[^>]*-->\s*<SetProperty Action="SetProductName"[\s\S]*?<\/SetProperty>/g,
+      ''
+    );
+
     // Completely replace the UI section with a custom one
     // Using WixUI_Common as base and defining our own complete dialog flow
     const customUiXml = `

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, shell, ipcMain, dialog, globalShortcut } from 'electron';
+import { app, BrowserWindow, Menu, Tray, shell, ipcMain, dialog, globalShortcut, nativeImage } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import { isDev } from './utils';
@@ -8,6 +8,8 @@ import * as ftp from 'basic-ftp';
 const { execSync } = require('child_process');
 
 let mainWindow: BrowserWindow | null;
+let tray: Tray | null = null;
+let isQuitting = false;
 
 function createWindow(): void {
   // Create the browser window
@@ -45,7 +47,15 @@ function createWindow(): void {
     }
   });
 
-  // Handle window closed
+  // Handle window close - minimize to tray instead of quitting
+  mainWindow.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      mainWindow?.hide();
+    }
+  });
+
+  // Handle window closed (only when actually quitting)
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -60,12 +70,69 @@ function createWindow(): void {
   Menu.setApplicationMenu(null);
 }
 
+// Create system tray icon and menu
+function createTray(): void {
+  // Get icon path - use different paths for dev vs production
+  let iconPath: string;
+  if (isDev()) {
+    iconPath = path.join(__dirname, '../src/assets/icon.ico');
+  } else {
+    // In production, the MSI installs app-icon.ico to the application root directory
+    // The exe is in app-1.0.0 subfolder, so go up two levels to find the icon
+    const exeDir = path.dirname(app.getPath('exe'));
+    const possiblePaths = [
+      path.join(exeDir, '..', 'app-icon.ico'),  // MSI installed icon (one level up from exe)
+      path.join(exeDir, 'app-icon.ico'),         // In case it's in exe directory
+      path.join(process.resourcesPath, 'app-icon.ico'),
+      path.join(process.resourcesPath, 'icon.ico')
+    ];
+    iconPath = possiblePaths.find(p => fs.existsSync(p)) || possiblePaths[0];
+    console.log('Tray icon path:', iconPath, 'exists:', fs.existsSync(iconPath));
+  }
+
+  // Create tray icon
+  const icon = nativeImage.createFromPath(iconPath);
+  tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon);
+
+  // Create context menu for tray
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Show App',
+      click: () => {
+        if (mainWindow) {
+          mainWindow.show();
+          mainWindow.focus();
+        }
+      }
+    },
+    {
+      label: 'Quit',
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      }
+    }
+  ]);
+
+  tray.setToolTip('PEI Site App');
+  tray.setContextMenu(contextMenu);
+
+  // Double-click on tray icon shows the window
+  tray.on('double-click', () => {
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
+
 // App event listeners
 app.whenReady().then(() => {
   // Initialize settings from installer BEFORE creating window
   // This ensures Angular app has correct values when it loads
   initializeSettingsFromInstaller();
   createWindow();
+  createTray();
 
   // Register global shortcut to toggle DevTools (F12)
   globalShortcut.register('F12', () => {
@@ -91,14 +158,23 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  // Don't quit when window is closed - app stays in system tray
+  // Only quit when isQuitting is true (user selected Quit from tray menu)
+});
+
+app.on('before-quit', () => {
+  isQuitting = true;
 });
 
 app.on('will-quit', () => {
   // Unregister all shortcuts
   globalShortcut.unregisterAll();
+
+  // Destroy tray icon
+  if (tray) {
+    tray.destroy();
+    tray = null;
+  }
 });
 
 app.on('activate', () => {
