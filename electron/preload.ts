@@ -64,6 +64,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Example of listening to messages from main process
   onMessage: (callback: (message: string) => void) => {
     ipcRenderer.on('app:message', (event, message) => callback(message));
+  },
+
+  // Navigation from tray menu
+  onNavigate: (callback: (route: string) => void) => {
+    ipcRenderer.on('app:navigate', (event, route) => callback(route));
   }
 });
 
@@ -95,6 +100,7 @@ declare global {
       ftpClearDownloadHistory: () => Promise<boolean>;
       sendMessage: (message: string) => Promise<any>;
       onMessage: (callback: (message: string) => void) => void;
+      onNavigate: (callback: (route: string) => void) => void;
     };
   }
 }

@@ -35,6 +35,11 @@ export class AppComponent implements OnInit, OnDestroy {
     // Settings are loaded by APP_INITIALIZER before any component initializes
     // Just establish WebSocket connection here
     this.webSocketService.connect();
+
+    // Listen for navigation events from system tray menu
+    this.electronService.onNavigate((route: string) => {
+      this.router.navigate([route]);
+    });
   }
 
   ngOnDestroy(): void {

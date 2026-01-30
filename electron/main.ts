@@ -102,9 +102,21 @@ function createTray(): void {
         if (mainWindow) {
           mainWindow.show();
           mainWindow.focus();
+          mainWindow.webContents.send('app:navigate', '/home');
         }
       }
     },
+    {
+      label: 'Settings',
+      click: () => {
+        if (mainWindow) {
+          mainWindow.show();
+          mainWindow.focus();
+          mainWindow.webContents.send('app:navigate', '/settings');
+        }
+      }
+    },
+    { type: 'separator' },
     {
       label: 'Quit',
       click: () => {
