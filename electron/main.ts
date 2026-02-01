@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, shell, ipcMain, dialog, globalShortcut } from 'electron';
+import { app, BrowserWindow, Menu, Tray, shell, ipcMain, dialog, globalShortcut, nativeImage } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import { isDev } from './utils';
@@ -8,6 +8,8 @@ import * as ftp from 'basic-ftp';
 const { execSync } = require('child_process');
 
 let mainWindow: BrowserWindow | null;
+let tray: Tray | null = null;
+let isQuitting = false;
 
 function createWindow(): void {
   // Create the browser window
@@ -45,7 +47,15 @@ function createWindow(): void {
     }
   });
 
-  // Handle window closed
+  // Handle window close - minimize to tray instead of quitting
+  mainWindow.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      mainWindow?.hide();
+    }
+  });
+
+  // Handle window closed (only when actually quitting)
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -60,9 +70,81 @@ function createWindow(): void {
   Menu.setApplicationMenu(null);
 }
 
+// Create system tray icon and menu
+function createTray(): void {
+  // Get icon path - use different paths for dev vs production
+  let iconPath: string;
+  if (isDev()) {
+    iconPath = path.join(__dirname, '../src/assets/icon.ico');
+  } else {
+    // In production, the MSI installs app-icon.ico to the application root directory
+    // The exe is in app-1.0.0 subfolder, so go up two levels to find the icon
+    const exeDir = path.dirname(app.getPath('exe'));
+    const possiblePaths = [
+      path.join(exeDir, '..', 'app-icon.ico'),  // MSI installed icon (one level up from exe)
+      path.join(exeDir, 'app-icon.ico'),         // In case it's in exe directory
+      path.join(process.resourcesPath, 'app-icon.ico'),
+      path.join(process.resourcesPath, 'icon.ico')
+    ];
+    iconPath = possiblePaths.find(p => fs.existsSync(p)) || possiblePaths[0];
+    console.log('Tray icon path:', iconPath, 'exists:', fs.existsSync(iconPath));
+  }
+
+  // Create tray icon
+  const icon = nativeImage.createFromPath(iconPath);
+  tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon);
+
+  // Create context menu for tray
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Show App',
+      click: () => {
+        if (mainWindow) {
+          mainWindow.show();
+          mainWindow.focus();
+          mainWindow.webContents.send('app:navigate', '/home');
+        }
+      }
+    },
+    {
+      label: 'Settings',
+      click: () => {
+        if (mainWindow) {
+          mainWindow.show();
+          mainWindow.focus();
+          mainWindow.webContents.send('app:navigate', '/settings');
+        }
+      }
+    },
+    { type: 'separator' },
+    {
+      label: 'Quit',
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      }
+    }
+  ]);
+
+  tray.setToolTip('PEI Site App');
+  tray.setContextMenu(contextMenu);
+
+  // Double-click on tray icon shows the window
+  tray.on('double-click', () => {
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
+
 // App event listeners
 app.whenReady().then(() => {
+  // Initialize settings from installer BEFORE creating window
+  // This ensures Angular app has correct values when it loads
+  initializeSettingsFromInstaller();
   createWindow();
+  createTray();
 
   // Register global shortcut to toggle DevTools (F12)
   globalShortcut.register('F12', () => {
@@ -88,14 +170,23 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  // Don't quit when window is closed - app stays in system tray
+  // Only quit when isQuitting is true (user selected Quit from tray menu)
+});
+
+app.on('before-quit', () => {
+  isQuitting = true;
 });
 
 app.on('will-quit', () => {
   // Unregister all shortcuts
   globalShortcut.unregisterAll();
+
+  // Destroy tray icon
+  if (tray) {
+    tray.destroy();
+    tray = null;
+  }
 });
 
 app.on('activate', () => {
@@ -216,39 +307,47 @@ function setStartupEnabled(enabled: boolean): boolean {
 // Initialize settings from installer registry on first run
 function initializeSettingsFromInstaller() {
   try {
-    // Check if settings file already exists
-    if (fs.existsSync(settingsFilePath)) {
-      const data = fs.readFileSync(settingsFilePath, 'utf8');
-      const settings = JSON.parse(data);
-      // If settings already have values, don't overwrite
-      if (settings.tenantId || settings.siteNumber || settings.siteName) {
-        return;
-      }
-    }
-
     // Try to read from Windows registry (MSI installer values)
-    const tenantId = readWindowsRegistry('HKLM\\Software\\PEI Data Systems\\PDS Site App', 'TenantId');
-    const siteId = readWindowsRegistry('HKLM\\Software\\PEI Data Systems\\PDS Site App', 'SiteId');
-    const siteName = readWindowsRegistry('HKLM\\Software\\PEI Data Systems\\PDS Site App', 'SiteName');
+    // 32-bit MSI on 64-bit Windows writes to WOW6432Node, so check both paths
+    const registryPath64 = 'HKLM\\Software\\PEI Data Systems\\PEI Site App';
+    const registryPath32 = 'HKLM\\Software\\WOW6432Node\\PEI Data Systems\\PEI Site App';
 
+    // Try 32-bit path first (where 32-bit MSI writes on 64-bit Windows)
+    let tenantId = readWindowsRegistry(registryPath32, 'TenantId');
+    let siteId = readWindowsRegistry(registryPath32, 'SiteId');
+    let siteName = readWindowsRegistry(registryPath32, 'SiteName');
+
+    // Fall back to 64-bit path if not found
+    if (!tenantId) tenantId = readWindowsRegistry(registryPath64, 'TenantId');
+    if (!siteId) siteId = readWindowsRegistry(registryPath64, 'SiteId');
+    if (!siteName) siteName = readWindowsRegistry(registryPath64, 'SiteName');
+
+    console.log('Registry values found:', { tenantId, siteId, siteName });
+
+    // If registry has values, use them (MSI installation takes precedence)
     if (tenantId || siteId || siteName) {
-      const settings: any = {};
+      // Load existing settings to preserve other values (like FTP settings)
+      let settings: any = {};
+      if (fs.existsSync(settingsFilePath)) {
+        const data = fs.readFileSync(settingsFilePath, 'utf8');
+        settings = JSON.parse(data);
+      }
+
+      // Update with registry values (overwrite existing site config)
       if (tenantId) settings.tenantId = tenantId;
       if (siteId) settings.siteNumber = parseInt(siteId, 10);
       if (siteName) settings.siteName = siteName;
 
       fs.writeFileSync(settingsFilePath, JSON.stringify(settings, null, 2), 'utf8');
-      console.log('Settings initialized from installer configuration');
+      console.log('Settings initialized from installer configuration:', { tenantId, siteId, siteName });
     }
   } catch (error) {
     console.error('Error initializing settings from installer:', error);
   }
 }
 
-// Initialize settings on app startup
-app.on('ready', () => {
-  initializeSettingsFromInstaller();
-});
+// Note: initializeSettingsFromInstaller() is called in whenReady().then()
+// before createWindow() to ensure settings are ready when Angular loads
 
 ipcMain.handle('settings:getSiteNumber', async () => {
   try {

@@ -179,4 +179,11 @@ export class ElectronService {
     }
     return false;
   }
+
+  // Navigation from tray menu
+  onNavigate(callback: (route: string) => void): void {
+    if (this.isElectron) {
+      window.electronAPI.onNavigate(callback);
+    }
+  }
 }

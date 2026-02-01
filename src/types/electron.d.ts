@@ -50,6 +50,7 @@ export interface IElectronAPI {
   ftpClearDownloadHistory: () => Promise<boolean>;
   sendMessage: (message: string) => Promise<any>;
   onMessage: (callback: (message: string) => void) => void;
+  onNavigate: (callback: (route: string) => void) => void;
 }
 
 declare global {

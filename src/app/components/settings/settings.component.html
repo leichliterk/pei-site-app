@@ -7,13 +7,9 @@
     <p-tablist>
       <p-tab value="0">
         <i class="pi pi-building mr-2"></i>
-        Site Configuration
+        Site
       </p-tab>
       <p-tab value="1">
-        <i class="pi pi-heart mr-2"></i>
-        Heartbeat
-      </p-tab>
-      <p-tab value="2">
         <i class="pi pi-server mr-2"></i>
         FTP
       </p-tab>
@@ -90,52 +86,8 @@
         </div>
       </p-tabpanel>
 
-      <!-- Heartbeat Tab -->
-      <p-tabpanel value="1">
-        <div class="p-4 space-y-4">
-          <h3 class="text-lg font-medium text-gray-800 mb-4">Connection Monitoring</h3>
-
-          <div class="flex items-center justify-between">
-            <div>
-              <span class="text-gray-700 font-medium">Auto-check connection status</span>
-              <p class="text-sm text-gray-500 mt-1">Automatically check connection status every 15 seconds</p>
-            </div>
-            <p-toggleswitch
-              [(ngModel)]="isTimerRunning"
-              (onChange)="toggleConnectionTimer()"
-              inputId="connection-timer-toggle" />
-          </div>
-
-          <!-- Last Connection Attempt Results -->
-          <div class="border rounded-lg p-4 bg-gray-50">
-            <h4 class="text-sm font-medium text-gray-700 mb-3">Last Connection Attempt</h4>
-            <div class="flex flex-col gap-2">
-              <div class="flex items-center justify-between">
-                <span class="text-gray-600">Status:</span>
-                <p-tag
-                  [severity]="getConnectionTagSeverity()"
-                  [icon]="getConnectionTagIcon()"
-                  [value]="getConnectionStatusText()" />
-              </div>
-              <div class="flex items-center justify-between">
-                <span class="text-gray-600">Last Checked:</span>
-                <span class="text-gray-800">{{ connectionState.lastChecked | date:'medium' }}</span>
-              </div>
-              @if (connectionState.errorMessage) {
-                <div class="mt-2">
-                  <p-message
-                    severity="error"
-                    [text]="connectionState.errorMessage"
-                    styleClass="w-full" />
-                </div>
-              }
-            </div>
-          </div>
-        </div>
-      </p-tabpanel>
-
       <!-- FTP Tab -->
-      <p-tabpanel value="2">
+      <p-tabpanel value="1">
         <div class="p-4 space-y-4">
           <h3 class="text-lg font-medium text-gray-800 mb-4">FTP Sync Configuration</h3>
 

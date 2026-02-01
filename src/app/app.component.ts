@@ -1,7 +1,10 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Router, RouterOutlet } from '@angular/router';
+import { CommonModule } from '@angular/common';
+import { Subject } from 'rxjs';
 import { ElectronService } from './services/electron.service';
 import { FtpSyncService } from './services/ftp-sync.service';
+import { WebSocketService } from './services/websocket.service';
 import { environment } from '../environments/environment';
 import { ButtonModule } from 'primeng/button';
 import { ToolbarModule } from 'primeng/toolbar';
@@ -10,34 +13,38 @@ import { MessageModule } from 'primeng/message';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, ButtonModule, ToolbarModule, TooltipModule, MessageModule],
+  imports: [CommonModule, RouterOutlet, ButtonModule, ToolbarModule, TooltipModule, MessageModule],
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss']
 })
-export class AppComponent implements OnInit {
+export class AppComponent implements OnInit, OnDestroy {
   selectedFile: any = null;
   isLoading = false;
   error: string | null = null;
   environment = environment;
+  private destroy$ = new Subject<void>();
 
   constructor(
     public electronService: ElectronService,
     private router: Router,
-    private ftpSyncService: FtpSyncService  // Inject to initialize the service
+    private ftpSyncService: FtpSyncService,
+    private webSocketService: WebSocketService
   ) {}
 
-  async ngOnInit(): Promise<void> {
-    // Load saved site number from Electron store
-    const savedSiteNumber = await this.electronService.getSiteNumber();
-    if (savedSiteNumber !== null) {
-      environment.siteNumber = savedSiteNumber;
-    }
+  ngOnInit(): void {
+    // Settings are loaded by APP_INITIALIZER before any component initializes
+    // Just establish WebSocket connection here
+    this.webSocketService.connect();
 
-    // Load saved site name from Electron store
-    const savedSiteName = await this.electronService.getSiteName();
-    if (savedSiteName !== null) {
-      environment.siteName = savedSiteName;
-    }
+    // Listen for navigation events from system tray menu
+    this.electronService.onNavigate((route: string) => {
+      this.router.navigate([route]);
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   async openFile() {
@@ -113,9 +120,5 @@ export class AppComponent implements OnInit {
 
   navigateToHome() {
     this.router.navigate(['/home']);
-  }
-
-  navigateToStatistics() {
-    this.router.navigate(['/statistics']);
   }
 }
