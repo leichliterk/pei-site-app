@@ -12,6 +12,23 @@ let tray: Tray | null = null;
 let isQuitting = false;
 
 function createWindow(): void {
+  // Get icon path - use different paths for dev vs production
+  let iconPath: string;
+  if (isDev()) {
+    // __dirname is dist/electron, so go up two levels to project root
+    iconPath = path.join(__dirname, '../../src/assets/icon.ico');
+  } else {
+    // In production, the MSI installs app-icon.ico to the application root directory
+    const exeDir = path.dirname(app.getPath('exe'));
+    const possiblePaths = [
+      path.join(exeDir, '..', 'app-icon.ico'),
+      path.join(exeDir, 'app-icon.ico'),
+      path.join(process.resourcesPath, 'app-icon.ico'),
+      path.join(process.resourcesPath, 'icon.ico')
+    ];
+    iconPath = possiblePaths.find(p => fs.existsSync(p)) || possiblePaths[0];
+  }
+
   // Create the browser window
   mainWindow = new BrowserWindow({
     height: 800,
@@ -23,7 +40,7 @@ function createWindow(): void {
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js')
     },
-    icon: path.join(__dirname, '../src/assets/icon.ico'), // Application icon
+    icon: iconPath,
     show: false, // Don't show until ready-to-show
     titleBarStyle: 'default'
   });
@@ -75,7 +92,8 @@ function createTray(): void {
   // Get icon path - use different paths for dev vs production
   let iconPath: string;
   if (isDev()) {
-    iconPath = path.join(__dirname, '../src/assets/icon.ico');
+    // __dirname is dist/electron, so go up two levels to project root
+    iconPath = path.join(__dirname, '../../src/assets/icon.ico');
   } else {
     // In production, the MSI installs app-icon.ico to the application root directory
     // The exe is in app-1.0.0 subfolder, so go up two levels to find the icon
