@@ -6,7 +6,7 @@ const fs = require('fs');
 async function buildMSI() {
   // Check if staging environment is requested
   const isStaging = process.argv.includes('staging');
-  const envSuffix = isStaging ? ' (Staging)' : '';
+  const envSuffix = isStaging ? ' - Staging' : '';
   const outDirSuffix = isStaging ? '-staging' : '';
 
   // Add WiX to PATH if not already present
@@ -226,10 +226,10 @@ async function buildMSI() {
     );
 
     // Fix the product name in Windows Settings - remove "(Machine)" suffix
-    // Override VisibleProductName to just be "PEI Site App"
+    // Override VisibleProductName to use the correct app name (including staging suffix if applicable)
     wxsContent = wxsContent.replace(
       /<Property Id="VisibleProductName" Value="[^"]*"/,
-      '<Property Id="VisibleProductName" Value="PEI Site App"'
+      `<Property Id="VisibleProductName" Value="${appName}"`
     );
 
     // Remove the SetProperty actions that add "(User)" suffix

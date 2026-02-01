@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Router, RouterOutlet } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { Title } from '@angular/platform-browser';
 import { Subject } from 'rxjs';
 import { ElectronService } from './services/electron.service';
 import { FtpSyncService } from './services/ftp-sync.service';
@@ -28,10 +29,14 @@ export class AppComponent implements OnInit, OnDestroy {
     public electronService: ElectronService,
     private router: Router,
     private ftpSyncService: FtpSyncService,
-    private webSocketService: WebSocketService
+    private webSocketService: WebSocketService,
+    private titleService: Title
   ) {}
 
   ngOnInit(): void {
+    // Set window title from environment
+    this.titleService.setTitle(environment.appName || 'PEI Site App');
+
     // Settings are loaded by APP_INITIALIZER before any component initializes
     // Just establish WebSocket connection here
     this.webSocketService.connect();
