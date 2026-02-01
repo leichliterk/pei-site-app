@@ -1,6 +1,7 @@
 export const environment = {
   production: false,
   staging: false,
+  appName: 'PEI Site App',
   siteNumber: 1051,
   siteName: 'Development Site',
   apiUrl: 'http://localhost:443/api/data',
