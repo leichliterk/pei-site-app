@@ -243,6 +243,19 @@ async function buildMSI() {
       ''
     );
 
+    // Remove electron-wix-msi's default RegistryRunKey component to prevent duplicate startup entries
+    // We have our own conditional StartupRegistryEntry component
+    wxsContent = wxsContent.replace(
+      /<Component Id="RegistryRunKey"[\s\S]*?<\/Component>/g,
+      ''
+    );
+
+    // Remove the AutoLaunch feature that references the removed RegistryRunKey
+    wxsContent = wxsContent.replace(
+      /<Feature Id="AutoLaunch"[\s\S]*?<\/Feature>/g,
+      ''
+    );
+
     // Completely replace the UI section with a custom one
     // Using WixUI_Common as base and defining our own complete dialog flow
     const customUiXml = `
