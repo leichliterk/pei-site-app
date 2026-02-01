@@ -146,6 +146,12 @@ export class HomeComponent implements OnInit, OnDestroy {
           console.log('Uptime data:', data);
           this.uptimeData = data;
           this.uptimeLoading = false;
+
+          // Prepopulate connection history with actual session data
+          if (data.sessions && data.sessions.length > 0) {
+            this.webSocketService.prepopulateHistory(data.sessions);
+            this.updateChartData();
+          }
         },
         error: (err) => {
           console.error('Failed to load uptime data:', err);

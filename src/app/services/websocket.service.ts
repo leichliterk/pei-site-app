@@ -135,6 +135,45 @@ export class WebSocketService implements OnDestroy {
     });
   }
 
+  /**
+   * Prepopulate connection history from uptime session data
+   * This fills in the last 5 minutes of history based on actual connection data
+   */
+  prepopulateHistory(sessions: Array<{ connected_at: string; disconnected_at: string | null }>): void {
+    const now = new Date();
+    const fiveMinutesAgo = new Date(now.getTime() - 300 * 1000);
+
+    // Reset history to all zeros first
+    this._connectionHistory = new Array(300).fill(0);
+
+    // For each session, mark the connected seconds in our history
+    for (const session of sessions) {
+      const connectedAt = new Date(session.connected_at);
+      // If disconnected_at is null or empty, the session is still active (use current time)
+      const disconnectedAt = session.disconnected_at ? new Date(session.disconnected_at) : now;
+
+      // Skip sessions that ended before our 5-minute window
+      if (disconnectedAt < fiveMinutesAgo) {
+        continue;
+      }
+
+      // Calculate the start and end indices in our history array
+      // Index 0 = 5 minutes ago, Index 299 = now
+      const sessionStart = Math.max(connectedAt.getTime(), fiveMinutesAgo.getTime());
+      const sessionEnd = Math.min(disconnectedAt.getTime(), now.getTime());
+
+      const startIndex = Math.floor((sessionStart - fiveMinutesAgo.getTime()) / 1000);
+      const endIndex = Math.floor((sessionEnd - fiveMinutesAgo.getTime()) / 1000);
+
+      // Mark all seconds in this range as connected
+      for (let i = Math.max(0, startIndex); i <= Math.min(299, endIndex); i++) {
+        this._connectionHistory[i] = 1;
+      }
+    }
+
+    console.log('Connection history prepopulated from', sessions.length, 'sessions');
+  }
+
   ngOnDestroy(): void {
     this.historyInterval$?.unsubscribe();
     this.disconnect();
