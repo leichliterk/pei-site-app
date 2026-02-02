@@ -5,6 +5,7 @@ import { ActivatedRoute } from '@angular/router';
 import { ElectronService, FtpSettings } from '../../services/electron.service';
 import { FtpSyncService } from '../../services/ftp-sync.service';
 import { SiteService } from '../../services/site.service';
+import { LocalServiceService } from '../../services/local-service.service';
 import { Subscription } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
@@ -84,6 +85,7 @@ export class SettingsComponent implements OnInit, OnDestroy {
     private electronService: ElectronService,
     private ftpSyncService: FtpSyncService,
     private siteService: SiteService,
+    private localServiceService: LocalServiceService,
     private messageService: MessageService,
     private route: ActivatedRoute
   ) {}
@@ -183,6 +185,12 @@ export class SettingsComponent implements OnInit, OnDestroy {
       console.log('Failed to save tenant ID to persistent storage (may be running in browser mode)');
     }
 
+    // Update local service if available
+    this.localServiceService.updateConfig({ tenantId: parseInt(this.tenantId, 10) }).subscribe({
+      next: () => console.log('Local service config updated with new tenant ID'),
+      error: () => console.log('Local service not available, skipping config update')
+    });
+
     this.closeTenantDialog();
   }
 
@@ -239,6 +247,12 @@ export class SettingsComponent implements OnInit, OnDestroy {
     } else {
       console.log('Failed to save site number to persistent storage (may be running in browser mode)');
     }
+
+    // Update local service if available
+    this.localServiceService.updateConfig({ siteId: parsedNumber }).subscribe({
+      next: () => console.log('Local service config updated with new site number'),
+      error: () => console.log('Local service not available, skipping config update')
+    });
 
     // Update site ID on the server
     if (this.tenantId && oldSiteNumber) {

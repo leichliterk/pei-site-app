@@ -18,9 +18,29 @@ async function buildMSI() {
 
   console.log(`Building MSI for ${isStaging ? 'STAGING' : 'PRODUCTION'} environment...`);
 
+  // Build the service executable first
+  console.log('Building background service executable...');
+  try {
+    execSync('npm run build:exe', {
+      cwd: path.resolve(__dirname, 'service'),
+      stdio: 'inherit'
+    });
+    console.log('Service executable built successfully!');
+  } catch (error) {
+    console.error('Failed to build service executable:', error.message);
+    process.exit(1);
+  }
+
   // Find the built Electron app directory
   const APP_DIR = path.resolve(__dirname, 'release', 'win-unpacked');
   const OUT_DIR = path.resolve(__dirname, 'release', `msi${outDirSuffix}`);
+  const SERVICE_EXE_PATH = path.resolve(__dirname, 'release', 'pei-site-service.exe');
+
+  // Copy service executable to app directory
+  const serviceDestPath = path.join(APP_DIR, 'pei-site-service.exe');
+  console.log('Copying service executable to app directory...');
+  fs.copyFileSync(SERVICE_EXE_PATH, serviceDestPath);
+  console.log('Service executable copied!');
 
   // Paths for icon embedding and MSI configuration
   const exePath = path.join(APP_DIR, 'PEI Site App.exe');
@@ -112,6 +132,25 @@ async function buildMSI() {
     const wxsPath = path.join(OUT_DIR, 'PEI Site App.wxs');
     let wxsContent = fs.readFileSync(wxsPath, 'utf8');
 
+    // Add util namespace for ServiceConfig (if not already present)
+    if (!wxsContent.includes('xmlns:util=')) {
+      wxsContent = wxsContent.replace(
+        /<Wix xmlns="([^"]+)"/,
+        '<Wix xmlns="$1" xmlns:util="http://schemas.microsoft.com/wix/UtilExtension"'
+      );
+    }
+
+    // Force per-machine installation (required for Windows Service)
+    // Modify existing ALLUSERS and MSIINSTALLPERUSER properties
+    wxsContent = wxsContent.replace(
+      /<Property Id="ALLUSERS"[^>]*\/>/,
+      '<Property Id="ALLUSERS" Value="1" />'
+    );
+    wxsContent = wxsContent.replace(
+      /<Property Id="MSIINSTALLPERUSER"[^>]*\/>/,
+      '<Property Id="MSIINSTALLPERUSER" Value="0" />'
+    );
+
     // Add custom properties for TENANT_ID, SITE_ID, and SITE_NAME after the Product opening tag
     const propertiesXml = `
     <!-- Custom properties to store user input -->
@@ -162,7 +201,7 @@ async function buildMSI() {
         </RegistryKey>
       </Component>
 
-      <!-- Component for Windows Startup - Conditional based on user choice -->
+      <!-- Component for Windows Startup (UI app) - Conditional based on user choice -->
       <Component Id="StartupRegistryEntry" Guid="*">
         <Condition>START_WITH_WINDOWS = "1"</Condition>
         <RegistryKey Root="HKCU" Key="Software\\Microsoft\\Windows\\CurrentVersion\\Run">
@@ -173,6 +212,36 @@ async function buildMSI() {
       <!-- Install icon file for Add/Remove Programs display -->
       <Component Id="AppIconFile" Guid="*">
         <File Id="AppIconIco" Name="app-icon.ico" Source="${iconPath}" KeyPath="yes" />
+      </Component>
+
+      <!-- Background Service Component - runs before user login -->
+      <Component Id="BackgroundService" Guid="*">
+        <File Id="ServiceExe" Name="pei-site-service.exe" Source="${serviceDestPath}" KeyPath="yes" />
+        <ServiceInstall
+          Id="PEISiteServiceInstaller"
+          Type="ownProcess"
+          Name="PEISiteService"
+          DisplayName="PEI Site Service"
+          Description="PEI Site App Background Service - Maintains WebSocket connection for industrial monitoring"
+          Start="auto"
+          Account="LocalSystem"
+          ErrorControl="normal"
+          Vital="no">
+          <!-- Configure service recovery options -->
+          <util:ServiceConfig
+            FirstFailureActionType="restart"
+            SecondFailureActionType="restart"
+            ThirdFailureActionType="restart"
+            RestartServiceDelayInSeconds="60"
+            ResetPeriodInDays="1" />
+        </ServiceInstall>
+        <!-- Don't start service during install - it will start on next boot -->
+        <ServiceControl
+          Id="PEISiteServiceControl"
+          Name="PEISiteService"
+          Stop="both"
+          Remove="uninstall"
+          Wait="yes" />
       </Component>
     </DirectoryRef>
 `;
@@ -187,7 +256,8 @@ async function buildMSI() {
     const componentRefXml = `
       <ComponentRef Id="ConfigRegistryEntries" />
       <ComponentRef Id="StartupRegistryEntry" />
-      <ComponentRef Id="AppIconFile" />`;
+      <ComponentRef Id="AppIconFile" />
+      <ComponentRef Id="BackgroundService" />`;
 
     // Find the Feature element and add our component references
     wxsContent = wxsContent.replace(
@@ -256,43 +326,22 @@ async function buildMSI() {
       ''
     );
 
-    // Completely replace the UI section with a custom one
-    // Using WixUI_Common as base and defining our own complete dialog flow
+    // Simpler approach: use WixUI_InstallDir but add our custom configuration dialog
+    // and modify the dialog flow to include our Config step
     const customUiXml = `
-    <UI Id="CustomInstallUI">
-      <UIRef Id="WixUI_Common" />
+    <UI>
+      <UIRef Id="WixUI_InstallDir" />
       <Property Id="WIXUI_INSTALLDIR" Value="APPLICATIONROOTDIRECTORY" />
 
-      <TextStyle Id="WixUI_Font_Normal" FaceName="Tahoma" Size="8" />
-      <TextStyle Id="WixUI_Font_Bigger" FaceName="Tahoma" Size="12" />
-      <TextStyle Id="WixUI_Font_Title" FaceName="Tahoma" Size="9" Bold="yes" />
-      <Property Id="DefaultUIFont" Value="WixUI_Font_Normal" />
-
-      <!-- Standard dialog references -->
-      <DialogRef Id="BrowseDlg" />
-      <DialogRef Id="DiskCostDlg" />
-      <DialogRef Id="ErrorDlg" />
-      <DialogRef Id="FatalError" />
-      <DialogRef Id="FilesInUse" />
-      <DialogRef Id="MsiRMFilesInUse" />
-      <DialogRef Id="PrepareDlg" />
-      <DialogRef Id="ProgressDlg" />
-      <DialogRef Id="ResumeDlg" />
-      <DialogRef Id="UserExit" />
-      <DialogRef Id="WelcomeDlg" />
-      <DialogRef Id="InstallDirDlg" />
-      <DialogRef Id="InvalidDirDlg" />
-      <DialogRef Id="VerifyReadyDlg" />
-      <DialogRef Id="ExitDialog" />
+      <!-- Add custom text to exit dialog about service and reboot -->
+      <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT" Value="A background service has been installed to maintain the connection to your monitoring server. The service will start automatically when Windows restarts. To start monitoring immediately, please restart your computer now." />
 
       <!-- Custom Configuration Dialog -->
       <Dialog Id="ConfigurationDlg" Width="370" Height="270" Title="[ProductName] Setup">
-        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="!(loc.InstallDirDlgBannerBitmap)" />
-        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
         <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
 
-        <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="{\\WixUI_Font_Title}Site Configuration" />
-        <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="Please enter your site configuration details." />
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="340" Height="20" NoPrefix="yes" Text="{\\WixUI_Font_Title}Site Configuration" />
+        <Control Id="Description" Type="Text" X="15" Y="26" Width="340" Height="20" NoPrefix="yes" Text="Please enter your site configuration details." />
 
         <!-- Tenant ID Input -->
         <Control Id="TenantIdLabel" Type="Text" X="20" Y="55" Width="100" Height="15" NoPrefix="yes" Text="Tenant ID:" />
@@ -310,32 +359,21 @@ async function buildMSI() {
         <Control Id="StartWithWindowsCheckbox" Type="CheckBox" X="20" Y="180" Width="330" Height="17" Property="START_WITH_WINDOWS" CheckBoxValue="1" Text="Start application automatically when Windows starts" />
 
         <!-- Navigation buttons -->
-        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
-        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)" />
-        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="Back" />
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="Next" />
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="Cancel">
           <Publish Event="SpawnDialog" Value="CancelDlg">1</Publish>
         </Control>
       </Dialog>
 
-      <!-- Complete dialog flow for fresh install: Welcome -> Configuration -> InstallDir -> VerifyReady -->
-      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="ConfigurationDlg">NOT Installed</Publish>
-      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg">Installed AND PATCH</Publish>
+      <!-- Override Welcome -> InstallDir to insert Configuration dialog -->
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="ConfigurationDlg" Order="99">NOT Installed</Publish>
 
       <Publish Dialog="ConfigurationDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg">1</Publish>
       <Publish Dialog="ConfigurationDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg">1</Publish>
 
-      <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="ConfigurationDlg">1</Publish>
-      <Publish Dialog="InstallDirDlg" Control="Next" Event="SetTargetPath" Value="[WIXUI_INSTALLDIR]" Order="1">1</Publish>
-      <Publish Dialog="InstallDirDlg" Control="Next" Event="DoAction" Value="WixUIValidatePath" Order="2">NOT WIXUI_DONTVALIDATEPATH</Publish>
-      <Publish Dialog="InstallDirDlg" Control="Next" Event="SpawnDialog" Value="InvalidDirDlg" Order="3"><![CDATA[NOT WIXUI_DONTVALIDATEPATH AND WIXUI_INSTALLDIR_VALID<>"1"]]></Publish>
-      <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Order="4">WIXUI_DONTVALIDATEPATH OR WIXUI_INSTALLDIR_VALID="1"</Publish>
-      <Publish Dialog="InstallDirDlg" Control="ChangeFolder" Property="_BrowseProperty" Value="[WIXUI_INSTALLDIR]" Order="1">1</Publish>
-      <Publish Dialog="InstallDirDlg" Control="ChangeFolder" Event="SpawnDialog" Value="BrowseDlg" Order="2">1</Publish>
-
-      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="InstallDirDlg" Order="1">NOT Installed</Publish>
-      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="2">Installed AND PATCH</Publish>
-
-      <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999">1</Publish>
+      <!-- Override InstallDirDlg back button to go to Configuration -->
+      <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="ConfigurationDlg" Order="99">1</Publish>
     </UI>
     <UIRef Id="WixUI_ErrorProgressText" />
 `;
