@@ -7,6 +7,7 @@ import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
 import { ChartModule } from 'primeng/chart';
 import { WebSocketService, WebSocketStatus } from '../../services/websocket.service';
+import { LocalServiceService, ServiceStatus } from '../../services/local-service.service';
 import { SiteService, UptimeResponse } from '../../services/site.service';
 import { environment } from '../../../environments/environment';
 
@@ -25,28 +26,54 @@ export class HomeComponent implements OnInit, OnDestroy {
   uptimeError: string | null = null;
   private destroy$ = new Subject<void>();
 
+  // Service mode tracking
+  usingLocalService = false;
+  serviceStatus: ServiceStatus | null = null;
+
   // Chart data
   chartData: any;
   chartOptions: any;
 
   constructor(
     private webSocketService: WebSocketService,
+    private localServiceService: LocalServiceService,
     private siteService: SiteService
   ) {}
 
   get connectedAt(): Date | null {
+    if (this.usingLocalService && this.serviceStatus?.connectedAt) {
+      return new Date(this.serviceStatus.connectedAt);
+    }
     return this.webSocketService.connectedAt;
   }
 
   ngOnInit(): void {
     this.initChart();
 
+    // Try to connect to local service first
+    this.tryLocalService();
+
+    // Subscribe to WebSocket status as fallback
     this.webSocketService.connectionStatus$
       .pipe(takeUntil(this.destroy$))
       .subscribe(status => {
-        this.wsStatus = status;
-        if (status !== WebSocketStatus.CONNECTED) {
-          this.currentUptime = '--';
+        // Only use WebSocket status if not using local service
+        if (!this.usingLocalService) {
+          this.wsStatus = status;
+          if (status !== WebSocketStatus.CONNECTED) {
+            this.currentUptime = '--';
+          }
+        }
+      });
+
+    // Subscribe to local service status
+    this.localServiceService.currentStatus$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(status => {
+        if (status) {
+          this.serviceStatus = status;
+          // Map service status to WebSocketStatus
+          this.wsStatus = this.mapServiceStatus(status.status);
         }
       });
 
@@ -60,6 +87,32 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     // Fetch last 7 days connection status
     this.loadUptimeData();
+  }
+
+  private tryLocalService(): void {
+    this.localServiceService.checkHealth()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          console.log('Local service available, using service mode');
+          this.usingLocalService = true;
+          this.localServiceService.startPolling();
+        },
+        error: () => {
+          console.log('Local service not available, using direct WebSocket');
+          this.usingLocalService = false;
+          // WebSocket connection is started by app.component.ts
+        }
+      });
+  }
+
+  private mapServiceStatus(status: string): WebSocketStatus {
+    switch (status) {
+      case 'connected': return WebSocketStatus.CONNECTED;
+      case 'connecting': return WebSocketStatus.CONNECTING;
+      case 'error': return WebSocketStatus.ERROR;
+      default: return WebSocketStatus.DISCONNECTED;
+    }
   }
 
   private initChart(): void {
@@ -118,11 +171,16 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   private updateChartData(): void {
+    // Use service history if available, otherwise use direct WebSocket history
+    const history = this.usingLocalService && this.serviceStatus?.connectionHistory
+      ? this.serviceStatus.connectionHistory
+      : this.webSocketService.connectionHistory;
+
     this.chartData = {
       labels: Array.from({ length: 300 }, (_, i) => i),
       datasets: [
         {
-          data: [...this.webSocketService.connectionHistory],
+          data: [...history],
           fill: true,
           backgroundColor: 'rgba(34, 197, 94, 0.2)',
           borderColor: 'rgb(34, 197, 94)',
@@ -149,7 +207,15 @@ export class HomeComponent implements OnInit, OnDestroy {
 
           // Prepopulate connection history with actual session data
           if (data.sessions && data.sessions.length > 0) {
-            this.webSocketService.prepopulateHistory(data.sessions);
+            if (this.usingLocalService) {
+              // Send to local service
+              this.localServiceService.prepopulateHistory(data.sessions)
+                .pipe(takeUntil(this.destroy$))
+                .subscribe();
+            } else {
+              // Use direct WebSocket service
+              this.webSocketService.prepopulateHistory(data.sessions);
+            }
             this.updateChartData();
           }
         },
@@ -162,11 +228,23 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.localServiceService.stopPolling();
     this.destroy$.next();
     this.destroy$.complete();
   }
 
   private updateUptime(): void {
+    // Use service uptime if available
+    if (this.usingLocalService && this.serviceStatus) {
+      if (this.serviceStatus.status !== 'connected' || !this.serviceStatus.currentUptime) {
+        this.currentUptime = '--';
+        return;
+      }
+      this.currentUptime = this.formatDuration(this.serviceStatus.currentUptime);
+      return;
+    }
+
+    // Fallback to direct WebSocket
     if (!this.connectedAt || this.wsStatus !== WebSocketStatus.CONNECTED) {
       this.currentUptime = '--';
       return;
