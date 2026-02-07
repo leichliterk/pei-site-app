@@ -60,7 +60,8 @@ export class WebSocketService implements OnDestroy {
       auth: {
         api_key: environment.apiKey,
         site_id: environment.siteNumber,
-        tenant_id: environment.tenantId
+        tenant_id: environment.tenantId,
+        connection_source: 'app'  // Identify this as a direct app connection (fallback when service not running)
       },
       reconnection: true,
       reconnectionAttempts: 5,

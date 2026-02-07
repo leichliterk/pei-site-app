@@ -72,7 +72,7 @@ async function buildMSI() {
     exe: 'PEI Site App',
     name: appName,
     manufacturer: 'PEI Data Systems',
-    version: '1.0.0',
+    version: '1.0.2',
     description: `PEI Site Application${envSuffix}`,
 
     // Provide icon path to avoid native dependency issue

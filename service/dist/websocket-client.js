@@ -47,7 +47,8 @@ class WebSocketClient extends events_1.EventEmitter {
             auth: {
                 api_key: this.config.apiKey,
                 site_id: this.config.siteId,
-                tenant_id: this.config.tenantId
+                tenant_id: this.config.tenantId,
+                connection_source: 'service' // Identify this as a background service connection
             },
             reconnection: true,
             reconnectionAttempts: Infinity, // Keep trying forever for service

@@ -2,10 +2,11 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Router, RouterOutlet } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { Title } from '@angular/platform-browser';
-import { Subject } from 'rxjs';
+import { Subject, takeUntil } from 'rxjs';
 import { ElectronService } from './services/electron.service';
 import { FtpSyncService } from './services/ftp-sync.service';
 import { WebSocketService } from './services/websocket.service';
+import { LocalServiceService } from './services/local-service.service';
 import { environment } from '../environments/environment';
 import { ButtonModule } from 'primeng/button';
 import { ToolbarModule } from 'primeng/toolbar';
@@ -30,6 +31,7 @@ export class AppComponent implements OnInit, OnDestroy {
     private router: Router,
     private ftpSyncService: FtpSyncService,
     private webSocketService: WebSocketService,
+    private localServiceService: LocalServiceService,
     private titleService: Title
   ) {}
 
@@ -37,9 +39,21 @@ export class AppComponent implements OnInit, OnDestroy {
     // Set window title from environment
     this.titleService.setTitle(environment.appName || 'PEI Site App');
 
-    // Settings are loaded by APP_INITIALIZER before any component initializes
-    // Just establish WebSocket connection here
-    this.webSocketService.connect();
+    // Check if local background service is available
+    // Only connect directly to WebSocket if the service is NOT running
+    // This prevents duplicate connections which cause constant reconnection cycles
+    this.localServiceService.checkHealth()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          console.log('Background service is running - UI will use service for status');
+          // Don't connect WebSocket - the service handles the connection
+        },
+        error: () => {
+          console.log('Background service not available - connecting WebSocket directly');
+          this.webSocketService.connect();
+        }
+      });
 
     // Listen for navigation events from system tray menu
     this.electronService.onNavigate((route: string) => {
