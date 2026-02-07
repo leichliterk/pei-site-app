@@ -13,6 +13,21 @@
             [value]="getStatusText()" />
         </div>
 
+        <!-- Background Service Row -->
+        <div class="flex items-center justify-between">
+          <span class="text-gray-600">Background Service</span>
+          <p-tag
+            [severity]="usingLocalService ? 'success' : 'warn'"
+            [icon]="usingLocalService ? 'pi pi-check-circle' : 'pi pi-minus-circle'"
+            [value]="usingLocalService ? 'Running' : 'Not Running'" />
+        </div>
+
+        <!-- Connection Source Row -->
+        <div class="flex items-center justify-between">
+          <span class="text-gray-600">Connection Source</span>
+          <span class="font-medium">{{ usingLocalService ? 'Background Service' : 'Application' }}</span>
+        </div>
+
         <!-- Connected At Row -->
         <div class="flex items-center justify-between">
           <span class="text-gray-600">Connected At</span>
