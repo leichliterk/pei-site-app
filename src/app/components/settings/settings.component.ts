@@ -284,6 +284,25 @@ export class SettingsComponent implements OnInit, OnDestroy {
     this.ftpTestMessage = '';
     this.ftpTestSuccess = null;
 
+    // Try via background service first, fall back to Electron IPC
+    if (this.localServiceService.isServiceAvailable) {
+      this.localServiceService.ftpTestConnection(this.ftpHost, this.ftpPath).subscribe({
+        next: (result) => {
+          this.ftpTestMessage = result.message;
+          this.ftpTestSuccess = result.success;
+          this.isFtpTesting = false;
+        },
+        error: async () => {
+          // Service call failed, fall back to Electron
+          await this.testFtpViaElectron();
+        }
+      });
+    } else {
+      await this.testFtpViaElectron();
+    }
+  }
+
+  private async testFtpViaElectron(): Promise<void> {
     try {
       const result = await this.electronService.ftpTestConnection(this.ftpHost, this.ftpPath);
       this.ftpTestMessage = result.message;
@@ -311,6 +330,20 @@ export class SettingsComponent implements OnInit, OnDestroy {
       if (success) {
         // Refresh the FTP sync service with new settings
         await this.ftpSyncService.refreshSettings();
+
+        // Also push config to background service if available
+        if (this.localServiceService.isServiceAvailable) {
+          this.localServiceService.ftpUpdateConfig({
+            ftpEnabled: this.ftpEnabled,
+            ftpHost: this.ftpHost,
+            ftpPath: this.ftpPath,
+            ftpPollInterval: this.ftpScheduleMinutes * 60
+          }).subscribe({
+            next: () => console.log('Background service FTP config updated'),
+            error: () => console.log('Background service not available for FTP config update')
+          });
+        }
+
         this.ftpTestMessage = 'FTP settings saved successfully';
         this.ftpTestSuccess = true;
       } else {

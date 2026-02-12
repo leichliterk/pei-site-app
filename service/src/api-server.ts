@@ -1,5 +1,7 @@
 import express, { Request, Response } from 'express';
 import { WebSocketClient, ConnectionStatus, ServiceConfig } from './websocket-client';
+import { FtpWatcher } from './ftp-watcher';
+import { ConfigManager, FtpConfig } from './config-manager';
 
 const API_PORT = 47836; // Local API port for UI communication
 
@@ -7,10 +9,20 @@ export class ApiServer {
   private app = express();
   private server: ReturnType<typeof this.app.listen> | null = null;
   private wsClient: WebSocketClient;
+  private ftpWatcher: FtpWatcher | null = null;
+  private configManager: ConfigManager | null = null;
 
   constructor(wsClient: WebSocketClient) {
     this.wsClient = wsClient;
     this.setupRoutes();
+  }
+
+  setFtpWatcher(ftpWatcher: FtpWatcher): void {
+    this.ftpWatcher = ftpWatcher;
+  }
+
+  setConfigManager(configManager: ConfigManager): void {
+    this.configManager = configManager;
   }
 
   private setupRoutes(): void {
@@ -72,6 +84,55 @@ export class ApiServer {
       } else {
         res.status(400).json({ error: 'sessions array required' });
       }
+    });
+
+    // FTP watcher status
+    this.app.get('/ftp/status', (_req: Request, res: Response) => {
+      if (!this.ftpWatcher) {
+        res.json({ enabled: false, lastResult: 'FTP watcher not initialized' });
+        return;
+      }
+      res.json(this.ftpWatcher.getStatus());
+    });
+
+    // Update FTP config
+    this.app.post('/ftp/config', (req: Request, res: Response) => {
+      const ftpConfig: Partial<FtpConfig> = req.body;
+      if (!this.configManager || !this.ftpWatcher) {
+        res.status(500).json({ error: 'FTP watcher not initialized' });
+        return;
+      }
+      console.log('[ApiServer] Updating FTP config:', ftpConfig);
+      this.configManager.updateConfig(ftpConfig);
+      this.ftpWatcher.updateConfig(this.configManager.getFtpConfig());
+      res.json({ success: true });
+    });
+
+    // Test FTP connection (lightweight - connect + list only)
+    this.app.post('/ftp/test', async (req: Request, res: Response) => {
+      if (!this.ftpWatcher) {
+        res.status(500).json({ success: false, message: 'FTP watcher not initialized' });
+        return;
+      }
+      const { host, path: remotePath } = req.body;
+      if (!host) {
+        res.status(400).json({ success: false, message: 'host is required' });
+        return;
+      }
+      console.log('[ApiServer] FTP test connection:', host, remotePath);
+      const result = await this.ftpWatcher.testConnection(host, remotePath || '/');
+      res.json(result);
+    });
+
+    // Trigger immediate FTP poll
+    this.app.post('/ftp/poll', async (_req: Request, res: Response) => {
+      if (!this.ftpWatcher) {
+        res.status(500).json({ error: 'FTP watcher not initialized' });
+        return;
+      }
+      console.log('[ApiServer] Manual FTP poll triggered');
+      await this.ftpWatcher.poll();
+      res.json(this.ftpWatcher.getStatus());
     });
   }
 

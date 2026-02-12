@@ -99,6 +99,14 @@ export class LocalServiceService implements OnDestroy {
     return this.http.post<{ success: boolean }>(`${SERVICE_API_URL}/prepopulate-history`, { sessions });
   }
 
+  ftpTestConnection(host: string, path: string): Observable<{ success: boolean; message: string; fileCount?: number }> {
+    return this.http.post<{ success: boolean; message: string; fileCount?: number }>(`${SERVICE_API_URL}/ftp/test`, { host, path });
+  }
+
+  ftpUpdateConfig(config: { ftpEnabled?: boolean; ftpHost?: string; ftpPath?: string; ftpPollInterval?: number }): Observable<{ success: boolean }> {
+    return this.http.post<{ success: boolean }>(`${SERVICE_API_URL}/ftp/config`, config);
+  }
+
   ngOnDestroy(): void {
     this.stopPolling();
   }
