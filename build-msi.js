@@ -16,7 +16,14 @@ async function buildMSI() {
     console.log(`Added WiX to PATH: ${wixPath}`);
   }
 
-  console.log(`Building MSI for ${isStaging ? 'STAGING' : 'PRODUCTION'} environment...`);
+  // Read version from the appropriate environment file
+  const envFile = isStaging ? 'environment.staging.ts' : 'environment.prod.ts';
+  const envFilePath = path.resolve(__dirname, 'src', 'environments', envFile);
+  const envContent = fs.readFileSync(envFilePath, 'utf8');
+  const versionMatch = envContent.match(/version:\s*'([^']+)'/);
+  const appVersion = versionMatch ? versionMatch[1] : '1.0.0';
+
+  console.log(`Building MSI for ${isStaging ? 'STAGING' : 'PRODUCTION'} environment (v${appVersion})...`);
 
   // Build the service executable first
   console.log('Building background service executable...');
@@ -72,7 +79,7 @@ async function buildMSI() {
     exe: 'PEI Site App',
     name: appName,
     manufacturer: 'PEI Data Systems',
-    version: '1.0.2',
+    version: appVersion,
     description: `PEI Site Application${envSuffix}`,
 
     // Provide icon path to avoid native dependency issue

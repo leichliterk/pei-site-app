@@ -1,6 +1,7 @@
 export const environment = {
   production: false,
   staging: false,
+  version: '1.0.2',
   appName: 'PEI Site App',
   siteNumber: 1051,
   siteName: 'Development Site',
