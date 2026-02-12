@@ -25,6 +25,7 @@ export declare class WebSocketClient extends EventEmitter {
     get currentUptime(): number;
     connect(): void;
     disconnect(): void;
+    emitToServer(event: string, data: any): void;
     updateConfig(config: Partial<ServiceConfig>): void;
     private setStatus;
     private startHistoryTracking;

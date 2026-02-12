@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const websocket_client_1 = require("./websocket-client");
 const api_server_1 = require("./api-server");
 const config_manager_1 = require("./config-manager");
+const ftp_watcher_1 = require("./ftp-watcher");
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 // Setup file logging for Windows Service debugging
@@ -78,6 +79,12 @@ const config = configManager.getConfig();
 log(`[PEI Site Service] Configuration loaded: apiUrl=${config.apiUrl}, siteId=${config.siteId}, tenantId=${config.tenantId}`);
 const wsClient = new websocket_client_1.WebSocketClient(config);
 const apiServer = new api_server_1.ApiServer(wsClient);
+// Initialize FTP watcher
+const ftpConfig = configManager.getFtpConfig();
+const ftpWatcher = new ftp_watcher_1.FtpWatcher(ftpConfig, wsClient, config.siteId, config.tenantId, log);
+apiServer.setFtpWatcher(ftpWatcher);
+apiServer.setConfigManager(configManager);
+log(`[PEI Site Service] FTP config: enabled=${ftpConfig.ftpEnabled}, host=${ftpConfig.ftpHost}`);
 // Log status changes
 wsClient.on('statusChange', (status) => {
     log(`[PEI Site Service] Connection status: ${status}`);
@@ -85,6 +92,7 @@ wsClient.on('statusChange', (status) => {
 // Graceful shutdown
 async function shutdown(signal) {
     log(`[PEI Site Service] Received ${signal}, shutting down...`);
+    ftpWatcher.stop();
     wsClient.disconnect();
     await apiServer.stop();
     log('[PEI Site Service] Shutdown complete');
@@ -130,6 +138,8 @@ async function start() {
         // Then connect to WebSocket
         log('[PEI Site Service] Initiating WebSocket connection...');
         wsClient.connect();
+        // Start FTP watcher if configured
+        ftpWatcher.start();
         log('[PEI Site Service] Service started successfully');
     }
     catch (err) {

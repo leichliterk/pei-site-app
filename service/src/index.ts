@@ -1,6 +1,7 @@
 import { WebSocketClient, ConnectionStatus } from './websocket-client';
 import { ApiServer } from './api-server';
 import { ConfigManager } from './config-manager';
+import { FtpWatcher } from './ftp-watcher';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -51,6 +52,14 @@ log(`[PEI Site Service] Configuration loaded: apiUrl=${config.apiUrl}, siteId=${
 const wsClient = new WebSocketClient(config);
 const apiServer = new ApiServer(wsClient);
 
+// Initialize FTP watcher
+const ftpConfig = configManager.getFtpConfig();
+const ftpWatcher = new FtpWatcher(ftpConfig, wsClient, config.siteId, config.tenantId, log);
+apiServer.setFtpWatcher(ftpWatcher);
+apiServer.setConfigManager(configManager);
+
+log(`[PEI Site Service] FTP config: enabled=${ftpConfig.ftpEnabled}, host=${ftpConfig.ftpHost}`);
+
 // Log status changes
 wsClient.on('statusChange', (status: ConnectionStatus) => {
   log(`[PEI Site Service] Connection status: ${status}`);
@@ -60,6 +69,7 @@ wsClient.on('statusChange', (status: ConnectionStatus) => {
 async function shutdown(signal: string): Promise<void> {
   log(`[PEI Site Service] Received ${signal}, shutting down...`);
 
+  ftpWatcher.stop();
   wsClient.disconnect();
   await apiServer.stop();
 
@@ -114,6 +124,9 @@ async function start(): Promise<void> {
     // Then connect to WebSocket
     log('[PEI Site Service] Initiating WebSocket connection...');
     wsClient.connect();
+
+    // Start FTP watcher if configured
+    ftpWatcher.start();
 
     log('[PEI Site Service] Service started successfully');
   } catch (err) {
