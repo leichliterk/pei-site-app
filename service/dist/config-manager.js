@@ -42,7 +42,11 @@ const DEFAULT_CONFIG = {
     apiUrl: 'https://pei-web-server.onrender.com/api/data',
     apiKey: '_6@L<Q*SC?mSdp$a1E4?L{"M+8QQ0|Cw',
     siteId: 1000,
-    tenantId: 1001
+    tenantId: 1001,
+    ftpEnabled: false,
+    ftpHost: '',
+    ftpPath: '/',
+    ftpPollInterval: 60
 };
 class ConfigManager {
     constructor() {
@@ -91,12 +95,19 @@ class ConfigManager {
                 this.readRegistryValue(registryPath64, 'TenantId');
             let siteId = this.readRegistryValue(registryPath32, 'SiteId') ||
                 this.readRegistryValue(registryPath64, 'SiteId');
+            let ftpHost = this.readRegistryValue(registryPath32, 'FtpHost') ||
+                this.readRegistryValue(registryPath64, 'FtpHost');
+            let ftpPath = this.readRegistryValue(registryPath32, 'FtpPath') ||
+                this.readRegistryValue(registryPath64, 'FtpPath');
             if (tenantId || siteId) {
-                console.log('[ConfigManager] Found registry values:', { tenantId, siteId });
+                console.log('[ConfigManager] Found registry values:', { tenantId, siteId, ftpHost, ftpPath });
                 return {
                     ...DEFAULT_CONFIG,
                     tenantId: tenantId ? parseInt(tenantId, 10) : DEFAULT_CONFIG.tenantId,
-                    siteId: siteId ? parseInt(siteId, 10) : DEFAULT_CONFIG.siteId
+                    siteId: siteId ? parseInt(siteId, 10) : DEFAULT_CONFIG.siteId,
+                    ftpHost: ftpHost || DEFAULT_CONFIG.ftpHost,
+                    ftpPath: ftpPath || DEFAULT_CONFIG.ftpPath,
+                    ftpEnabled: !!ftpHost
                 };
             }
         }
@@ -117,6 +128,14 @@ class ConfigManager {
     }
     getConfig() {
         return { ...this.config };
+    }
+    getFtpConfig() {
+        return {
+            ftpEnabled: this.config.ftpEnabled,
+            ftpHost: this.config.ftpHost,
+            ftpPath: this.config.ftpPath,
+            ftpPollInterval: this.config.ftpPollInterval
+        };
     }
     updateConfig(updates) {
         this.config = { ...this.config, ...updates };

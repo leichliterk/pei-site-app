@@ -86,6 +86,11 @@ class WebSocketClient extends events_1.EventEmitter {
         }
         this.setStatus(ConnectionStatus.DISCONNECTED);
     }
+    emitToServer(event, data) {
+        if (this.socket?.connected) {
+            this.socket.emit(event, data);
+        }
+    }
     updateConfig(config) {
         const needsReconnect = this.socket?.connected && (config.apiUrl !== undefined ||
             config.apiKey !== undefined ||
