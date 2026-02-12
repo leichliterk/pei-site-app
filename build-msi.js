@@ -205,7 +205,7 @@ async function buildMSI() {
       <Component Id="StartupRegistryEntry" Guid="*">
         <Condition>START_WITH_WINDOWS = "1"</Condition>
         <RegistryKey Root="HKCU" Key="Software\\Microsoft\\Windows\\CurrentVersion\\Run">
-          <RegistryValue Type="string" Name="[ProductName]" Value="&quot;[APPLICATIONROOTDIRECTORY]app-1.0.0\\PEI Site App.exe&quot;" KeyPath="yes"/>
+          <RegistryValue Type="string" Name="[ProductName]" Value="&quot;[APPLICATIONROOTDIRECTORY]PEI Site App.exe&quot;" KeyPath="yes"/>
         </RegistryKey>
       </Component>
 
@@ -214,34 +214,9 @@ async function buildMSI() {
         <File Id="AppIconIco" Name="app-icon.ico" Source="${iconPath}" KeyPath="yes" />
       </Component>
 
-      <!-- Background Service Component - runs before user login -->
+      <!-- Background Service Executable - managed via scheduled task instead of SCM service -->
       <Component Id="BackgroundService" Guid="*">
         <File Id="ServiceExe" Name="pei-site-service.exe" Source="${serviceDestPath}" KeyPath="yes" />
-        <ServiceInstall
-          Id="PEISiteServiceInstaller"
-          Type="ownProcess"
-          Name="PEISiteService"
-          DisplayName="PEI Site Service"
-          Description="PEI Site App Background Service - Maintains WebSocket connection for industrial monitoring"
-          Start="auto"
-          Account="LocalSystem"
-          ErrorControl="normal"
-          Vital="no">
-          <!-- Configure service recovery options -->
-          <util:ServiceConfig
-            FirstFailureActionType="restart"
-            SecondFailureActionType="restart"
-            ThirdFailureActionType="restart"
-            RestartServiceDelayInSeconds="60"
-            ResetPeriodInDays="1" />
-        </ServiceInstall>
-        <!-- Don't start service during install - it will start on next boot -->
-        <ServiceControl
-          Id="PEISiteServiceControl"
-          Name="PEISiteService"
-          Stop="both"
-          Remove="uninstall"
-          Wait="yes" />
       </Component>
     </DirectoryRef>
 `;
@@ -387,6 +362,60 @@ async function buildMSI() {
     } else {
       console.error('Could not find UI section in WXS file');
     }
+
+    // Add custom actions for scheduled task (replaces Windows Service which requires SCM protocol)
+    // Uses VBScript custom actions which are more reliable than WixQuietExec
+    const scheduledTaskXml = `
+    <!-- Pass install directory to deferred custom actions via CustomActionData -->
+    <SetProperty Id="CreateAndStartServiceTask" Before="CreateAndStartServiceTask" Sequence="execute" Value="[APPLICATIONROOTDIRECTORY]" />
+    <SetProperty Id="StopAndRemoveServiceTask" Before="StopAndRemoveServiceTask" Sequence="execute" Value="[APPLICATIONROOTDIRECTORY]" />
+
+    <!-- Deferred VBScript: create scheduled task and start it -->
+    <CustomAction Id="CreateAndStartServiceTask" Script="vbscript" Execute="deferred" Impersonate="no" Return="ignore">
+      <![CDATA[
+        Dim installDir, oShell, sExePath, sCreateCmd, sRunCmd
+        installDir = Session.Property("CustomActionData")
+        sExePath = installDir & "pei-site-service.exe"
+        Set oShell = CreateObject("WScript.Shell")
+
+        ' Create scheduled task to run at system startup as SYSTEM
+        sCreateCmd = "schtasks /create /tn ""PEI Site Service"" /tr """ & Chr(34) & sExePath & Chr(34) & """ /sc onstart /ru SYSTEM /rl HIGHEST /f"
+        oShell.Run sCreateCmd, 0, True
+
+        ' Start it immediately
+        sRunCmd = "schtasks /run /tn ""PEI Site Service"""
+        oShell.Run sRunCmd, 0, True
+      ]]>
+    </CustomAction>
+
+    <!-- Deferred VBScript: stop process and remove scheduled task -->
+    <CustomAction Id="StopAndRemoveServiceTask" Script="vbscript" Execute="deferred" Impersonate="no" Return="ignore">
+      <![CDATA[
+        Dim oShell
+        Set oShell = CreateObject("WScript.Shell")
+
+        ' Kill the service process
+        oShell.Run "taskkill /f /im pei-site-service.exe", 0, True
+
+        ' Remove the scheduled task
+        oShell.Run "schtasks /delete /tn ""PEI Site Service"" /f", 0, True
+      ]]>
+    </CustomAction>
+
+    <InstallExecuteSequence>
+      <!-- On install: create the scheduled task and start it immediately -->
+      <Custom Action="CreateAndStartServiceTask" After="InstallFiles">NOT Installed AND NOT REMOVE</Custom>
+      <!-- On uninstall: stop the process and remove the scheduled task -->
+      <Custom Action="StopAndRemoveServiceTask" Before="RemoveFiles">REMOVE="ALL"</Custom>
+    </InstallExecuteSequence>
+`;
+
+    // Insert scheduled task custom actions before closing </Product> tag
+    wxsContent = wxsContent.replace(
+      /<\/Product>/,
+      `${scheduledTaskXml}\n  </Product>`
+    );
+    console.log('Added scheduled task custom actions for background service');
 
     // Write the modified content back
     fs.writeFileSync(wxsPath, wxsContent, 'utf8');
