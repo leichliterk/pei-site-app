@@ -1,10 +1,13 @@
-const { MSICreator } = require('electron-wix-msi');
 const path = require('path');
 const { execSync } = require('child_process');
 const fs = require('fs');
+const crypto = require('crypto');
 
-async function buildMSI() {
-  // Check if staging environment is requested
+function generateGuid() {
+  return crypto.randomUUID().toUpperCase();
+}
+
+function buildMSI() {
   const isStaging = process.argv.includes('staging');
   const envSuffix = isStaging ? ' - Staging' : '';
   const outDirSuffix = isStaging ? '-staging' : '';
@@ -22,200 +25,99 @@ async function buildMSI() {
   const envContent = fs.readFileSync(envFilePath, 'utf8');
   const versionMatch = envContent.match(/version:\s*'([^']+)'/);
   const appVersion = versionMatch ? versionMatch[1] : '1.0.0';
+  const appName = `PEI Site App${envSuffix}`;
 
   console.log(`Building MSI for ${isStaging ? 'STAGING' : 'PRODUCTION'} environment (v${appVersion})...`);
 
   // Build the C# service executable
-  console.log('Building background service executable (dotnet publish)...');
-  try {
-    execSync('dotnet publish -c Release', {
-      cwd: path.resolve(__dirname, 'service-dotnet', 'PeiSiteService'),
-      stdio: 'inherit'
-    });
-    console.log('Service executable built successfully!');
-  } catch (error) {
-    console.error('Failed to build service executable:', error.message);
-    process.exit(1);
-  }
-
-  // Find the built Electron app directory
-  const APP_DIR = path.resolve(__dirname, 'release', 'win-unpacked');
-  const OUT_DIR = path.resolve(__dirname, 'release', `msi${outDirSuffix}`);
-  const SERVICE_EXE_PATH = path.resolve(__dirname, 'service-dotnet', 'PeiSiteService', 'bin', 'Release', 'net8.0-windows', 'win-x64', 'publish', 'pei-site-service.exe');
-
-  // Copy service executable to app directory
-  const serviceDestPath = path.join(APP_DIR, 'pei-site-service.exe');
-  console.log('Copying service executable to app directory...');
-  fs.copyFileSync(SERVICE_EXE_PATH, serviceDestPath);
-  console.log('Service executable copied!');
-
-  // Paths for icon embedding and MSI configuration
-  const exePath = path.join(APP_DIR, 'PEI Site App.exe');
-  const iconPath = path.resolve(__dirname, 'build', 'icon.ico');
-  const rceditPath = path.join(__dirname, 'node_modules', 'rcedit', 'bin', 'rcedit-x64.exe');
-
-  console.log('Embedding icon in executable...');
-  try {
-    if (fs.existsSync(exePath) && fs.existsSync(iconPath) && fs.existsSync(rceditPath)) {
-      execSync(`"${rceditPath}" "${exePath}" --set-icon "${iconPath}" --set-version-string "ProductName" "PEI Site App${envSuffix}" --set-version-string "FileDescription" "PEI Site Application${envSuffix}" --set-version-string "CompanyName" "PEI Data Systems"`, {
-        stdio: 'inherit'
-      });
-      console.log('Icon embedded successfully!');
-    } else {
-      console.log('Missing required files for icon embedding, skipping...');
-    }
-  } catch (error) {
-    console.error('Failed to embed icon:', error.message);
-    console.log('Continuing with MSI creation anyway...');
-  }
-
-  // Create MSI Creator
-  const appName = `PEI Site App${envSuffix}`;
-  const msiCreator = new MSICreator({
-    appDirectory: APP_DIR,
-    outputDirectory: OUT_DIR,
-
-    // App metadata
-    exe: 'PEI Site App',
-    name: appName,
-    manufacturer: 'PEI Data Systems',
-    version: appVersion,
-    description: `PEI Site Application${envSuffix}`,
-
-    // Provide icon path to avoid native dependency issue
-    appIconPath: path.resolve(__dirname, 'src', 'assets', 'icon.ico'),
-
-    // Explicitly skip icon extraction to avoid native dependencies
-    appUserModelId: 'com.pei.site-app',
-
-    // MSI specific configuration
-    upgradeCode: '57f48daa-3001-40a9-9dab-5a20450fd982', // Generate a new GUID for this
-
-    // UI configuration - use WixUI_InstallDir as base
-    ui: {
-      chooseDirectory: true
-      // images: {
-      //   background: path.resolve(__dirname, 'installer', 'background.png'), // Optional: 493x312
-      //   banner: path.resolve(__dirname, 'installer', 'banner.png'), // Optional: 493x58
-      // }
-    },
-
-    // Custom features
-    features: {
-      autoLaunch: true,
-      autoUpdate: false,
-    },
-
-    // WiX extension configuration for custom UI
-    extensions: [],
-
-    // Certificate configuration (optional, for signing)
-    // signWithParams: '/a /fd SHA256 /tr http://timestamp.digicert.com /td SHA256'
+  console.log('\n--- Building background service (dotnet publish) ---');
+  execSync('dotnet publish -c Release', {
+    cwd: path.resolve(__dirname, 'service-dotnet', 'PeiSiteService'),
+    stdio: 'inherit'
   });
+  console.log('Service executable built successfully!');
 
-  try {
-    console.log('Creating MSI installer...');
+  // Build the WPF app executable
+  console.log('\n--- Building WPF app (dotnet publish) ---');
+  execSync('dotnet publish -c Release', {
+    cwd: path.resolve(__dirname, 'service-dotnet', 'PeiSiteApp'),
+    stdio: 'inherit'
+  });
+  console.log('WPF app built successfully!');
 
-    // Bypass icon extraction by providing appIconPath directly
-    // This avoids the need for the native @bitdisaster/exe-icon-extractor module
-    const iconPath = path.resolve(__dirname, 'src', 'assets', 'icon.ico');
+  // Paths
+  const servicePublishDir = path.resolve(__dirname, 'service-dotnet', 'PeiSiteService', 'bin', 'Release', 'net8.0-windows', 'win-x64', 'publish');
+  const appPublishDir = path.resolve(__dirname, 'service-dotnet', 'PeiSiteApp', 'bin', 'Release', 'net8.0-windows', 'win-x64', 'publish');
+  const outDir = path.resolve(__dirname, 'release', `msi${outDirSuffix}`);
+  const iconPath = path.resolve(__dirname, 'src', 'assets', 'icon.ico');
 
-    // Step 1: Create the .wxs file
-    try {
-      await msiCreator.create();
-    } catch (error) {
-      // If icon extraction fails, continue anyway - the MSI will still work
-      if (error.message && error.message.includes('exe-icon-extractor')) {
-        console.log('Icon extraction skipped (optional dependency missing)');
-      } else {
-        throw error;
+  // Ensure output directory exists
+  if (!fs.existsSync(outDir)) {
+    fs.mkdirSync(outDir, { recursive: true });
+  }
+
+  console.log('\n--- Collecting files ---');
+  console.log(`Service publish dir: ${servicePublishDir}`);
+  console.log(`App publish dir: ${appPublishDir}`);
+
+  // Collect all files from publish directories
+  function getFiles(dir) {
+    const files = [];
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isFile()) {
+        files.push(entry.name);
       }
     }
-    console.log('WiX source file created successfully');
+    return files;
+  }
 
-    // Step 2: Modify the generated .wxs file to add custom properties and actions
-    const fs = require('fs');
-    // The library uses the exe name for the wxs file, not the full app name with suffix
-    const wxsPath = path.join(OUT_DIR, 'PEI Site App.wxs');
-    let wxsContent = fs.readFileSync(wxsPath, 'utf8');
+  const serviceFiles = getFiles(servicePublishDir);
+  const appFiles = getFiles(appPublishDir);
+  console.log(`Service files: ${serviceFiles.join(', ')}`);
+  console.log(`App files: ${appFiles.join(', ')}`);
 
-    // Force per-machine installation (required for Windows Service)
-    // Modify existing ALLUSERS and MSIINSTALLPERUSER properties
-    wxsContent = wxsContent.replace(
-      /<Property Id="ALLUSERS"[^>]*\/>/,
-      '<Property Id="ALLUSERS" Value="1" />'
-    );
-    wxsContent = wxsContent.replace(
-      /<Property Id="MSIINSTALLPERUSER"[^>]*\/>/,
-      '<Property Id="MSIINSTALLPERUSER" Value="0" />'
-    );
+  // Generate WiX component entries for files
+  // The service exe gets special handling (ServiceInstall/ServiceControl)
+  // The app exe gets shortcut handling
+  function fileId(name) {
+    // WiX IDs must be alphanumeric + underscore, max 72 chars
+    return name.replace(/[^a-zA-Z0-9_]/g, '_').substring(0, 70);
+  }
 
-    // Add custom properties for TENANT_ID, SITE_ID, and SITE_NAME after the Product opening tag
-    const propertiesXml = `
-    <!-- Custom properties to store user input -->
-    <Property Id="TENANT_ID" Secure="yes">
-      <RegistrySearch Id="TenantIdSearch"
-                     Root="HKLM"
-                     Key="Software\\PEI Data Systems\\PEI Site App"
-                     Name="TenantId"
-                     Type="raw" />
-    </Property>
-
-    <Property Id="SITE_ID" Secure="yes">
-      <RegistrySearch Id="SiteIdSearch"
-                     Root="HKLM"
-                     Key="Software\\PEI Data Systems\\PEI Site App"
-                     Name="SiteId"
-                     Type="raw" />
-    </Property>
-
-    <Property Id="SITE_NAME" Secure="yes">
-      <RegistrySearch Id="SiteNameSearch"
-                     Root="HKLM"
-                     Key="Software\\PEI Data Systems\\PEI Site App"
-                     Name="SiteName"
-                     Type="raw" />
-    </Property>
-
-    <!-- Property to control startup with Windows (default to yes) -->
-    <Property Id="START_WITH_WINDOWS" Value="1" />
-
-    <!-- Property for Add/Remove Programs icon -->
-    <Property Id="ARPPRODUCTICON" Value="AppIcon.exe" />
+  // Build component XML for app files (excluding service exe if present)
+  let appComponentsXml = '';
+  let appComponentRefs = '';
+  for (const file of appFiles) {
+    const id = `App_${fileId(file)}`;
+    const source = path.join(appPublishDir, file);
+    if (file === 'pei-site-app.exe') {
+      // Main app exe — includes shortcuts
+      appComponentsXml += `
+      <Component Id="${id}" Guid="*">
+        <File Id="${id}_file" Name="${file}" Source="${source}" KeyPath="yes" />
+      </Component>
 `;
-
-    // Find the first <Directory or <DirectoryRef tag and insert properties before it
-    wxsContent = wxsContent.replace(/(\s+)(<Directory[\s>])/m, `$1${propertiesXml}$1$2`);
-
-    // Add registry component as a new DirectoryRef section
-    // 32-bit MSI writes to WOW6432Node on 64-bit Windows - Electron app handles this
-    const registryComponentXml = `
-    <DirectoryRef Id="APPLICATIONROOTDIRECTORY">
-      <Component Id="ConfigRegistryEntries" Guid="*">
-        <RegistryKey Root="HKLM" Key="Software\\PEI Data Systems\\PEI Site App" ForceCreateOnInstall="yes">
-          <RegistryValue Type="string" Name="TenantId" Value="[TENANT_ID]" KeyPath="yes"/>
-          <RegistryValue Type="string" Name="SiteId" Value="[SITE_ID]"/>
-          <RegistryValue Type="string" Name="SiteName" Value="[SITE_NAME]"/>
-          <RegistryValue Type="string" Name="InstallPath" Value="[APPLICATIONROOTDIRECTORY]"/>
-        </RegistryKey>
+    } else {
+      appComponentsXml += `
+      <Component Id="${id}" Guid="*">
+        <File Id="${id}_file" Name="${file}" Source="${source}" KeyPath="yes" />
       </Component>
+`;
+    }
+    appComponentRefs += `        <ComponentRef Id="${id}" />\n`;
+  }
 
-      <!-- Component for Windows Startup (UI app) - Conditional based on user choice -->
-      <Component Id="StartupRegistryEntry" Guid="*">
-        <Condition>START_WITH_WINDOWS = "1"</Condition>
-        <RegistryKey Root="HKCU" Key="Software\\Microsoft\\Windows\\CurrentVersion\\Run">
-          <RegistryValue Type="string" Name="[ProductName]" Value="&quot;[APPLICATIONROOTDIRECTORY]PEI Site App.exe&quot;" KeyPath="yes"/>
-        </RegistryKey>
-      </Component>
-
-      <!-- Install icon file for Add/Remove Programs display -->
-      <Component Id="AppIconFile" Guid="*">
-        <File Id="AppIconIco" Name="app-icon.ico" Source="${iconPath}" KeyPath="yes" />
-      </Component>
-
-      <!-- Background Service Executable - native Windows Service via SCM -->
-      <Component Id="BackgroundService" Guid="*">
-        <File Id="ServiceExe" Name="pei-site-service.exe" Source="${serviceDestPath}" KeyPath="yes" />
+  // Build component XML for service files
+  let serviceComponentsXml = '';
+  let serviceComponentRefs = '';
+  for (const file of serviceFiles) {
+    const id = `Svc_${fileId(file)}`;
+    const source = path.join(servicePublishDir, file);
+    if (file === 'pei-site-service.exe') {
+      // Service exe — includes ServiceInstall/ServiceControl
+      serviceComponentsXml += `
+      <Component Id="${id}" Guid="*">
+        <File Id="${id}_file" Name="${file}" Source="${source}" KeyPath="yes" />
         <ServiceInstall Id="PeiSiteServiceInstall"
                         Name="PeiSiteService"
                         DisplayName="PEI Site Service"
@@ -231,97 +133,140 @@ async function buildMSI() {
                         Remove="uninstall"
                         Wait="yes" />
       </Component>
-    </DirectoryRef>
 `;
+    } else {
+      serviceComponentsXml += `
+      <Component Id="${id}" Guid="*">
+        <File Id="${id}_file" Name="${file}" Source="${source}" KeyPath="yes" />
+      </Component>
+`;
+    }
+    serviceComponentRefs += `        <ComponentRef Id="${id}" />\n`;
+  }
 
-    // Find an existing DirectoryRef and add our DirectoryRef after it
-    wxsContent = wxsContent.replace(
-      /(<DirectoryRef\s+Id="APPLICATIONROOTDIRECTORY">[\s\S]*?<\/DirectoryRef>)/,
-      `$1\n${registryComponentXml}`
-    );
+  // Generate the complete WiX source
+  const wxsContent = `<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*"
+           Name="${appName}"
+           Language="1033"
+           Version="${appVersion}"
+           Manufacturer="PEI Data Systems"
+           UpgradeCode="57f48daa-3001-40a9-9dab-5a20450fd982">
 
-    // Add ComponentRef to the main feature
-    const componentRefXml = `
-      <ComponentRef Id="ConfigRegistryEntries" />
-      <ComponentRef Id="StartupRegistryEntry" />
-      <ComponentRef Id="AppIconFile" />
-      <ComponentRef Id="BackgroundService" />`;
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine"
+             Description="${appName} Installer" Comments="Installs ${appName} v${appVersion}" />
 
-    // Find the Feature element and add our component references
-    wxsContent = wxsContent.replace(
-      /(<Feature\s+Id="MainApplication"[^>]*>)/,
-      `$1${componentRefXml}`
-    );
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
-    // Add icon attribute to shortcuts
-    // For Start Menu shortcut
-    wxsContent = wxsContent.replace(
-      /(<Shortcut\s+Id="ApplicationStartMenuShortcut"[^>]*\n[^>]*\n[^>]*\n[^>]*)(WorkingDirectory="APPLICATIONROOTDIRECTORY">)/,
-      `$1WorkingDirectory="APPLICATIONROOTDIRECTORY"\n                  Icon="AppIcon.exe"\n                  IconIndex="0">`
-    );
+    <Property Id="ARPPRODUCTICON" Value="AppIcon.exe" />
+    <Property Id="VisibleProductName" Value="${appName}" />
 
-    // For Desktop shortcut
-    wxsContent = wxsContent.replace(
-      /(<Shortcut\s+Id="MyDesktopShortcut"[^>]*\n[^>]*\n[^>]*\n[^>]*)(WorkingDirectory="APPLICATIONROOTDIRECTORY")/,
-      `$1WorkingDirectory="APPLICATIONROOTDIRECTORY"\n                    Icon="AppIcon.exe"\n                    IconIndex="0"`
-    );
+    <!-- Custom properties for site configuration -->
+    <Property Id="TENANT_ID" Secure="yes">
+      <RegistrySearch Id="TenantIdSearch" Root="HKLM"
+                     Key="Software\\PEI Data Systems\\PEI Site App"
+                     Name="TenantId" Type="raw" />
+    </Property>
+    <Property Id="SITE_ID" Secure="yes">
+      <RegistrySearch Id="SiteIdSearch" Root="HKLM"
+                     Key="Software\\PEI Data Systems\\PEI Site App"
+                     Name="SiteId" Type="raw" />
+    </Property>
+    <Property Id="SITE_NAME" Secure="yes">
+      <RegistrySearch Id="SiteNameSearch" Root="HKLM"
+                     Key="Software\\PEI Data Systems\\PEI Site App"
+                     Name="SiteName" Type="raw" />
+    </Property>
+    <Property Id="START_WITH_WINDOWS" Value="1" />
 
-    // Add Icon element definition before closing Product tag
-    const iconDefinition = `
     <Icon Id="AppIcon.exe" SourceFile="${iconPath}" />
-  </Product>`;
 
-    wxsContent = wxsContent.replace(
-      /<\/Product>/,
-      iconDefinition
-    );
+    <!-- Directory structure -->
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFilesFolder">
+        <Directory Id="ManufacturerFolder" Name="PEI Data Systems">
+          <Directory Id="APPLICATIONROOTDIRECTORY" Name="${appName}" />
+        </Directory>
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ApplicationProgramsFolder" Name="${appName}" />
+      </Directory>
+      <Directory Id="DesktopFolder" />
+    </Directory>
 
-    // Update the DisplayIcon registry value to point to the installed .ico file
-    // This ensures Windows Settings shows the correct icon
-    wxsContent = wxsContent.replace(
-      /(<RegistryValue\s+Name="DisplayIcon"\s+Type="expandable"\s+Value=")(\[APPLICATIONROOTDIRECTORY\]PEI Site App\.exe)(")/,
-      '$1[APPLICATIONROOTDIRECTORY]app-icon.ico$3'
-    );
+    <!-- App files -->
+    <DirectoryRef Id="APPLICATIONROOTDIRECTORY">
+${appComponentsXml}
+${serviceComponentsXml}
+      <!-- Registry entries for configuration -->
+      <Component Id="ConfigRegistryEntries" Guid="*">
+        <RegistryKey Root="HKLM" Key="Software\\PEI Data Systems\\PEI Site App" ForceCreateOnInstall="yes">
+          <RegistryValue Type="string" Name="TenantId" Value="[TENANT_ID]" KeyPath="yes" />
+          <RegistryValue Type="string" Name="SiteId" Value="[SITE_ID]" />
+          <RegistryValue Type="string" Name="SiteName" Value="[SITE_NAME]" />
+          <RegistryValue Type="string" Name="InstallPath" Value="[APPLICATIONROOTDIRECTORY]" />
+        </RegistryKey>
+      </Component>
 
-    // Fix the product name in Windows Settings - remove "(Machine)" suffix
-    // Override VisibleProductName to use the correct app name (including staging suffix if applicable)
-    wxsContent = wxsContent.replace(
-      /<Property Id="VisibleProductName" Value="[^"]*"/,
-      `<Property Id="VisibleProductName" Value="${appName}"`
-    );
+      <!-- Windows startup entry -->
+      <Component Id="StartupRegistryEntry" Guid="*">
+        <Condition>START_WITH_WINDOWS = "1"</Condition>
+        <RegistryKey Root="HKCU" Key="Software\\Microsoft\\Windows\\CurrentVersion\\Run">
+          <RegistryValue Type="string" Name="${appName}" Value="&quot;[APPLICATIONROOTDIRECTORY]pei-site-app.exe&quot;" KeyPath="yes" />
+        </RegistryKey>
+      </Component>
 
-    // Remove the SetProperty actions that add "(User)" suffix
-    // These span multiple lines and contain CDATA sections
-    wxsContent = wxsContent.replace(
-      /<!--[^>]*change the product name[^>]*-->\s*<SetProperty Action="SetVisibleProductName"[\s\S]*?<\/SetProperty>/g,
-      ''
-    );
-    wxsContent = wxsContent.replace(
-      /<!--[^>]*MSI generaten entry[^>]*-->\s*<SetProperty Action="SetProductName"[\s\S]*?<\/SetProperty>/g,
-      ''
-    );
+      <!-- App icon for Add/Remove Programs -->
+      <Component Id="AppIconFile" Guid="*">
+        <File Id="AppIconIco" Name="app-icon.ico" Source="${iconPath}" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
 
-    // Remove electron-wix-msi's default RegistryRunKey component to prevent duplicate startup entries
-    // We have our own conditional StartupRegistryEntry component
-    wxsContent = wxsContent.replace(
-      /<Component Id="RegistryRunKey"[\s\S]*?<\/Component>/g,
-      ''
-    );
+    <!-- Start Menu shortcuts -->
+    <DirectoryRef Id="ApplicationProgramsFolder">
+      <Component Id="ApplicationShortcut" Guid="*">
+        <Shortcut Id="ApplicationStartMenuShortcut"
+                  Name="${appName}"
+                  Description="${appName}"
+                  Target="[APPLICATIONROOTDIRECTORY]pei-site-app.exe"
+                  WorkingDirectory="APPLICATIONROOTDIRECTORY"
+                  Icon="AppIcon.exe"
+                  IconIndex="0" />
+        <RemoveFolder Id="CleanUpStartMenu" Directory="ApplicationProgramsFolder" On="uninstall" />
+        <RegistryValue Root="HKCU" Key="Software\\PEI Data Systems\\${appName}" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
 
-    // Remove the AutoLaunch feature that references the removed RegistryRunKey
-    wxsContent = wxsContent.replace(
-      /<Feature Id="AutoLaunch"[\s\S]*?<\/Feature>/g,
-      ''
-    );
+    <!-- Desktop shortcut -->
+    <DirectoryRef Id="DesktopFolder">
+      <Component Id="DesktopShortcut" Guid="*">
+        <Shortcut Id="ApplicationDesktopShortcut"
+                  Name="${appName}"
+                  Description="${appName}"
+                  Target="[APPLICATIONROOTDIRECTORY]pei-site-app.exe"
+                  WorkingDirectory="APPLICATIONROOTDIRECTORY"
+                  Icon="AppIcon.exe"
+                  IconIndex="0" />
+        <RegistryValue Root="HKCU" Key="Software\\PEI Data Systems\\${appName}" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
 
-    // Simpler approach: use WixUI_InstallDir but add our custom configuration dialog
-    // and modify the dialog flow to include our Config step
-    const customUiXml = `
+    <!-- Feature definition -->
+    <Feature Id="MainApplication" Title="${appName}" Level="1">
+${appComponentRefs}${serviceComponentRefs}        <ComponentRef Id="ConfigRegistryEntries" />
+        <ComponentRef Id="StartupRegistryEntry" />
+        <ComponentRef Id="AppIconFile" />
+        <ComponentRef Id="ApplicationShortcut" />
+        <ComponentRef Id="DesktopShortcut" />
+    </Feature>
+
+    <!-- UI Configuration -->
     <UI>
       <UIRef Id="WixUI_InstallDir" />
       <Property Id="WIXUI_INSTALLDIR" Value="APPLICATIONROOTDIRECTORY" />
 
-      <!-- Add custom text to exit dialog about service and reboot -->
       <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT" Value="The PEI Site Service has been installed and started. The background service will maintain the connection to your monitoring server automatically." />
 
       <!-- Custom Configuration Dialog -->
@@ -331,22 +276,17 @@ async function buildMSI() {
         <Control Id="Title" Type="Text" X="15" Y="6" Width="340" Height="20" NoPrefix="yes" Text="{\\WixUI_Font_Title}Site Configuration" />
         <Control Id="Description" Type="Text" X="15" Y="26" Width="340" Height="20" NoPrefix="yes" Text="Please enter your site configuration details." />
 
-        <!-- Tenant ID Input -->
         <Control Id="TenantIdLabel" Type="Text" X="20" Y="55" Width="100" Height="15" NoPrefix="yes" Text="Tenant ID:" />
         <Control Id="TenantIdEdit" Type="Edit" X="20" Y="70" Width="330" Height="18" Property="TENANT_ID" />
 
-        <!-- Site ID Input -->
         <Control Id="SiteIdLabel" Type="Text" X="20" Y="95" Width="100" Height="15" NoPrefix="yes" Text="Site ID:" />
         <Control Id="SiteIdEdit" Type="Edit" X="20" Y="110" Width="330" Height="18" Property="SITE_ID" />
 
-        <!-- Site Name Input -->
         <Control Id="SiteNameLabel" Type="Text" X="20" Y="135" Width="100" Height="15" NoPrefix="yes" Text="Site Name:" />
         <Control Id="SiteNameEdit" Type="Edit" X="20" Y="150" Width="330" Height="18" Property="SITE_NAME" />
 
-        <!-- Start with Windows Checkbox -->
         <Control Id="StartWithWindowsCheckbox" Type="CheckBox" X="20" Y="180" Width="330" Height="17" Property="START_WITH_WINDOWS" CheckBoxValue="1" Text="Start application automatically when Windows starts" />
 
-        <!-- Navigation buttons -->
         <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="Back" />
         <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="Next" />
         <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="Cancel">
@@ -354,45 +294,39 @@ async function buildMSI() {
         </Control>
       </Dialog>
 
-      <!-- Override Welcome -> InstallDir to insert Configuration dialog -->
+      <!-- Dialog flow: Welcome -> Configuration -> InstallDir -> ... -->
       <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="ConfigurationDlg" Order="99">NOT Installed</Publish>
-
       <Publish Dialog="ConfigurationDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg">1</Publish>
       <Publish Dialog="ConfigurationDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg">1</Publish>
-
-      <!-- Override InstallDirDlg back button to go to Configuration -->
       <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="ConfigurationDlg" Order="99">1</Publish>
     </UI>
     <UIRef Id="WixUI_ErrorProgressText" />
+
+  </Product>
+</Wix>
 `;
 
-    // Replace the entire UI section with our custom one
-    // Match UI sections with or without Id attribute, and also remove the following UIRef if present
-    const uiSectionRegex = /<UI[^>]*>[\s\S]*?<\/UI>\s*(?:<UIRef[^>]*\/>)?/;
-    if (uiSectionRegex.test(wxsContent)) {
-      wxsContent = wxsContent.replace(uiSectionRegex, customUiXml);
-      console.log('Replaced UI section with custom UI');
-    } else {
-      console.error('Could not find UI section in WXS file');
-    }
+  // Write WiX source file
+  const wxsPath = path.join(outDir, 'PEI Site App.wxs');
+  fs.writeFileSync(wxsPath, wxsContent, 'utf8');
+  console.log(`\nWiX source written to: ${wxsPath}`);
 
-    // ServiceInstall/ServiceControl are now embedded in the BackgroundService component above
-    // No VBScript custom actions needed - WiX handles service lifecycle natively
-    console.log('Using native WiX ServiceInstall/ServiceControl for background service');
+  // Compile with candle.exe
+  console.log('\n--- Compiling WiX source (candle.exe) ---');
+  const wixobjPath = path.join(outDir, 'PEI Site App.wixobj');
+  execSync(`candle.exe -nologo -ext WixUIExtension -ext WixUtilExtension -out "${wixobjPath}" "${wxsPath}"`, {
+    stdio: 'inherit'
+  });
 
-    // Write the modified content back
-    fs.writeFileSync(wxsPath, wxsContent, 'utf8');
-    console.log('Modified WiX source file with custom UI, properties, components, and icons');
+  // Link with light.exe
+  console.log('\n--- Linking MSI (light.exe) ---');
+  const msiPath = path.join(outDir, `PEI Site App${envSuffix}.msi`);
+  execSync(`light.exe -nologo -ext WixUIExtension -ext WixUtilExtension -sice:ICE61 -out "${msiPath}" "${wixobjPath}"`, {
+    stdio: 'inherit'
+  });
 
-    // Step 3: Compile the MSI
-    await msiCreator.compile();
-    console.log('MSI installer created successfully!');
-    console.log(`Output location: ${OUT_DIR}`);
-
-  } catch (error) {
-    console.error('Error creating MSI:', error);
-    process.exit(1);
-  }
+  console.log(`\nMSI installer created successfully!`);
+  console.log(`Output: ${msiPath}`);
 }
 
 buildMSI();
