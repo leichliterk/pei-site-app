@@ -72,7 +72,7 @@ public class WebSocketClient : IDisposable
                 tenant_id = _config.TenantId,
                 connection_source = "service"
             },
-            Reconnection = true,
+            Reconnection = false,
             Transport = TransportProtocol.WebSocket
         });
 
@@ -122,25 +122,14 @@ public class WebSocketClient : IDisposable
             SetStatus(ConnectionStatus.error);
         };
 
-        _socket.OnReconnectAttempt += (s, attempt) =>
-        {
-            _logger.Log($"[WebSocketClient] Reconnect attempt #{attempt}");
-        };
-
-        _socket.OnReconnectError += (s, ex) =>
-        {
-            _logger.Log($"[WebSocketClient] Reconnect error: {ex.Message}");
-        };
-
         _socket.OnAny(async (name, ctx) =>
         {
             _logger.Log($"[WebSocketClient] Event: {name}");
             await Task.CompletedTask;
         });
 
-        // SocketIOClient v4 has a bug where large ReconnectionAttempts causes
-        // a millisecondsDelay overflow, so we use defaults (10 attempts) and
-        // implement our own outer retry loop for infinite reconnection.
+        // We handle reconnection ourselves in OnDisconnected, so Reconnection = false.
+        // Outer retry loop handles initial connection failures.
         _ = Task.Run(async () =>
         {
             while (true)
