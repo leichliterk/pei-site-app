@@ -13,7 +13,7 @@
           "Microsoft.Extensions.Hosting.WindowsServices": "10.0.3",
           "Microsoft.NET.ILLink.Tasks": "8.0.24",
           "Microsoft.Win32.Registry": "5.0.0",
-          "SocketIOClient": "4.0.0.2",
+          "SocketIOClient": "3.1.2",
           "runtimepack.Microsoft.NETCore.App.Runtime.win-x64": "8.0.24",
           "runtimepack.Microsoft.AspNetCore.App.Runtime.win-x64": "8.0.24"
         },
@@ -1572,60 +1572,47 @@
           "System.Security.Principal.Windows": "5.0.0"
         }
       },
-      "Newtonsoft.Json/13.0.4": {
+      "SocketIO.Core/3.1.2": {
         "runtime": {
-          "lib/net6.0/Newtonsoft.Json.dll": {
-            "assemblyVersion": "13.0.0.0",
-            "fileVersion": "13.0.4.30916"
+          "lib/netstandard2.0/SocketIO.Core.dll": {
+            "assemblyVersion": "3.1.2.0",
+            "fileVersion": "3.1.2.0"
           }
         }
       },
-      "SocketIOClient/4.0.0.2": {
+      "SocketIO.Serializer.Core/3.1.2": {
         "dependencies": {
-          "Microsoft.Extensions.DependencyInjection": "10.0.3",
-          "Microsoft.Extensions.Logging": "10.0.3",
-          "SocketIOClient.Common": "4.0.0",
-          "SocketIOClient.Serializer": "4.0.0.1",
-          "SocketIOClient.Serializer.NewtonsoftJson": "4.0.0.1",
+          "SocketIO.Core": "3.1.2"
+        },
+        "runtime": {
+          "lib/netstandard2.0/SocketIO.Serializer.Core.dll": {
+            "assemblyVersion": "3.1.2.0",
+            "fileVersion": "3.1.2.0"
+          }
+        }
+      },
+      "SocketIO.Serializer.SystemTextJson/3.1.2": {
+        "dependencies": {
+          "SocketIO.Core": "3.1.2",
+          "SocketIO.Serializer.Core": "3.1.2",
           "System.Text.Json": "10.0.3"
         },
         "runtime": {
-          "lib/net8.0/SocketIOClient.dll": {
-            "assemblyVersion": "4.0.0.2",
-            "fileVersion": "4.0.0.2"
+          "lib/netstandard2.0/SocketIO.Serializer.SystemTextJson.dll": {
+            "assemblyVersion": "3.1.2.0",
+            "fileVersion": "3.1.2.0"
           }
         }
       },
-      "SocketIOClient.Common/4.0.0": {
-        "runtime": {
-          "lib/net8.0/SocketIOClient.Common.dll": {
-            "assemblyVersion": "4.0.0.0",
-            "fileVersion": "4.0.0.0"
-          }
-        }
-      },
-      "SocketIOClient.Serializer/4.0.0.1": {
+      "SocketIOClient/3.1.2": {
         "dependencies": {
-          "SocketIOClient.Common": "4.0.0"
+          "SocketIO.Serializer.Core": "3.1.2",
+          "SocketIO.Serializer.SystemTextJson": "3.1.2"
         },
         "runtime": {
-          "lib/net8.0/SocketIOClient.Serializer.dll": {
-            "assemblyVersion": "4.0.0.1",
-            "fileVersion": "4.0.0.1"
-          }
-        }
-      },
-      "SocketIOClient.Serializer.NewtonsoftJson/4.0.0.1": {
-        "dependencies": {
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.3",
-          "Newtonsoft.Json": "13.0.4",
-          "SocketIOClient.Common": "4.0.0",
-          "SocketIOClient.Serializer": "4.0.0.1"
-        },
-        "runtime": {
-          "lib/net8.0/SocketIOClient.Serializer.NewtonsoftJson.dll": {
-            "assemblyVersion": "4.0.0.1",
-            "fileVersion": "4.0.0.1"
+          "lib/net6.0/SocketIOClient.dll": {
+            "assemblyVersion": "3.1.2.0",
+            "fileVersion": "3.1.2.0"
           }
         }
       },
@@ -1937,40 +1924,33 @@
       "path": "microsoft.win32.registry/5.0.0",
       "hashPath": "microsoft.win32.registry.5.0.0.nupkg.sha512"
     },
-    "Newtonsoft.Json/13.0.4": {
+    "SocketIO.Core/3.1.2": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-pdgNNMai3zv51W5aq268sujXUyx7SNdE2bj1wZcWjAQrKMFZV260lbqYop1d2GM67JI1huLRwxo9ZqnfF/lC6A==",
-      "path": "newtonsoft.json/13.0.4",
-      "hashPath": "newtonsoft.json.13.0.4.nupkg.sha512"
+      "sha512": "sha512-tb6vZ7DYhZooRGLHTPK7/Gifbu+kHbkQRbsee0LAnI28pWc5+Br+juh4pvid3kfIrGTl5dzAfy5huLELVU4svA==",
+      "path": "socketio.core/3.1.2",
+      "hashPath": "socketio.core.3.1.2.nupkg.sha512"
     },
-    "SocketIOClient/4.0.0.2": {
+    "SocketIO.Serializer.Core/3.1.2": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-RYtHafPCBCoY8F9KI583t4Dw3+c45XHmPf6xLIHtQeSimDLn3rMUSnITcCCRzbI7ITkKgw1eBhICdeVEs4hjHQ==",
-      "path": "socketioclient/4.0.0.2",
-      "hashPath": "socketioclient.4.0.0.2.nupkg.sha512"
+      "sha512": "sha512-/cJtU3JVzjqP/Jh3BpMMR0aNzYua6s9e3+hjZ6OnYprFHrGYyg/n9OcST1dBjmOvvgyJ3GwJlyq0NjnPETAHsA==",
+      "path": "socketio.serializer.core/3.1.2",
+      "hashPath": "socketio.serializer.core.3.1.2.nupkg.sha512"
     },
-    "SocketIOClient.Common/4.0.0": {
+    "SocketIO.Serializer.SystemTextJson/3.1.2": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-7wlg0hMX5/k+fZejclVR7aKSj+Q37KCmVrKPIjZV+9z/odb11hZ4L+a0T3cV1w1jicTBWFEKvjWfWh6YKtz9Qg==",
-      "path": "socketioclient.common/4.0.0",
-      "hashPath": "socketioclient.common.4.0.0.nupkg.sha512"
+      "sha512": "sha512-AA8w3Y4JldC3FaL1D4WuyG4zLPdrzjf8AQx1LCKtzlMlTLOcbEW0UGt+BhKxkUnxYAD5O5fsqRrTNCGXu6VeWA==",
+      "path": "socketio.serializer.systemtextjson/3.1.2",
+      "hashPath": "socketio.serializer.systemtextjson.3.1.2.nupkg.sha512"
     },
-    "SocketIOClient.Serializer/4.0.0.1": {
+    "SocketIOClient/3.1.2": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-+p1xnwSkX8UQQLgqr2Em6dIATl5pR7awHj1nbaRd/9aA2iAHGgy7HsseN8eblv3NHlPtTP9Y3IFDl5JKfWSYjg==",
-      "path": "socketioclient.serializer/4.0.0.1",
-      "hashPath": "socketioclient.serializer.4.0.0.1.nupkg.sha512"
-    },
-    "SocketIOClient.Serializer.NewtonsoftJson/4.0.0.1": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-D7nzYdIcNIPjGp7LW+KmJHk5I6uz3ioGb6fwxdpspuruwTTl1bTwczRuvEFcFjTHtb0Avhbcaw65jo6eAUmsYw==",
-      "path": "socketioclient.serializer.newtonsoftjson/4.0.0.1",
-      "hashPath": "socketioclient.serializer.newtonsoftjson.4.0.0.1.nupkg.sha512"
+      "sha512": "sha512-CMmnmhvG1Qf8k6BPh3RLqc/9MNvGUlCOyptjoP8a62bowPQkHTWvN25yy+gQqx5Ry/NgzkQHBJNpmRJhZNZrVQ==",
+      "path": "socketioclient/3.1.2",
+      "hashPath": "socketioclient.3.1.2.nupkg.sha512"
     },
     "System.Diagnostics.DiagnosticSource/10.0.3": {
       "type": "package",
