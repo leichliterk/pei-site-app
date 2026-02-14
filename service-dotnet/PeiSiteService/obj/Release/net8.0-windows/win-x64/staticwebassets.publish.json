@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "dBMH+4RXBe+3b1CSvYTR+t8f5mNOoiD11qlnM9bUcfc=",
+  "Source": "pei-site-service",
+  "BasePath": "_content/pei-site-service",
+  "Mode": "Default",
+  "ManifestType": "Publish",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}

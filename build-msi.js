@@ -25,11 +25,11 @@ async function buildMSI() {
 
   console.log(`Building MSI for ${isStaging ? 'STAGING' : 'PRODUCTION'} environment (v${appVersion})...`);
 
-  // Build the service executable first
-  console.log('Building background service executable...');
+  // Build the C# service executable
+  console.log('Building background service executable (dotnet publish)...');
   try {
-    execSync('npm run build:exe', {
-      cwd: path.resolve(__dirname, 'service'),
+    execSync('dotnet publish -c Release', {
+      cwd: path.resolve(__dirname, 'service-dotnet', 'PeiSiteService'),
       stdio: 'inherit'
     });
     console.log('Service executable built successfully!');
@@ -41,7 +41,7 @@ async function buildMSI() {
   // Find the built Electron app directory
   const APP_DIR = path.resolve(__dirname, 'release', 'win-unpacked');
   const OUT_DIR = path.resolve(__dirname, 'release', `msi${outDirSuffix}`);
-  const SERVICE_EXE_PATH = path.resolve(__dirname, 'release', 'pei-site-service.exe');
+  const SERVICE_EXE_PATH = path.resolve(__dirname, 'service-dotnet', 'PeiSiteService', 'bin', 'Release', 'net8.0-windows', 'win-x64', 'publish', 'pei-site-service.exe');
 
   // Copy service executable to app directory
   const serviceDestPath = path.join(APP_DIR, 'pei-site-service.exe');
@@ -107,7 +107,7 @@ async function buildMSI() {
     },
 
     // WiX extension configuration for custom UI
-    extensions: ['WixUtilExtension'],
+    extensions: [],
 
     // Certificate configuration (optional, for signing)
     // signWithParams: '/a /fd SHA256 /tr http://timestamp.digicert.com /td SHA256'
@@ -138,14 +138,6 @@ async function buildMSI() {
     // The library uses the exe name for the wxs file, not the full app name with suffix
     const wxsPath = path.join(OUT_DIR, 'PEI Site App.wxs');
     let wxsContent = fs.readFileSync(wxsPath, 'utf8');
-
-    // Add util namespace for ServiceConfig (if not already present)
-    if (!wxsContent.includes('xmlns:util=')) {
-      wxsContent = wxsContent.replace(
-        /<Wix xmlns="([^"]+)"/,
-        '<Wix xmlns="$1" xmlns:util="http://schemas.microsoft.com/wix/UtilExtension"'
-      );
-    }
 
     // Force per-machine installation (required for Windows Service)
     // Modify existing ALLUSERS and MSIINSTALLPERUSER properties
@@ -221,9 +213,23 @@ async function buildMSI() {
         <File Id="AppIconIco" Name="app-icon.ico" Source="${iconPath}" KeyPath="yes" />
       </Component>
 
-      <!-- Background Service Executable - managed via scheduled task instead of SCM service -->
+      <!-- Background Service Executable - native Windows Service via SCM -->
       <Component Id="BackgroundService" Guid="*">
         <File Id="ServiceExe" Name="pei-site-service.exe" Source="${serviceDestPath}" KeyPath="yes" />
+        <ServiceInstall Id="PeiSiteServiceInstall"
+                        Name="PeiSiteService"
+                        DisplayName="PEI Site Service"
+                        Description="Background service for PEI Site App monitoring"
+                        Start="auto"
+                        Type="ownProcess"
+                        Account="LocalSystem"
+                        ErrorControl="normal" />
+        <ServiceControl Id="PeiSiteServiceControl"
+                        Name="PeiSiteService"
+                        Start="install"
+                        Stop="both"
+                        Remove="uninstall"
+                        Wait="yes" />
       </Component>
     </DirectoryRef>
 `;
@@ -316,7 +322,7 @@ async function buildMSI() {
       <Property Id="WIXUI_INSTALLDIR" Value="APPLICATIONROOTDIRECTORY" />
 
       <!-- Add custom text to exit dialog about service and reboot -->
-      <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT" Value="A background service has been installed to maintain the connection to your monitoring server. The service will start automatically when Windows restarts. To start monitoring immediately, please restart your computer now." />
+      <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT" Value="The PEI Site Service has been installed and started. The background service will maintain the connection to your monitoring server automatically." />
 
       <!-- Custom Configuration Dialog -->
       <Dialog Id="ConfigurationDlg" Width="370" Height="270" Title="[ProductName] Setup">
@@ -370,59 +376,9 @@ async function buildMSI() {
       console.error('Could not find UI section in WXS file');
     }
 
-    // Add custom actions for scheduled task (replaces Windows Service which requires SCM protocol)
-    // Uses VBScript custom actions which are more reliable than WixQuietExec
-    const scheduledTaskXml = `
-    <!-- Pass install directory to deferred custom actions via CustomActionData -->
-    <SetProperty Id="CreateAndStartServiceTask" Before="CreateAndStartServiceTask" Sequence="execute" Value="[APPLICATIONROOTDIRECTORY]" />
-    <SetProperty Id="StopAndRemoveServiceTask" Before="StopAndRemoveServiceTask" Sequence="execute" Value="[APPLICATIONROOTDIRECTORY]" />
-
-    <!-- Deferred VBScript: create scheduled task and start it -->
-    <CustomAction Id="CreateAndStartServiceTask" Script="vbscript" Execute="deferred" Impersonate="no" Return="ignore">
-      <![CDATA[
-        Dim installDir, oShell, sExePath, sCreateCmd, sRunCmd
-        installDir = Session.Property("CustomActionData")
-        sExePath = installDir & "pei-site-service.exe"
-        Set oShell = CreateObject("WScript.Shell")
-
-        ' Create scheduled task to run at system startup as SYSTEM
-        sCreateCmd = "schtasks /create /tn ""PEI Site Service"" /tr """ & Chr(34) & sExePath & Chr(34) & """ /sc onstart /ru SYSTEM /rl HIGHEST /f"
-        oShell.Run sCreateCmd, 0, True
-
-        ' Start it immediately
-        sRunCmd = "schtasks /run /tn ""PEI Site Service"""
-        oShell.Run sRunCmd, 0, True
-      ]]>
-    </CustomAction>
-
-    <!-- Deferred VBScript: stop process and remove scheduled task -->
-    <CustomAction Id="StopAndRemoveServiceTask" Script="vbscript" Execute="deferred" Impersonate="no" Return="ignore">
-      <![CDATA[
-        Dim oShell
-        Set oShell = CreateObject("WScript.Shell")
-
-        ' Kill the service process
-        oShell.Run "taskkill /f /im pei-site-service.exe", 0, True
-
-        ' Remove the scheduled task
-        oShell.Run "schtasks /delete /tn ""PEI Site Service"" /f", 0, True
-      ]]>
-    </CustomAction>
-
-    <InstallExecuteSequence>
-      <!-- On install: create the scheduled task and start it immediately -->
-      <Custom Action="CreateAndStartServiceTask" After="InstallFiles">NOT Installed AND NOT REMOVE</Custom>
-      <!-- On uninstall: stop the process and remove the scheduled task -->
-      <Custom Action="StopAndRemoveServiceTask" Before="RemoveFiles">REMOVE="ALL"</Custom>
-    </InstallExecuteSequence>
-`;
-
-    // Insert scheduled task custom actions before closing </Product> tag
-    wxsContent = wxsContent.replace(
-      /<\/Product>/,
-      `${scheduledTaskXml}\n  </Product>`
-    );
-    console.log('Added scheduled task custom actions for background service');
+    // ServiceInstall/ServiceControl are now embedded in the BackgroundService component above
+    // No VBScript custom actions needed - WiX handles service lifecycle natively
+    console.log('Using native WiX ServiceInstall/ServiceControl for background service');
 
     // Write the modified content back
     fs.writeFileSync(wxsPath, wxsContent, 'utf8');

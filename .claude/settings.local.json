@@ -8,7 +8,8 @@
       "Bash(npm install:*)",
       "Bash(npx tailwindcss:*)",
       "Bash(npm uninstall:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(dotnet new:*)"
     ],
     "deny": [],
     "ask": []
