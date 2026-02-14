@@ -34,11 +34,7 @@ C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteServic
 C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\Microsoft.Extensions.Options.dll
 C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\Microsoft.Extensions.Options.ConfigurationExtensions.dll
 C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\Microsoft.Extensions.Primitives.dll
-C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\Newtonsoft.Json.dll
 C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\SocketIOClient.dll
-C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\SocketIOClient.Common.dll
-C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\SocketIOClient.Serializer.dll
-C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\SocketIOClient.Serializer.NewtonsoftJson.dll
 C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\System.Diagnostics.DiagnosticSource.dll
 C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\System.Diagnostics.EventLog.Messages.dll
 C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\System.Diagnostics.EventLog.dll
@@ -357,3 +353,6 @@ C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteServic
 C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\obj\Release\net8.0-windows\win-x64\pei-site-service.pdb
 C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\obj\Release\net8.0-windows\win-x64\PeiSiteService.genruntimeconfig.cache
 C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\obj\Release\net8.0-windows\win-x64\ref\pei-site-service.dll
+C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\SocketIO.Core.dll
+C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\SocketIO.Serializer.Core.dll
+C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\SocketIO.Serializer.SystemTextJson.dll

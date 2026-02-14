@@ -1,5 +1,6 @@
 using PeiSiteService.Models;
 using SocketIOClient;
+using SocketIOClient.Transport;
 
 namespace PeiSiteService.Services;
 
@@ -71,7 +72,8 @@ public class WebSocketClient : IDisposable
                 tenant_id = _config.TenantId,
                 connection_source = "service"
             },
-            Reconnection = true
+            Reconnection = true,
+            Transport = TransportProtocol.WebSocket
         });
 
         _socket.OnConnected += (s, e) =>
