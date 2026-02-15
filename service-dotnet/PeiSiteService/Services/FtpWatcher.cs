@@ -5,6 +5,17 @@ using PeiSiteService.Models;
 
 namespace PeiSiteService.Services;
 
+/// <summary>
+/// Routes FluentFTP protocol-level log messages to our FileLogger.
+/// </summary>
+internal sealed class FtpFileLogAdapter : IFtpLogger
+{
+    private readonly FileLogger _logger;
+    public FtpFileLogAdapter(FileLogger logger) => _logger = logger;
+    public void Log(FtpLogEntry entry) => _logger.Log($"[FluentFTP] {entry.Message}");
+}
+
+
 public class FtpWatcher
 {
     private Models.FtpConfig _config;
@@ -113,6 +124,11 @@ public class FtpWatcher
 
         var client = new AsyncFtpClient(_config.FtpHost, "anonymous", "anonymous@");
         client.Config.EncryptionMode = FtpEncryptionMode.None;
+        client.Config.ConnectTimeout = 15000;
+        client.Config.DataConnectionConnectTimeout = 15000;
+        client.Config.ReadTimeout = 15000;
+        client.Config.CheckCapabilities = false;
+        client.Config.DataConnectionType = FtpDataConnectionType.PORT;
 
         try
         {
@@ -192,6 +208,13 @@ public class FtpWatcher
     {
         var client = new AsyncFtpClient(host, "anonymous", "anonymous@");
         client.Config.EncryptionMode = FtpEncryptionMode.None;
+        client.Config.ConnectTimeout = 15000;
+        client.Config.DataConnectionConnectTimeout = 15000;
+        client.Config.ReadTimeout = 15000;
+        client.Config.CheckCapabilities = false;
+        client.Config.DataConnectionType = FtpDataConnectionType.PORT;
+        client.Config.SendHost = false;
+        client.Logger = new FtpFileLogAdapter(_logger);
 
         try
         {

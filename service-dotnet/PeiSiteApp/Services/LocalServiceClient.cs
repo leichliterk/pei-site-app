@@ -28,7 +28,7 @@ public class LocalServiceClient : IDisposable
         _http = new HttpClient
         {
             BaseAddress = new Uri(BaseUrl),
-            Timeout = TimeSpan.FromSeconds(5)
+            Timeout = TimeSpan.FromSeconds(30)
         };
     }
 
@@ -132,13 +132,18 @@ public class LocalServiceClient : IDisposable
     {
         try
         {
-            var response = await _http.PostAsJsonAsync("/ftp/test", new { host, path });
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var response = await _http.PostAsJsonAsync("/ftp/test", new { host, path }, cts.Token);
             if (response.IsSuccessStatusCode)
             {
-                var json = await response.Content.ReadAsStringAsync();
+                var json = await response.Content.ReadAsStringAsync(cts.Token);
                 return JsonSerializer.Deserialize<FtpTestResult>(json, JsonOptions) ?? new FtpTestResult { Success = false, Message = "Invalid response" };
             }
             return new FtpTestResult { Success = false, Message = "Service returned error" };
+        }
+        catch (OperationCanceledException)
+        {
+            return new FtpTestResult { Success = false, Message = "Connection test timed out after 30 seconds" };
         }
         catch (Exception ex)
         {
