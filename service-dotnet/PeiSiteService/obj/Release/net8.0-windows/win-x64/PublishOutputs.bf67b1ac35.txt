@@ -1,0 +1,4 @@
+C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\publish\appsettings.Development.json
+C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\publish\appsettings.json
+C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\publish\pei-site-service.pdb
+C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\publish\pei-site-service.exe

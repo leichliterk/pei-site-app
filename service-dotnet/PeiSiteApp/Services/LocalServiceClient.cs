@@ -1,0 +1,179 @@
+using System.Net.Http;
+using System.Net.Http.Json;
+using System.Text;
+using System.Text.Json;
+using PeiSiteApp.Models;
+
+namespace PeiSiteApp.Services;
+
+public class LocalServiceClient : IDisposable
+{
+    private const string BaseUrl = "http://127.0.0.1:47836";
+    private readonly HttpClient _http;
+    private Timer? _pollTimer;
+    private bool _isPolling;
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
+    public ServiceStatusResponse? CurrentStatus { get; private set; }
+    public bool IsServiceAvailable { get; private set; }
+
+    public event Action<ServiceStatusResponse?>? StatusChanged;
+
+    public LocalServiceClient()
+    {
+        _http = new HttpClient
+        {
+            BaseAddress = new Uri(BaseUrl),
+            Timeout = TimeSpan.FromSeconds(5)
+        };
+    }
+
+    public async Task<bool> CheckHealthAsync()
+    {
+        try
+        {
+            var response = await _http.GetAsync("/health");
+            IsServiceAvailable = response.IsSuccessStatusCode;
+            return IsServiceAvailable;
+        }
+        catch
+        {
+            IsServiceAvailable = false;
+            return false;
+        }
+    }
+
+    public void StartPolling()
+    {
+        if (_isPolling) return;
+        _isPolling = true;
+
+        // Initial fetch
+        _ = FetchStatusAsync();
+
+        // Poll every second
+        _pollTimer = new Timer(async _ =>
+        {
+            await FetchStatusAsync();
+        }, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+    }
+
+    public void StopPolling()
+    {
+        _isPolling = false;
+        _pollTimer?.Dispose();
+        _pollTimer = null;
+    }
+
+    private async Task FetchStatusAsync()
+    {
+        try
+        {
+            var response = await _http.GetAsync("/status");
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                var status = JsonSerializer.Deserialize<ServiceStatusResponse>(json, JsonOptions);
+                IsServiceAvailable = true;
+                CurrentStatus = status;
+                StatusChanged?.Invoke(status);
+            }
+            else
+            {
+                IsServiceAvailable = false;
+                CurrentStatus = null;
+                StatusChanged?.Invoke(null);
+            }
+        }
+        catch
+        {
+            IsServiceAvailable = false;
+            CurrentStatus = null;
+            StatusChanged?.Invoke(null);
+        }
+    }
+
+    public async Task<bool> ForceReconnectAsync()
+    {
+        try
+        {
+            var response = await _http.PostAsync("/reconnect", new StringContent("{}", System.Text.Encoding.UTF8, "application/json"));
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    public async Task<bool> UpdateConfigAsync(object config)
+    {
+        try
+        {
+            var response = await _http.PostAsJsonAsync("/config", config);
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    public async Task<bool> PrepopulateHistoryAsync(List<UptimeSession> sessions)
+    {
+        try
+        {
+            var payload = new { sessions = sessions.Select(s => new { connected_at = s.ConnectedAt, disconnected_at = s.DisconnectedAt }).ToList() };
+            var response = await _http.PostAsJsonAsync("/prepopulate-history", payload);
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    public async Task<FtpTestResult> FtpTestConnectionAsync(string host, string path)
+    {
+        try
+        {
+            var response = await _http.PostAsJsonAsync("/ftp/test", new { host, path });
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<FtpTestResult>(json, JsonOptions) ?? new FtpTestResult { Success = false, Message = "Invalid response" };
+            }
+            return new FtpTestResult { Success = false, Message = "Service returned error" };
+        }
+        catch (Exception ex)
+        {
+            return new FtpTestResult { Success = false, Message = ex.Message };
+        }
+    }
+
+    public async Task<bool> FtpUpdateConfigAsync(object config)
+    {
+        try
+        {
+            var response = await _http.PostAsJsonAsync("/ftp/config", config);
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    public async Task<FtpStatusResponse?> FtpGetStatusAsync()
+    {
+        try
+        {
+            var response = await _http.GetAsync("/ftp/status");
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<FtpStatusResponse>(json, JsonOptions);
+            }
+            return null;
+        }
+        catch { return null; }
+    }
+
+    public void Dispose()
+    {
+        StopPolling();
+        _http.Dispose();
+    }
+}
