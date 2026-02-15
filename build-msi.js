@@ -1,12 +1,6 @@
 const path = require('path');
 const { execSync } = require('child_process');
 const fs = require('fs');
-const crypto = require('crypto');
-
-function generateGuid() {
-  return crypto.randomUUID().toUpperCase();
-}
-
 function buildMSI() {
   const isStaging = process.argv.includes('staging');
   const envSuffix = isStaging ? ' - Staging' : '';
@@ -19,11 +13,10 @@ function buildMSI() {
     console.log(`Added WiX to PATH: ${wixPath}`);
   }
 
-  // Read version from the appropriate environment file
-  const envFile = isStaging ? 'environment.staging.ts' : 'environment.prod.ts';
-  const envFilePath = path.resolve(__dirname, 'src', 'environments', envFile);
-  const envContent = fs.readFileSync(envFilePath, 'utf8');
-  const versionMatch = envContent.match(/version:\s*'([^']+)'/);
+  // Read version from AppSettings.cs
+  const appSettingsPath = path.resolve(__dirname, 'service-dotnet', 'PeiSiteApp', 'Models', 'AppSettings.cs');
+  const appSettingsContent = fs.readFileSync(appSettingsPath, 'utf8');
+  const versionMatch = appSettingsContent.match(/Version\s*\{[^}]*\}\s*=\s*"([^"]+)"/);
   const appVersion = versionMatch ? versionMatch[1] : '1.0.0';
   const appName = `PEI Site App${envSuffix}`;
 
@@ -49,7 +42,7 @@ function buildMSI() {
   const servicePublishDir = path.resolve(__dirname, 'service-dotnet', 'PeiSiteService', 'bin', 'Release', 'net8.0-windows', 'win-x64', 'publish');
   const appPublishDir = path.resolve(__dirname, 'service-dotnet', 'PeiSiteApp', 'bin', 'Release', 'net8.0-windows', 'win-x64', 'publish');
   const outDir = path.resolve(__dirname, 'release', `msi${outDirSuffix}`);
-  const iconPath = path.resolve(__dirname, 'src', 'assets', 'icon.ico');
+  const iconPath = path.resolve(__dirname, 'service-dotnet', 'PeiSiteApp', 'Resources', 'icon.ico');
 
   // Ensure output directory exists
   if (!fs.existsSync(outDir)) {
