@@ -1,0 +1,156 @@
+using System.IO;
+using System.Text.Json;
+using Microsoft.Win32;
+using PeiSiteApp.Models;
+
+namespace PeiSiteApp.Services;
+
+public class SettingsManager
+{
+    private readonly string _configPath;
+    private readonly string _userSettingsPath;
+    private AppSettings _settings;
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        WriteIndented = true
+    };
+
+    public AppSettings Settings => _settings;
+
+    public SettingsManager()
+    {
+        var programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+        var configDir = Path.Combine(programData, "PEI Site Service");
+        try { Directory.CreateDirectory(configDir); } catch { }
+        _configPath = Path.Combine(configDir, "config.json");
+
+        var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var userDir = Path.Combine(appData, "PEI Site App");
+        try { Directory.CreateDirectory(userDir); } catch { }
+        _userSettingsPath = Path.Combine(userDir, "settings.json");
+
+        _settings = LoadSettings();
+    }
+
+    private AppSettings LoadSettings()
+    {
+        var settings = new AppSettings();
+
+        // Load from shared config.json (service config)
+        if (File.Exists(_configPath))
+        {
+            try
+            {
+                var data = File.ReadAllText(_configPath);
+                var config = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(data, JsonOptions);
+                if (config != null)
+                {
+                    if (config.TryGetValue("apiUrl", out var apiUrl) && apiUrl.ValueKind == JsonValueKind.String)
+                        settings.ApiUrl = apiUrl.GetString()!;
+                    if (config.TryGetValue("apiKey", out var apiKey) && apiKey.ValueKind == JsonValueKind.String)
+                        settings.ApiKey = apiKey.GetString()!;
+                    if (config.TryGetValue("siteId", out var siteId) && siteId.ValueKind == JsonValueKind.Number)
+                        settings.SiteNumber = siteId.GetInt32();
+                    if (config.TryGetValue("tenantId", out var tenantId) && tenantId.ValueKind == JsonValueKind.Number)
+                        settings.TenantId = tenantId.GetInt32();
+                }
+            }
+            catch { }
+        }
+
+        // Try Windows Registry for installer-provided values
+        var regSiteId = ReadRegistryValue("SiteId");
+        var regTenantId = ReadRegistryValue("TenantId");
+        var regSiteName = ReadRegistryValue("SiteName");
+
+        if (regSiteId != null && int.TryParse(regSiteId, out var sid))
+            settings.SiteNumber = sid;
+        if (regTenantId != null && int.TryParse(regTenantId, out var tid))
+            settings.TenantId = tid;
+        if (regSiteName != null)
+            settings.SiteName = regSiteName;
+
+        // Load user-specific settings (site name, etc.)
+        if (File.Exists(_userSettingsPath))
+        {
+            try
+            {
+                var data = File.ReadAllText(_userSettingsPath);
+                var userSettings = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(data, JsonOptions);
+                if (userSettings != null)
+                {
+                    if (userSettings.TryGetValue("siteName", out var siteName) && siteName.ValueKind == JsonValueKind.String)
+                        settings.SiteName = siteName.GetString()!;
+                }
+            }
+            catch { }
+        }
+
+        return settings;
+    }
+
+    private static string? ReadRegistryValue(string valueName)
+    {
+        if (!OperatingSystem.IsWindows()) return null;
+        try
+        {
+            // Try 32-bit registry first (WOW6432Node)
+            using var baseKey32 = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry32);
+            using var key32 = baseKey32.OpenSubKey(@"Software\PEI Data Systems\PEI Site App");
+            var value = key32?.GetValue(valueName) as string;
+            if (value != null) return value;
+
+            // Try 64-bit registry
+            using var baseKey64 = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+            using var key64 = baseKey64.OpenSubKey(@"Software\PEI Data Systems\PEI Site App");
+            return key64?.GetValue(valueName) as string;
+        }
+        catch { return null; }
+    }
+
+    public void SaveSiteName(string siteName)
+    {
+        _settings.SiteName = siteName;
+        SaveUserSettings();
+    }
+
+    public void UpdateSiteNumber(int siteNumber)
+    {
+        _settings.SiteNumber = siteNumber;
+        SaveServiceConfig();
+    }
+
+    public void UpdateTenantId(int tenantId)
+    {
+        _settings.TenantId = tenantId;
+        SaveServiceConfig();
+    }
+
+    private void SaveUserSettings()
+    {
+        try
+        {
+            var data = new { siteName = _settings.SiteName };
+            File.WriteAllText(_userSettingsPath, JsonSerializer.Serialize(data, JsonOptions));
+        }
+        catch { }
+    }
+
+    private void SaveServiceConfig()
+    {
+        try
+        {
+            var config = new
+            {
+                apiUrl = _settings.ApiUrl,
+                apiKey = _settings.ApiKey,
+                siteId = _settings.SiteNumber,
+                tenantId = _settings.TenantId
+            };
+            File.WriteAllText(_configPath, JsonSerializer.Serialize(config, JsonOptions));
+        }
+        catch { }
+    }
+}

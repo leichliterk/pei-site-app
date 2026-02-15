@@ -1,0 +1,2 @@
+C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteApp\bin\Release\net8.0-windows\win-x64\publish\pei-site-app.pdb
+C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteApp\bin\Release\net8.0-windows\win-x64\publish\pei-site-app.exe
