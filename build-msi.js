@@ -125,6 +125,12 @@ function buildMSI() {
                         Stop="both"
                         Remove="uninstall"
                         Wait="yes" />
+        <fire:FirewallException Id="PeiSiteServiceFwIn"
+                                Name="PEI Site Service"
+                                Description="Allow inbound connections for PEI Site Service (FTP active mode)"
+                                Program="[APPLICATIONROOTDIRECTORY]pei-site-service.exe"
+                                Protocol="tcp"
+                                Scope="localSubnet" />
       </Component>
 `;
     } else {
@@ -139,7 +145,8 @@ function buildMSI() {
 
   // Generate the complete WiX source
   const wxsContent = `<?xml version="1.0" encoding="UTF-8"?>
-<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
+     xmlns:fire="http://schemas.microsoft.com/wix/FirewallExtension">
   <Product Id="*"
            Name="${appName}"
            Language="1033"
@@ -307,14 +314,14 @@ ${appComponentRefs}${serviceComponentRefs}        <ComponentRef Id="ConfigRegist
   // Compile with candle.exe
   console.log('\n--- Compiling WiX source (candle.exe) ---');
   const wixobjPath = path.join(outDir, 'PEI Site App.wixobj');
-  execSync(`candle.exe -nologo -ext WixUIExtension -ext WixUtilExtension -out "${wixobjPath}" "${wxsPath}"`, {
+  execSync(`candle.exe -nologo -ext WixUIExtension -ext WixUtilExtension -ext WixFirewallExtension -out "${wixobjPath}" "${wxsPath}"`, {
     stdio: 'inherit'
   });
 
   // Link with light.exe
   console.log('\n--- Linking MSI (light.exe) ---');
   const msiPath = path.join(outDir, `PEI Site App${envSuffix}.msi`);
-  execSync(`light.exe -nologo -ext WixUIExtension -ext WixUtilExtension -sice:ICE61 -out "${msiPath}" "${wixobjPath}"`, {
+  execSync(`light.exe -nologo -ext WixUIExtension -ext WixUtilExtension -ext WixFirewallExtension -sice:ICE61 -out "${msiPath}" "${wixobjPath}"`, {
     stdio: 'inherit'
   });
 
