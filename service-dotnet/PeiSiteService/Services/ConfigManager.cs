@@ -24,9 +24,7 @@ public class ConfigManager
         SiteId = 1000,
         TenantId = 1001,
         FtpEnabled = false,
-        FtpHost = "",
-        FtpPath = "/",
-        FtpPollInterval = 60
+        FtpServers = new()
     };
 
     public ConfigManager(FileLogger logger)
@@ -51,7 +49,8 @@ public class ConfigManager
                 if (fileConfig != null)
                 {
                     _logger.Log($"[ConfigManager] Loaded config from file: {_configPath}");
-                    return MergeWithDefaults(fileConfig);
+                    var merged = MergeWithDefaults(fileConfig);
+                    return MigrateIfNeeded(merged);
                 }
             }
             catch (Exception ex)
@@ -64,12 +63,65 @@ public class ConfigManager
         var registryConfig = ReadFromRegistry();
         if (registryConfig != null)
         {
-            SaveConfig(registryConfig);
-            return registryConfig;
+            var migrated = MigrateIfNeeded(registryConfig);
+            SaveConfig(migrated);
+            return migrated;
         }
 
         _logger.Log("[ConfigManager] Using default configuration");
         return Clone(DefaultConfig);
+    }
+
+    /// <summary>
+    /// Migrates legacy single-server FTP config (flat fields) to the new
+    /// multi-server list format. Preserves the existing ftp-state.json by
+    /// renaming it to match the migrated server's ID.
+    /// </summary>
+    private FullConfig MigrateIfNeeded(FullConfig config)
+    {
+        if (!string.IsNullOrEmpty(config.FtpHost) &&
+            (config.FtpServers == null || config.FtpServers.Count == 0))
+        {
+            _logger.Log("[ConfigManager] Migrating legacy single-FTP config to multi-server format");
+            config.FtpServers = new List<FtpServerConfig>
+            {
+                new FtpServerConfig
+                {
+                    Id = "legacy",
+                    FtpHost = config.FtpHost,
+                    FtpPath = config.FtpPath,
+                    FtpPollInterval = config.FtpPollInterval
+                }
+            };
+
+            // Clear legacy fields
+            config.FtpHost = "";
+            config.FtpPath = "/";
+            config.FtpPollInterval = 60;
+
+            // Rename state file to match the migrated server's ID
+            var programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+            var stateDir = Path.Combine(programData, "PEI Site Service");
+            var oldState = Path.Combine(stateDir, "ftp-state.json");
+            var newState = Path.Combine(stateDir, "ftp-state-legacy.json");
+            try
+            {
+                if (File.Exists(oldState) && !File.Exists(newState))
+                {
+                    File.Move(oldState, newState);
+                    _logger.Log("[ConfigManager] Migrated ftp-state.json -> ftp-state-legacy.json");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Log($"[ConfigManager] Could not migrate state file: {ex.Message}");
+            }
+
+            SaveConfig(config);
+        }
+
+        config.FtpServers ??= new List<FtpServerConfig>();
+        return config;
     }
 
     private FullConfig? ReadFromRegistry()
@@ -91,17 +143,30 @@ public class ConfigManager
             if (tenantId != null || siteId != null)
             {
                 _logger.Log($"[ConfigManager] Found registry values: tenantId={tenantId}, siteId={siteId}, ftpHost={ftpHost}, ftpPath={ftpPath}");
-                return new FullConfig
+
+                var config = new FullConfig
                 {
                     ApiUrl = DefaultConfig.ApiUrl,
                     ApiKey = DefaultConfig.ApiKey,
                     SiteId = siteId != null && int.TryParse(siteId, out var sid) ? sid : DefaultConfig.SiteId,
                     TenantId = tenantId != null && int.TryParse(tenantId, out var tid) ? tid : DefaultConfig.TenantId,
                     FtpEnabled = !string.IsNullOrEmpty(ftpHost),
-                    FtpHost = ftpHost ?? DefaultConfig.FtpHost,
-                    FtpPath = ftpPath ?? DefaultConfig.FtpPath,
-                    FtpPollInterval = DefaultConfig.FtpPollInterval
+                    FtpServers = new()
                 };
+
+                // If registry has FTP host, create a server entry directly
+                if (!string.IsNullOrEmpty(ftpHost))
+                {
+                    config.FtpServers.Add(new FtpServerConfig
+                    {
+                        Id = "legacy",
+                        FtpHost = ftpHost,
+                        FtpPath = ftpPath ?? "/",
+                        FtpPollInterval = 60
+                    });
+                }
+
+                return config;
             }
         }
         catch (Exception ex)
@@ -134,6 +199,7 @@ public class ConfigManager
         lock (_lock) { return _config.ToFtpConfig(); }
     }
 
+    // Generic config update (for non-FTP fields like apiUrl, siteId, tenantId)
     public void UpdateConfig(object updates)
     {
         lock (_lock)
@@ -154,20 +220,71 @@ public class ConfigManager
                         _config.SiteId = kvp.Value.GetInt32(); break;
                     case "tenantId" when kvp.Value.ValueKind == JsonValueKind.Number:
                         _config.TenantId = kvp.Value.GetInt32(); break;
-                    case "ftpEnabled":
-                        if (kvp.Value.ValueKind == JsonValueKind.True) _config.FtpEnabled = true;
-                        else if (kvp.Value.ValueKind == JsonValueKind.False) _config.FtpEnabled = false;
-                        break;
-                    case "ftpHost" when kvp.Value.ValueKind == JsonValueKind.String:
-                        _config.FtpHost = kvp.Value.GetString()!; break;
-                    case "ftpPath" when kvp.Value.ValueKind == JsonValueKind.String:
-                        _config.FtpPath = kvp.Value.GetString()!; break;
-                    case "ftpPollInterval" when kvp.Value.ValueKind == JsonValueKind.Number:
-                        _config.FtpPollInterval = kvp.Value.GetInt32(); break;
                 }
             }
 
             SaveConfig(_config);
+        }
+    }
+
+    // FTP global toggle
+    public void SetFtpEnabled(bool enabled)
+    {
+        lock (_lock)
+        {
+            _config.FtpEnabled = enabled;
+            SaveConfig(_config);
+        }
+    }
+
+    // FTP server CRUD
+    public FtpServerConfig AddFtpServer(FtpServerCreateRequest req)
+    {
+        lock (_lock)
+        {
+            var server = new FtpServerConfig
+            {
+                Id = Guid.NewGuid().ToString("N")[..8],
+                FtpHost = req.FtpHost,
+                FtpPath = req.FtpPath,
+                FtpPollInterval = req.FtpPollInterval
+            };
+            _config.FtpServers.Add(server);
+            SaveConfig(_config);
+            _logger.Log($"[ConfigManager] Added FTP server {server.Id}: {server.FtpHost}");
+            return server;
+        }
+    }
+
+    public FtpServerConfig? UpdateFtpServer(string id, FtpServerUpdateRequest req)
+    {
+        lock (_lock)
+        {
+            var server = _config.FtpServers.FirstOrDefault(s => s.Id == id);
+            if (server == null) return null;
+
+            if (req.FtpHost != null) server.FtpHost = req.FtpHost;
+            if (req.FtpPath != null) server.FtpPath = req.FtpPath;
+            if (req.FtpPollInterval.HasValue) server.FtpPollInterval = req.FtpPollInterval.Value;
+
+            SaveConfig(_config);
+            _logger.Log($"[ConfigManager] Updated FTP server {id}: {server.FtpHost}");
+            return server;
+        }
+    }
+
+    public bool RemoveFtpServer(string id)
+    {
+        lock (_lock)
+        {
+            var removed = _config.FtpServers.RemoveAll(s => s.Id == id);
+            if (removed > 0)
+            {
+                SaveConfig(_config);
+                _logger.Log($"[ConfigManager] Removed FTP server {id}");
+                return true;
+            }
+            return false;
         }
     }
 
@@ -194,9 +311,11 @@ public class ConfigManager
             SiteId = config.SiteId == 0 ? DefaultConfig.SiteId : config.SiteId,
             TenantId = config.TenantId == 0 ? DefaultConfig.TenantId : config.TenantId,
             FtpEnabled = config.FtpEnabled,
-            FtpHost = config.FtpHost ?? DefaultConfig.FtpHost,
-            FtpPath = string.IsNullOrEmpty(config.FtpPath) ? DefaultConfig.FtpPath : config.FtpPath,
-            FtpPollInterval = config.FtpPollInterval == 0 ? DefaultConfig.FtpPollInterval : config.FtpPollInterval
+            FtpServers = config.FtpServers ?? new(),
+            // Keep legacy fields for migration detection
+            FtpHost = config.FtpHost ?? "",
+            FtpPath = string.IsNullOrEmpty(config.FtpPath) ? "/" : config.FtpPath,
+            FtpPollInterval = config.FtpPollInterval
         };
     }
 
@@ -207,8 +326,12 @@ public class ConfigManager
         SiteId = c.SiteId,
         TenantId = c.TenantId,
         FtpEnabled = c.FtpEnabled,
-        FtpHost = c.FtpHost,
-        FtpPath = c.FtpPath,
-        FtpPollInterval = c.FtpPollInterval
+        FtpServers = c.FtpServers.Select(s => new FtpServerConfig
+        {
+            Id = s.Id,
+            FtpHost = s.FtpHost,
+            FtpPath = s.FtpPath,
+            FtpPollInterval = s.FtpPollInterval
+        }).ToList()
     };
 }

@@ -1,5 +1,7 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using PeiSiteApp.Models;
 using PeiSiteApp.Services;
 
 namespace PeiSiteApp.ViewModels;
@@ -56,30 +58,67 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _errorMessage = "";
 
-    // FTP tab
+    // FTP tab — server list
     [ObservableProperty]
     private bool _ftpEnabled;
 
+    public ObservableCollection<FtpServerStatusResponse> FtpServers { get; } = new();
+
+    // FTP Add/Edit dialog
     [ObservableProperty]
-    private string _ftpHost = "";
+    private bool _showFtpServerDialog;
 
     [ObservableProperty]
-    private string _ftpPath = "/";
+    private string _ftpDialogTitle = "Add FTP Server";
 
     [ObservableProperty]
-    private int _ftpScheduleMinutes = 15;
+    private string _editingServerId = "";
 
     [ObservableProperty]
-    private string _ftpTestMessage = "";
+    private string _dialogFtpHost = "";
 
     [ObservableProperty]
-    private bool? _ftpTestSuccess;
+    private string _dialogFtpPath = "/";
 
     [ObservableProperty]
-    private bool _isFtpTesting;
+    private int _dialogFtpIntervalMinutes = 15;
 
     [ObservableProperty]
-    private bool _isFtpSaving;
+    private string _dialogTestMessage = "";
+
+    [ObservableProperty]
+    private bool? _dialogTestSuccess;
+
+    [ObservableProperty]
+    private bool _isDialogTesting;
+
+    [ObservableProperty]
+    private bool _isDialogSaving;
+
+    // FTP Browse dialog
+    [ObservableProperty]
+    private bool _showBrowseDialog;
+
+    [ObservableProperty]
+    private bool _isBrowseLoading;
+
+    [ObservableProperty]
+    private string _browseErrorMessage = "";
+
+    public ObservableCollection<FtpDirectoryNode> BrowseRoots { get; } = new();
+
+    [ObservableProperty]
+    private FtpDirectoryNode? _selectedBrowseNode;
+
+    // FTP Delete dialog
+    [ObservableProperty]
+    private bool _showDeleteDialog;
+
+    [ObservableProperty]
+    private string _deletingServerId = "";
+
+    [ObservableProperty]
+    private string _deletingServerHost = "";
 
     public bool IsFormValid
     {
@@ -114,7 +153,11 @@ public partial class SettingsViewModel : ObservableObject
         SiteName = settings.SiteName;
         TenantId = settings.TenantId.ToString();
         SiteNumber = settings.SiteNumber;
+
+        _ = LoadFtpServersAsync();
     }
+
+    // --- Site tab commands ---
 
     [RelayCommand]
     private async Task SaveSiteNameAsync()
@@ -243,51 +286,239 @@ public partial class SettingsViewModel : ObservableObject
         CloseDialog();
     }
 
-    [RelayCommand]
-    private async Task TestFtpConnectionAsync()
+    // --- FTP tab commands ---
+
+    private async Task LoadFtpServersAsync()
     {
-        if (string.IsNullOrWhiteSpace(FtpHost))
-        {
-            FtpTestMessage = "Please enter an FTP host address";
-            FtpTestSuccess = false;
-            return;
-        }
+        var status = await _localService.FtpGetStatusAsync();
+        if (status == null) return;
 
-        IsFtpTesting = true;
-        FtpTestMessage = "";
-        FtpTestSuccess = null;
-
-        var result = await _localService.FtpTestConnectionAsync(FtpHost, FtpPath);
-        FtpTestMessage = result.Message;
-        FtpTestSuccess = result.Success;
-        IsFtpTesting = false;
+        FtpEnabled = status.FtpEnabled;
+        FtpServers.Clear();
+        foreach (var s in status.Servers)
+            FtpServers.Add(s);
     }
 
     [RelayCommand]
-    private async Task SaveFtpSettingsAsync()
+    private async Task ToggleFtpEnabledAsync()
     {
-        IsFtpSaving = true;
+        await _localService.FtpSetEnabledAsync(FtpEnabled);
+    }
 
-        var success = await _localService.FtpUpdateConfigAsync(new
-        {
-            ftpEnabled = FtpEnabled,
-            ftpHost = FtpHost,
-            ftpPath = FtpPath,
-            ftpPollInterval = FtpScheduleMinutes * 60
-        });
+    [RelayCommand]
+    private void OpenAddServerDialog()
+    {
+        FtpDialogTitle = "Add FTP Server";
+        EditingServerId = "";
+        DialogFtpHost = "";
+        DialogFtpPath = "/";
+        DialogFtpIntervalMinutes = 15;
+        DialogTestMessage = "";
+        DialogTestSuccess = null;
+        ShowFtpServerDialog = true;
+    }
 
-        if (success)
+    [RelayCommand]
+    private void OpenEditServerDialog(FtpServerStatusResponse server)
+    {
+        FtpDialogTitle = "Edit FTP Server";
+        EditingServerId = server.Id;
+        DialogFtpHost = server.Host;
+        DialogFtpPath = server.Path;
+        DialogFtpIntervalMinutes = server.PollInterval / 60;
+        if (DialogFtpIntervalMinutes < 1) DialogFtpIntervalMinutes = 1;
+        DialogTestMessage = "";
+        DialogTestSuccess = null;
+        ShowFtpServerDialog = true;
+    }
+
+    [RelayCommand]
+    private void CloseFtpServerDialog()
+    {
+        ShowFtpServerDialog = false;
+    }
+
+    [RelayCommand]
+    private async Task DialogTestConnectionAsync()
+    {
+        if (string.IsNullOrWhiteSpace(DialogFtpHost))
         {
-            FtpTestMessage = "FTP settings saved successfully";
-            FtpTestSuccess = true;
+            DialogTestMessage = "Please enter an FTP host address";
+            DialogTestSuccess = false;
+            return;
+        }
+
+        IsDialogTesting = true;
+        DialogTestMessage = "Testing connection...";
+        DialogTestSuccess = null;
+
+        var result = await _localService.FtpTestConnectionAsync(DialogFtpHost, DialogFtpPath);
+        DialogTestMessage = result.Message;
+        DialogTestSuccess = result.Success;
+        IsDialogTesting = false;
+    }
+
+    [RelayCommand]
+    private async Task SaveFtpServerAsync()
+    {
+        if (string.IsNullOrWhiteSpace(DialogFtpHost))
+        {
+            DialogTestMessage = "Please enter an FTP host address";
+            DialogTestSuccess = false;
+            return;
+        }
+
+        IsDialogSaving = true;
+        var intervalSeconds = DialogFtpIntervalMinutes * 60;
+
+        if (string.IsNullOrEmpty(EditingServerId))
+        {
+            var result = await _localService.FtpAddServerAsync(DialogFtpHost, DialogFtpPath, intervalSeconds);
+            if (result != null)
+            {
+                ShowFtpServerDialog = false;
+                await LoadFtpServersAsync();
+            }
+            else
+            {
+                DialogTestMessage = "Failed to add FTP server";
+                DialogTestSuccess = false;
+            }
         }
         else
         {
-            FtpTestMessage = "Failed to save FTP settings";
-            FtpTestSuccess = false;
+            var success = await _localService.FtpUpdateServerAsync(EditingServerId, DialogFtpHost, DialogFtpPath, intervalSeconds);
+            if (success)
+            {
+                ShowFtpServerDialog = false;
+                await LoadFtpServersAsync();
+            }
+            else
+            {
+                DialogTestMessage = "Failed to update FTP server";
+                DialogTestSuccess = false;
+            }
         }
 
-        IsFtpSaving = false;
+        IsDialogSaving = false;
+    }
+
+    // Browse dialog
+
+    [RelayCommand]
+    private async Task OpenBrowseDialogAsync()
+    {
+        if (string.IsNullOrWhiteSpace(DialogFtpHost))
+        {
+            DialogTestMessage = "Please enter an FTP host address first";
+            DialogTestSuccess = false;
+            return;
+        }
+
+        ShowBrowseDialog = true;
+        BrowseErrorMessage = "";
+        SelectedBrowseNode = null;
+        BrowseRoots.Clear();
+
+        await LoadBrowseChildrenAsync("/");
+    }
+
+    [RelayCommand]
+    private void CloseBrowseDialog()
+    {
+        ShowBrowseDialog = false;
+    }
+
+    [RelayCommand]
+    private void SelectBrowsePath()
+    {
+        if (SelectedBrowseNode != null)
+        {
+            DialogFtpPath = SelectedBrowseNode.FullPath;
+        }
+        ShowBrowseDialog = false;
+    }
+
+    [RelayCommand]
+    private async Task ExpandBrowseNodeAsync(FtpDirectoryNode node)
+    {
+        if (node.HasLoadedChildren) return;
+
+        node.IsLoading = true;
+        var result = await _localService.FtpBrowseAsync(DialogFtpHost, node.FullPath);
+        node.IsLoading = false;
+
+        if (result.Success)
+        {
+            node.Children.Clear();
+            foreach (var dir in result.Directories)
+            {
+                node.Children.Add(new FtpDirectoryNode
+                {
+                    Name = dir.Name,
+                    FullPath = dir.FullPath,
+                    Children = { new FtpDirectoryNode { Name = "Loading..." } }
+                });
+            }
+            node.HasLoadedChildren = true;
+        }
+    }
+
+    private async Task LoadBrowseChildrenAsync(string path)
+    {
+        IsBrowseLoading = true;
+        BrowseErrorMessage = "";
+
+        var result = await _localService.FtpBrowseAsync(DialogFtpHost, path);
+        IsBrowseLoading = false;
+
+        if (result.Success)
+        {
+            BrowseRoots.Clear();
+            foreach (var dir in result.Directories)
+            {
+                BrowseRoots.Add(new FtpDirectoryNode
+                {
+                    Name = dir.Name,
+                    FullPath = dir.FullPath,
+                    Children = { new FtpDirectoryNode { Name = "Loading..." } }
+                });
+            }
+
+            if (result.Directories.Count == 0)
+                BrowseErrorMessage = "No subdirectories found at this path";
+        }
+        else
+        {
+            BrowseErrorMessage = result.Message;
+        }
+    }
+
+    // Delete dialog
+
+    [RelayCommand]
+    private void OpenDeleteDialog(FtpServerStatusResponse server)
+    {
+        DeletingServerId = server.Id;
+        DeletingServerHost = server.Host;
+        ShowDeleteDialog = true;
+    }
+
+    [RelayCommand]
+    private void CloseDeleteDialog()
+    {
+        ShowDeleteDialog = false;
+        DeletingServerId = "";
+        DeletingServerHost = "";
+    }
+
+    [RelayCommand]
+    private async Task ConfirmDeleteServerAsync()
+    {
+        var success = await _localService.FtpDeleteServerAsync(DeletingServerId);
+        ShowDeleteDialog = false;
+        if (success)
+            await LoadFtpServersAsync();
     }
 
     partial void OnConfirmationPhraseChanged(string value) => OnPropertyChanged(nameof(IsFormValid));

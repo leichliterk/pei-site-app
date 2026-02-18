@@ -19,12 +19,25 @@ public class SessionInfo
     public string? DisconnectedAt { get; set; }
 }
 
-public class FtpConfigUpdate
+// FTP server CRUD
+
+public class FtpServerCreateRequest
 {
-    public bool? FtpEnabled { get; set; }
+    public string FtpHost { get; set; } = "";
+    public string FtpPath { get; set; } = "/";
+    public int FtpPollInterval { get; set; } = 900;
+}
+
+public class FtpServerUpdateRequest
+{
     public string? FtpHost { get; set; }
     public string? FtpPath { get; set; }
     public int? FtpPollInterval { get; set; }
+}
+
+public class FtpEnabledRequest
+{
+    public bool Enabled { get; set; }
 }
 
 public class FtpTestRequest
@@ -40,9 +53,30 @@ public class FtpTestResult
     public int? FileCount { get; set; }
 }
 
+public class FtpBrowseRequest
+{
+    public string Host { get; set; } = "";
+    public string Path { get; set; } = "/";
+}
+
+public class FtpBrowseResult
+{
+    public bool Success { get; set; }
+    public string Message { get; set; } = "";
+    public List<FtpDirectoryEntry> Directories { get; set; } = new();
+}
+
+public class FtpDirectoryEntry
+{
+    public string Name { get; set; } = "";
+    public string FullPath { get; set; } = "";
+}
+
+// FTP status responses
+
 public class FtpWatcherStatus
 {
-    public bool Enabled { get; set; }
+    public string Id { get; set; } = "";
     public string Host { get; set; } = "";
     public string Path { get; set; } = "";
     public int PollInterval { get; set; }
@@ -50,4 +84,10 @@ public class FtpWatcherStatus
     public string LastResult { get; set; } = "";
     public int FilesForwarded { get; set; }
     public bool IsPolling { get; set; }
+}
+
+public class FtpOverallStatus
+{
+    public bool FtpEnabled { get; set; }
+    public List<FtpWatcherStatus> Servers { get; set; } = new();
 }
