@@ -1,5 +1,4 @@
 using System.Net;
-using PeiSiteService.Models;
 using PeiSiteService.Services;
 
 namespace PeiSiteService;
@@ -7,14 +6,14 @@ namespace PeiSiteService;
 public class Worker : BackgroundService
 {
     private readonly FileLogger _logger;
-    private readonly Services.WebSocketClient _wsClient;
-    private readonly FtpWatcher _ftpWatcher;
+    private readonly WebSocketClient _wsClient;
+    private readonly FtpWatcherManager _ftpManager;
 
-    public Worker(FileLogger logger, Services.WebSocketClient wsClient, FtpWatcher ftpWatcher)
+    public Worker(FileLogger logger, WebSocketClient wsClient, FtpWatcherManager ftpManager)
     {
         _logger = logger;
         _wsClient = wsClient;
-        _ftpWatcher = ftpWatcher;
+        _ftpManager = ftpManager;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -37,8 +36,8 @@ public class Worker : BackgroundService
             _logger.Log("[PEI Site Service] Initiating WebSocket connection...");
             _wsClient.Connect();
 
-            // Start FTP watcher
-            _ftpWatcher.Start();
+            // Start FTP watchers
+            _ftpManager.StartAll();
 
             _logger.Log("[PEI Site Service] Service started successfully");
 
@@ -63,7 +62,7 @@ public class Worker : BackgroundService
     {
         _logger.Log("[PEI Site Service] Shutting down...");
 
-        _ftpWatcher.Stop();
+        _ftpManager.StopAll();
         await _wsClient.DisconnectAsync();
 
         _logger.Log("[PEI Site Service] Shutdown complete");

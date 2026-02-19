@@ -20,8 +20,37 @@
                             BorderThickness="0" Background="Transparent">
                     <TabControl.Resources>
                         <Style TargetType="TabItem">
-                            <Setter Property="Padding" Value="16,10" />
+                            <Setter Property="Padding" Value="12,8" />
                             <Setter Property="FontSize" Value="13" />
+                            <Setter Property="Background" Value="Transparent" />
+                            <Setter Property="BorderThickness" Value="0" />
+                            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="TabItem">
+                                        <Border x:Name="TabBorder"
+                                                Background="Transparent"
+                                                BorderThickness="2,0,0,0"
+                                                BorderBrush="Transparent"
+                                                Padding="{TemplateBinding Padding}"
+                                                Cursor="Hand">
+                                            <ContentPresenter ContentSource="Header"
+                                                              HorizontalAlignment="Left"
+                                                              VerticalAlignment="Center" />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="TabBorder" Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+                                            </Trigger>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+                                                <Setter Property="FontWeight" Value="SemiBold" />
+                                                <Setter TargetName="TabBorder" Property="BorderBrush" Value="{StaticResource PrimaryBrush}" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
                         </Style>
                     </TabControl.Resources>
 
@@ -122,56 +151,76 @@
                             <!-- Enable Toggle -->
                             <DockPanel Margin="0,0,0,16">
                                 <CheckBox DockPanel.Dock="Right" IsChecked="{Binding FtpEnabled}"
-                                          VerticalAlignment="Center" />
+                                          VerticalAlignment="Center"
+                                          Command="{Binding ToggleFtpEnabledCommand}" />
                                 <StackPanel>
                                     <TextBlock Text="Enable FTP Auto-Sync" FontWeight="Medium" />
-                                    <TextBlock Text="Automatically sync files from FTP server on schedule"
+                                    <TextBlock Text="Automatically sync files from FTP servers on schedule"
                                                Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,2,0,0" />
                                 </StackPanel>
                             </DockPanel>
 
                             <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}" Margin="0,0,0,16" />
 
-                            <!-- FTP Host -->
-                            <TextBlock Text="FTP Server Address" Style="{StaticResource FieldLabel}" />
-                            <TextBox Text="{Binding FtpHost, UpdateSourceTrigger=PropertyChanged}"
-                                     Style="{StaticResource InputTextBox}" Margin="0,0,0,16" />
+                            <!-- Add FTP Server button -->
+                            <Button Content="Add FTP Server" Style="{StaticResource PrimaryButton}"
+                                    Command="{Binding OpenAddServerDialogCommand}"
+                                    HorizontalAlignment="Left" Margin="0,0,0,16" />
 
-                            <!-- FTP Path -->
-                            <TextBlock Text="FTP Folder Path" Style="{StaticResource FieldLabel}" />
-                            <TextBox Text="{Binding FtpPath, UpdateSourceTrigger=PropertyChanged}"
-                                     Style="{StaticResource InputTextBox}" Margin="0,0,0,16" />
+                            <!-- Server list -->
+                            <ItemsControl ItemsSource="{Binding FtpServers}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                                                CornerRadius="6" Padding="16" Margin="0,0,0,10">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0">
+                                                    <TextBlock FontWeight="SemiBold" FontSize="14"
+                                                               Foreground="{StaticResource TextPrimaryBrush}">
+                                                        <Run Text="&#xE774;" FontFamily="Segoe MDL2 Assets" FontSize="12" />
+                                                        <Run Text=" " /><Run Text="{Binding Name, Mode=OneWay}" />
+                                                    </TextBlock>
+                                                    <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,4,0,0">
+                                                        <Run Text="{Binding Host, Mode=OneWay}" /><Run Text="{Binding Path, Mode=OneWay}" />
+                                                    </TextBlock>
+                                                    <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,2,0,0">
+                                                        <Run Text="Interval: " /><Run Text="{Binding PollInterval, Mode=OneWay}" /><Run Text="s" />
+                                                        <Run Text="  |  Last: " /><Run Text="{Binding LastResult, Mode=OneWay}" />
+                                                    </TextBlock>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <Button Content="Edit" Style="{StaticResource SecondaryButton}"
+                                                            Command="{Binding DataContext.OpenEditServerDialogCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                            CommandParameter="{Binding}" Margin="0,0,6,0" />
+                                                    <Button Content="Delete" Style="{StaticResource DangerButton}"
+                                                            Command="{Binding DataContext.OpenDeleteDialogCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                            CommandParameter="{Binding}" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
 
-                            <!-- Sync Interval -->
-                            <TextBlock Text="Sync Interval (minutes)" Style="{StaticResource FieldLabel}" />
-                            <TextBox Text="{Binding FtpScheduleMinutes, UpdateSourceTrigger=PropertyChanged}"
-                                     Style="{StaticResource InputTextBox}" Margin="0,0,0,20" />
-
-                            <!-- Action Buttons -->
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                                <Button Content="Test Connection" Style="{StaticResource SecondaryButton}"
-                                        Command="{Binding TestFtpConnectionCommand}"
-                                        IsEnabled="{Binding FtpHost, Converter={x:Static converters:StringNotEmptyConverter.Instance}}"
-                                        Margin="0,0,8,0" />
-                                <Button Content="Save Settings" Style="{StaticResource PrimaryButton}"
-                                        Command="{Binding SaveFtpSettingsCommand}" />
-                            </StackPanel>
-
-                            <!-- Status Message -->
-                            <Border Padding="10,8" CornerRadius="4" Margin="0,0,0,8"
-                                    Visibility="{Binding FtpTestMessage, Converter={StaticResource NullToVisConverter}, FallbackValue=Collapsed}">
-                                <Border.Style>
-                                    <Style TargetType="Border">
-                                        <Setter Property="Background" Value="#FEF2F2" />
+                            <!-- Empty state -->
+                            <TextBlock Text="No FTP servers configured. Click 'Add FTP Server' to get started."
+                                       Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"
+                                       Margin="0,4,0,0" TextWrapping="Wrap">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed" />
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding FtpTestSuccess}" Value="True">
-                                                <Setter Property="Background" Value="#F0FDF4" />
+                                            <DataTrigger Binding="{Binding FtpServers.Count}" Value="0">
+                                                <Setter Property="Visibility" Value="Visible" />
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
-                                </Border.Style>
-                                <TextBlock Text="{Binding FtpTestMessage}" TextWrapping="Wrap" FontSize="12" />
-                            </Border>
+                                </TextBlock.Style>
+                            </TextBlock>
                         </StackPanel>
                     </TabItem>
                 </TabControl>
@@ -256,6 +305,155 @@
                         <Button Content="Confirm" Style="{StaticResource PrimaryButton}"
                                 Command="{Binding ConfirmSiteNumberChangeCommand}"
                                 IsEnabled="{Binding IsFormValid}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- FTP Add/Edit Server Dialog -->
+        <Grid Visibility="{Binding ShowFtpServerDialog, Converter={StaticResource BoolToVis}}">
+            <Border Background="#80000000" />
+            <Border Background="White" CornerRadius="8" MaxWidth="500" MaxHeight="550"
+                    VerticalAlignment="Center" HorizontalAlignment="Center" Padding="24">
+                <Border.Effect>
+                    <DropShadowEffect ShadowDepth="4" BlurRadius="16" Opacity="0.2" Color="Black" />
+                </Border.Effect>
+                <StackPanel>
+                    <TextBlock Text="{Binding FtpDialogTitle}" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,16" />
+
+                    <!-- Server Name -->
+                    <TextBlock Text="Server Name" Style="{StaticResource FieldLabel}" />
+                    <TextBox Text="{Binding DialogServerName, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource InputTextBox}" Margin="0,0,0,12" />
+
+                    <!-- Host -->
+                    <TextBlock Text="FTP Server Address" Style="{StaticResource FieldLabel}" />
+                    <TextBox Text="{Binding DialogFtpHost, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource InputTextBox}" Margin="0,0,0,12" />
+
+                    <!-- Path + Browse -->
+                    <TextBlock Text="Folder Path" Style="{StaticResource FieldLabel}" />
+                    <DockPanel Margin="0,0,0,12">
+                        <Button DockPanel.Dock="Right" Content="Browse" Style="{StaticResource SecondaryButton}"
+                                Command="{Binding OpenBrowseDialogCommand}" Margin="8,0,0,0" />
+                        <TextBox Text="{Binding DialogFtpPath, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource InputTextBox}" />
+                    </DockPanel>
+
+                    <!-- Interval -->
+                    <TextBlock Text="Sync Interval (minutes)" Style="{StaticResource FieldLabel}" />
+                    <TextBox Text="{Binding DialogFtpIntervalMinutes, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource InputTextBox}" Margin="0,0,0,16" />
+
+                    <!-- Test / Status Message -->
+                    <Border Padding="10,8" CornerRadius="4" Margin="0,0,0,12"
+                            Visibility="{Binding DialogTestMessage, Converter={StaticResource NullToVisConverter}, FallbackValue=Collapsed}">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background" Value="#FEF2F2" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding DialogTestSuccess}" Value="True">
+                                        <Setter Property="Background" Value="#F0FDF4" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <TextBlock Text="{Binding DialogTestMessage}" TextWrapping="Wrap" FontSize="12" />
+                    </Border>
+
+                    <!-- Action buttons -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="Test Connection" Style="{StaticResource SecondaryButton}"
+                                Command="{Binding DialogTestConnectionCommand}"
+                                IsEnabled="{Binding DialogFtpHost, Converter={x:Static converters:StringNotEmptyConverter.Instance}}"
+                                Margin="0,0,8,0" />
+                        <Button Content="Cancel" Style="{StaticResource SecondaryButton}"
+                                Command="{Binding CloseFtpServerDialogCommand}" Margin="0,0,8,0" />
+                        <Button Content="Save" Style="{StaticResource PrimaryButton}"
+                                Command="{Binding SaveFtpServerCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- FTP Browse Dialog -->
+        <Grid Visibility="{Binding ShowBrowseDialog, Converter={StaticResource BoolToVis}}">
+            <Border Background="#80000000" />
+            <Border Background="White" CornerRadius="8" MaxWidth="500" MaxHeight="500"
+                    VerticalAlignment="Center" HorizontalAlignment="Center" Padding="24">
+                <Border.Effect>
+                    <DropShadowEffect ShadowDepth="4" BlurRadius="16" Opacity="0.2" Color="Black" />
+                </Border.Effect>
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="Browse FTP Directories" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
+
+                    <!-- Loading indicator -->
+                    <TextBlock DockPanel.Dock="Top" Text="Loading directories..."
+                               Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,0,0,8"
+                               Visibility="{Binding IsBrowseLoading, Converter={StaticResource BoolToVis}}" />
+
+                    <!-- Error message -->
+                    <TextBlock DockPanel.Dock="Top" Text="{Binding BrowseErrorMessage}"
+                               Foreground="{StaticResource DangerBrush}" FontSize="12" Margin="0,0,0,8"
+                               Visibility="{Binding BrowseErrorMessage, Converter={StaticResource NullToVisConverter}, FallbackValue=Collapsed}" />
+
+                    <!-- Action buttons at bottom -->
+                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+                        <Button Content="Cancel" Style="{StaticResource SecondaryButton}"
+                                Command="{Binding CloseBrowseDialogCommand}" Margin="0,0,8,0" />
+                        <Button Content="Select" Style="{StaticResource PrimaryButton}"
+                                Command="{Binding SelectBrowsePathCommand}" />
+                    </StackPanel>
+
+                    <!-- Tree view -->
+                    <TreeView ItemsSource="{Binding BrowseRoots}" BorderThickness="1"
+                              BorderBrush="{StaticResource BorderBrush}" Margin="0,4,0,0"
+                              MinHeight="200"
+                              SelectedItemChanged="BrowseTree_SelectedItemChanged">
+                        <TreeView.ItemContainerStyle>
+                            <Style TargetType="TreeViewItem">
+                                <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                                <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+                                <EventSetter Event="Expanded" Handler="TreeViewItem_Expanded" />
+                            </Style>
+                        </TreeView.ItemContainerStyle>
+                        <TreeView.ItemTemplate>
+                            <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                               Margin="0,0,6,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </HierarchicalDataTemplate>
+                        </TreeView.ItemTemplate>
+                    </TreeView>
+                </DockPanel>
+            </Border>
+        </Grid>
+
+        <!-- FTP Delete Confirmation Dialog -->
+        <Grid Visibility="{Binding ShowDeleteDialog, Converter={StaticResource BoolToVis}}">
+            <Border Background="#80000000" />
+            <Border Background="White" CornerRadius="8" MaxWidth="400" MaxHeight="250"
+                    VerticalAlignment="Center" HorizontalAlignment="Center" Padding="24">
+                <Border.Effect>
+                    <DropShadowEffect ShadowDepth="4" BlurRadius="16" Opacity="0.2" Color="Black" />
+                </Border.Effect>
+                <StackPanel>
+                    <TextBlock Text="Delete FTP Server" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
+
+                    <TextBlock TextWrapping="Wrap" Margin="0,0,0,20">
+                        <Run Text="Are you sure you want to remove the FTP server " />
+                        <Run Text="{Binding DeletingServerHost, Mode=OneWay}" FontWeight="Bold" />
+                        <Run Text="? This action cannot be undone." />
+                    </TextBlock>
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="Cancel" Style="{StaticResource SecondaryButton}"
+                                Command="{Binding CloseDeleteDialogCommand}" Margin="0,0,8,0" />
+                        <Button Content="Delete" Style="{StaticResource DangerButton}"
+                                Command="{Binding ConfirmDeleteServerCommand}" />
                     </StackPanel>
                 </StackPanel>
             </Border>

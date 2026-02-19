@@ -43,15 +43,18 @@ var config = configManager.GetConfig();
 var ftpConfig = configManager.GetFtpConfig();
 
 logger.Log($"[PEI Site Service] Configuration loaded: apiUrl={config.ApiUrl}, siteId={config.SiteId}, tenantId={config.TenantId}");
-logger.Log($"[PEI Site Service] FTP config: enabled={ftpConfig.FtpEnabled}, host={ftpConfig.FtpHost}");
+logger.Log($"[PEI Site Service] FTP config: enabled={ftpConfig.FtpEnabled}, servers={ftpConfig.Servers.Count}");
 
 var wsClient = new WebSocketClient(config.ToServiceConfig(), logger);
-var ftpWatcher = new FtpWatcher(ftpConfig, wsClient, config.SiteId, config.TenantId, logger);
+var pendingQueue = new PendingFileQueue(logger);
+var ftpManager = new FtpWatcherManager(wsClient, pendingQueue, logger);
+ftpManager.Initialize(ftpConfig, config.SiteId, config.TenantId);
 
 builder.Services.AddSingleton(logger);
 builder.Services.AddSingleton(configManager);
 builder.Services.AddSingleton(wsClient);
-builder.Services.AddSingleton(ftpWatcher);
+builder.Services.AddSingleton(pendingQueue);
+builder.Services.AddSingleton(ftpManager);
 builder.Services.AddHostedService<Worker>();
 
 var app = builder.Build();

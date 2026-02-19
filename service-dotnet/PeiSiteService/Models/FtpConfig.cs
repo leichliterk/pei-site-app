@@ -1,9 +1,16 @@
 namespace PeiSiteService.Models;
 
-public class FtpConfig
+public class FtpServerConfig
 {
-    public bool FtpEnabled { get; set; }
+    public string Id { get; set; } = Guid.NewGuid().ToString("N")[..8];
+    public string Name { get; set; } = "";
     public string FtpHost { get; set; } = "";
     public string FtpPath { get; set; } = "/";
     public int FtpPollInterval { get; set; } = 60;
+}
+
+public class FtpConfig
+{
+    public bool FtpEnabled { get; set; }
+    public List<FtpServerConfig> Servers { get; set; } = new();
 }

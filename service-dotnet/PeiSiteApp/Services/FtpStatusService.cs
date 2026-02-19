@@ -61,14 +61,26 @@ public class FtpStatusService : IDisposable
             return;
         }
 
-        Status = ftpStatus.Status switch
+        if (!ftpStatus.FtpEnabled)
         {
-            "connected" => FtpStatus.Connected,
-            "connecting" => FtpStatus.Connecting,
-            "error" => FtpStatus.Error,
-            "disabled" => FtpStatus.Disabled,
-            _ => FtpStatus.Disconnected
-        };
+            Status = FtpStatus.Disabled;
+        }
+        else if (ftpStatus.Servers.Count == 0)
+        {
+            Status = FtpStatus.Disconnected;
+        }
+        else if (ftpStatus.Servers.Any(s => s.LastResult.StartsWith("Error")))
+        {
+            Status = FtpStatus.Error;
+        }
+        else if (ftpStatus.Servers.Any(s => s.IsPolling))
+        {
+            Status = FtpStatus.Connecting;
+        }
+        else
+        {
+            Status = FtpStatus.Connected;
+        }
     }
 
     public void Dispose()

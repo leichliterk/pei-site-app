@@ -10,7 +10,7 @@ public static class ApiServer
         app.Use(async (context, next) =>
         {
             context.Response.Headers.Append("Access-Control-Allow-Origin", "*");
-            context.Response.Headers.Append("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS");
+            context.Response.Headers.Append("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
             context.Response.Headers.Append("Access-Control-Allow-Headers", "Content-Type");
 
             if (context.Request.Method == "OPTIONS")
@@ -69,31 +69,62 @@ public static class ApiServer
             return Results.Ok(new { success = true });
         });
 
-        // GET /ftp/status
-        app.MapGet("/ftp/status", (FtpWatcher ftp) => ftp.GetStatus());
+        // --- FTP endpoints ---
 
-        // POST /ftp/config
-        app.MapPost("/ftp/config", (FtpConfigUpdate req, FtpWatcher ftp, ConfigManager cfg) =>
+        // GET /ftp/status — overall status (enabled + all server statuses)
+        app.MapGet("/ftp/status", (FtpWatcherManager mgr) => mgr.GetOverallStatus());
+
+        // PUT /ftp/enabled — toggle global FTP enabled
+        app.MapPut("/ftp/enabled", (FtpEnabledRequest req, FtpWatcherManager mgr, ConfigManager cfg) =>
         {
-            cfg.UpdateConfig(req);
-            ftp.UpdateConfig(cfg.GetFtpConfig());
+            cfg.SetFtpEnabled(req.Enabled);
+            mgr.SetEnabled(req.Enabled);
             return new { success = true };
         });
 
-        // POST /ftp/test
-        app.MapPost("/ftp/test", async (FtpTestRequest req, FtpWatcher ftp) =>
+        // POST /ftp/servers — create a new FTP server
+        app.MapPost("/ftp/servers", (FtpServerCreateRequest req, FtpWatcherManager mgr, ConfigManager cfg) =>
+        {
+            var server = cfg.AddFtpServer(req);
+            mgr.AddServer(server);
+            return Results.Ok(server);
+        });
+
+        // PUT /ftp/servers/{id} — update an existing FTP server
+        app.MapPut("/ftp/servers/{id}", (string id, FtpServerUpdateRequest req, FtpWatcherManager mgr, ConfigManager cfg) =>
+        {
+            var updated = cfg.UpdateFtpServer(id, req);
+            if (updated == null)
+                return Results.NotFound(new { error = "Server not found" });
+            mgr.UpdateServer(updated);
+            return Results.Ok(updated);
+        });
+
+        // DELETE /ftp/servers/{id} — remove an FTP server
+        app.MapDelete("/ftp/servers/{id}", (string id, FtpWatcherManager mgr, ConfigManager cfg) =>
+        {
+            if (!cfg.RemoveFtpServer(id))
+                return Results.NotFound(new { error = "Server not found" });
+            mgr.RemoveServer(id);
+            return Results.Ok(new { success = true });
+        });
+
+        // POST /ftp/test — test FTP connection
+        app.MapPost("/ftp/test", async (FtpTestRequest req, FtpWatcherManager mgr) =>
         {
             if (string.IsNullOrEmpty(req.Host))
                 return Results.BadRequest(new { success = false, message = "host is required" });
-            var result = await ftp.TestConnectionAsync(req.Host, req.Path ?? "/");
+            var result = await mgr.TestConnectionAsync(req.Host, req.Path ?? "/");
             return Results.Ok(result);
         });
 
-        // POST /ftp/poll
-        app.MapPost("/ftp/poll", async (FtpWatcher ftp) =>
+        // POST /ftp/browse — browse FTP directories
+        app.MapPost("/ftp/browse", async (FtpBrowseRequest req, FtpWatcherManager mgr) =>
         {
-            await ftp.PollAsync();
-            return ftp.GetStatus();
+            if (string.IsNullOrEmpty(req.Host))
+                return Results.BadRequest(new { success = false, message = "host is required" });
+            var result = await mgr.BrowseDirectoryAsync(req.Host, req.Path);
+            return Results.Ok(result);
         });
     }
 }

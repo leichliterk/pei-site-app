@@ -28,7 +28,7 @@ public class LocalServiceClient : IDisposable
         _http = new HttpClient
         {
             BaseAddress = new Uri(BaseUrl),
-            Timeout = TimeSpan.FromSeconds(5)
+            Timeout = TimeSpan.FromSeconds(30)
         };
     }
 
@@ -101,7 +101,7 @@ public class LocalServiceClient : IDisposable
     {
         try
         {
-            var response = await _http.PostAsync("/reconnect", new StringContent("{}", System.Text.Encoding.UTF8, "application/json"));
+            var response = await _http.PostAsync("/reconnect", new StringContent("{}", Encoding.UTF8, "application/json"));
             return response.IsSuccessStatusCode;
         }
         catch { return false; }
@@ -128,35 +128,9 @@ public class LocalServiceClient : IDisposable
         catch { return false; }
     }
 
-    public async Task<FtpTestResult> FtpTestConnectionAsync(string host, string path)
-    {
-        try
-        {
-            var response = await _http.PostAsJsonAsync("/ftp/test", new { host, path });
-            if (response.IsSuccessStatusCode)
-            {
-                var json = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<FtpTestResult>(json, JsonOptions) ?? new FtpTestResult { Success = false, Message = "Invalid response" };
-            }
-            return new FtpTestResult { Success = false, Message = "Service returned error" };
-        }
-        catch (Exception ex)
-        {
-            return new FtpTestResult { Success = false, Message = ex.Message };
-        }
-    }
+    // --- FTP endpoints ---
 
-    public async Task<bool> FtpUpdateConfigAsync(object config)
-    {
-        try
-        {
-            var response = await _http.PostAsJsonAsync("/ftp/config", config);
-            return response.IsSuccessStatusCode;
-        }
-        catch { return false; }
-    }
-
-    public async Task<FtpStatusResponse?> FtpGetStatusAsync()
+    public async Task<FtpOverallStatusResponse?> FtpGetStatusAsync()
     {
         try
         {
@@ -164,11 +138,115 @@ public class LocalServiceClient : IDisposable
             if (response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<FtpStatusResponse>(json, JsonOptions);
+                return JsonSerializer.Deserialize<FtpOverallStatusResponse>(json, JsonOptions);
             }
             return null;
         }
         catch { return null; }
+    }
+
+    public async Task<bool> FtpSetEnabledAsync(bool enabled)
+    {
+        try
+        {
+            var response = await _http.PutAsJsonAsync("/ftp/enabled", new { enabled });
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    public async Task<FtpServerResponse?> FtpAddServerAsync(string name, string host, string path, int pollInterval)
+    {
+        try
+        {
+            var response = await _http.PostAsJsonAsync("/ftp/servers", new
+            {
+                name,
+                ftpHost = host,
+                ftpPath = path,
+                ftpPollInterval = pollInterval
+            });
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<FtpServerResponse>(json, JsonOptions);
+            }
+            return null;
+        }
+        catch { return null; }
+    }
+
+    public async Task<bool> FtpUpdateServerAsync(string id, string name, string host, string path, int pollInterval)
+    {
+        try
+        {
+            var response = await _http.PutAsJsonAsync($"/ftp/servers/{id}", new
+            {
+                name,
+                ftpHost = host,
+                ftpPath = path,
+                ftpPollInterval = pollInterval
+            });
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    public async Task<bool> FtpDeleteServerAsync(string id)
+    {
+        try
+        {
+            var response = await _http.DeleteAsync($"/ftp/servers/{id}");
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    public async Task<FtpTestResult> FtpTestConnectionAsync(string host, string path)
+    {
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var response = await _http.PostAsJsonAsync("/ftp/test", new { host, path }, cts.Token);
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync(cts.Token);
+                return JsonSerializer.Deserialize<FtpTestResult>(json, JsonOptions) ?? new FtpTestResult { Success = false, Message = "Invalid response" };
+            }
+            return new FtpTestResult { Success = false, Message = "Service returned error" };
+        }
+        catch (OperationCanceledException)
+        {
+            return new FtpTestResult { Success = false, Message = "Connection test timed out after 30 seconds" };
+        }
+        catch (Exception ex)
+        {
+            return new FtpTestResult { Success = false, Message = ex.Message };
+        }
+    }
+
+    public async Task<FtpBrowseResponse> FtpBrowseAsync(string host, string path)
+    {
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var response = await _http.PostAsJsonAsync("/ftp/browse", new { host, path }, cts.Token);
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync(cts.Token);
+                return JsonSerializer.Deserialize<FtpBrowseResponse>(json, JsonOptions)
+                    ?? new FtpBrowseResponse { Success = false, Message = "Invalid response" };
+            }
+            return new FtpBrowseResponse { Success = false, Message = "Service returned error" };
+        }
+        catch (OperationCanceledException)
+        {
+            return new FtpBrowseResponse { Success = false, Message = "Browse timed out after 30 seconds" };
+        }
+        catch (Exception ex)
+        {
+            return new FtpBrowseResponse { Success = false, Message = ex.Message };
+        }
     }
 
     public void Dispose()
