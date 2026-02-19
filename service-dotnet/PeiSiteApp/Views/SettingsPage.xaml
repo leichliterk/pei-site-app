@@ -182,10 +182,10 @@
                                                     <TextBlock FontWeight="SemiBold" FontSize="14"
                                                                Foreground="{StaticResource TextPrimaryBrush}">
                                                         <Run Text="&#xE774;" FontFamily="Segoe MDL2 Assets" FontSize="12" />
-                                                        <Run Text=" " /><Run Text="{Binding Host, Mode=OneWay}" />
+                                                        <Run Text=" " /><Run Text="{Binding Name, Mode=OneWay}" />
                                                     </TextBlock>
                                                     <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,4,0,0">
-                                                        <Run Text="Path: " /><Run Text="{Binding Path, Mode=OneWay}" />
+                                                        <Run Text="{Binding Host, Mode=OneWay}" /><Run Text="{Binding Path, Mode=OneWay}" />
                                                     </TextBlock>
                                                     <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,2,0,0">
                                                         <Run Text="Interval: " /><Run Text="{Binding PollInterval, Mode=OneWay}" /><Run Text="s" />
@@ -320,6 +320,11 @@
                 </Border.Effect>
                 <StackPanel>
                     <TextBlock Text="{Binding FtpDialogTitle}" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,16" />
+
+                    <!-- Server Name -->
+                    <TextBlock Text="Server Name" Style="{StaticResource FieldLabel}" />
+                    <TextBox Text="{Binding DialogServerName, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource InputTextBox}" Margin="0,0,0,12" />
 
                     <!-- Host -->
                     <TextBlock Text="FTP Server Address" Style="{StaticResource FieldLabel}" />

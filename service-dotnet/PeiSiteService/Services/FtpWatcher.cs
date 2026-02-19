@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using PeiSiteService.Models;
@@ -10,6 +11,7 @@ public class FtpWatcher
 {
     private FtpServerConfig _serverConfig;
     private readonly WebSocketClient _wsClient;
+    private readonly PendingFileQueue _pendingQueue;
     private readonly int _siteId;
     private readonly int _tenantId;
     private readonly FileLogger _logger;
@@ -32,10 +34,11 @@ public class FtpWatcher
     public string Host => _serverConfig.FtpHost;
     public bool IsCurrentlyPolling => _isPolling == 1;
 
-    public FtpWatcher(FtpServerConfig serverConfig, WebSocketClient wsClient, int siteId, int tenantId, FileLogger logger)
+    public FtpWatcher(FtpServerConfig serverConfig, WebSocketClient wsClient, PendingFileQueue pendingQueue, int siteId, int tenantId, FileLogger logger)
     {
         _serverConfig = serverConfig;
         _wsClient = wsClient;
+        _pendingQueue = pendingQueue;
         _siteId = siteId;
         _tenantId = tenantId;
         _logger = logger;
@@ -54,6 +57,7 @@ public class FtpWatcher
             return new FtpWatcherStatus
             {
                 Id = _serverConfig.Id,
+                Name = _serverConfig.Name,
                 Host = _serverConfig.FtpHost,
                 Path = _serverConfig.FtpPath,
                 PollInterval = _serverConfig.FtpPollInterval,
@@ -452,20 +456,62 @@ public class FtpWatcher
 
     private void ForwardFile(string filename, byte[] content)
     {
-        var payload = new
+        // Compute SHA-256 hash for integrity verification
+        string sha256Hash;
+        using (var sha256 = SHA256.Create())
         {
-            filename,
-            content = Convert.ToBase64String(content),
-            encoding = "base64",
-            size = content.Length,
-            siteId = _siteId,
-            tenantId = _tenantId,
-            timestamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+            var hashBytes = sha256.ComputeHash(content);
+            sha256Hash = BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
+        }
+
+        var entry = new PendingFileEntry
+        {
+            PendingFileId = $"{Id}_{DateTime.UtcNow:yyyyMMddHHmmssfff}_{Guid.NewGuid():N}",
+            ServerId = Id,
+            Filename = filename,
+            ContentBase64 = Convert.ToBase64String(content),
+            Sha256 = sha256Hash,
+            Size = content.Length,
+            Source = _serverConfig.Name,
+            SiteId = _siteId,
+            TenantId = _tenantId,
+            Timestamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+            QueuedAt = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
         };
 
-        _wsClient.EmitToServer("ftp:file", payload);
+        // Save to pending queue FIRST (guarantees no data loss)
+        _pendingQueue.Enqueue(entry);
+        _logger.Log($"[FtpWatcher:{Id}] Queued: {filename} ({content.Length} bytes, SHA256: {sha256Hash[..12]}...)");
+
+        // Attempt immediate send if WebSocket is connected
+        if (_wsClient.Status == ConnectionStatus.connected)
+        {
+            _wsClient.EmitToServer("ftp:file", CreatePayloadFromEntry(entry));
+            _pendingQueue.Remove(entry.PendingFileId);
+            _logger.Log($"[FtpWatcher:{Id}] Sent immediately: {filename}");
+        }
+        else
+        {
+            _logger.Log($"[FtpWatcher:{Id}] WebSocket disconnected, file queued for later: {filename}");
+        }
+
         Interlocked.Increment(ref _filesForwarded);
-        _logger.Log($"[FtpWatcher:{Id}] Forwarded: {filename} ({content.Length} bytes)");
+    }
+
+    internal static object CreatePayloadFromEntry(PendingFileEntry entry)
+    {
+        return new
+        {
+            filename = entry.Filename,
+            content = entry.ContentBase64,
+            sha256 = entry.Sha256,
+            encoding = entry.Encoding,
+            size = entry.Size,
+            source = entry.Source,
+            siteId = entry.SiteId,
+            tenantId = entry.TenantId,
+            timestamp = entry.Timestamp
+        };
     }
 
     private void LoadState()

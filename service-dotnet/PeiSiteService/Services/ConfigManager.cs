@@ -245,6 +245,7 @@ public class ConfigManager
             var server = new FtpServerConfig
             {
                 Id = Guid.NewGuid().ToString("N")[..8],
+                Name = req.Name,
                 FtpHost = req.FtpHost,
                 FtpPath = req.FtpPath,
                 FtpPollInterval = req.FtpPollInterval
@@ -263,6 +264,7 @@ public class ConfigManager
             var server = _config.FtpServers.FirstOrDefault(s => s.Id == id);
             if (server == null) return null;
 
+            if (req.Name != null) server.Name = req.Name;
             if (req.FtpHost != null) server.FtpHost = req.FtpHost;
             if (req.FtpPath != null) server.FtpPath = req.FtpPath;
             if (req.FtpPollInterval.HasValue) server.FtpPollInterval = req.FtpPollInterval.Value;
@@ -329,6 +331,7 @@ public class ConfigManager
         FtpServers = c.FtpServers.Select(s => new FtpServerConfig
         {
             Id = s.Id,
+            Name = s.Name,
             FtpHost = s.FtpHost,
             FtpPath = s.FtpPath,
             FtpPollInterval = s.FtpPollInterval

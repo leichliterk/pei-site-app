@@ -30,6 +30,7 @@ public class FtpOverallStatusResponse
 public class FtpServerStatusResponse
 {
     public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
     public string Host { get; set; } = "";
     public string Path { get; set; } = "";
     public int PollInterval { get; set; }
@@ -42,6 +43,7 @@ public class FtpServerStatusResponse
 public class FtpServerResponse
 {
     public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
     public string FtpHost { get; set; } = "";
     public string FtpPath { get; set; } = "/";
     public int FtpPollInterval { get; set; }

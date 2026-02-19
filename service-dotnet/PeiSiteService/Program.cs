@@ -46,12 +46,14 @@ logger.Log($"[PEI Site Service] Configuration loaded: apiUrl={config.ApiUrl}, si
 logger.Log($"[PEI Site Service] FTP config: enabled={ftpConfig.FtpEnabled}, servers={ftpConfig.Servers.Count}");
 
 var wsClient = new WebSocketClient(config.ToServiceConfig(), logger);
-var ftpManager = new FtpWatcherManager(wsClient, logger);
+var pendingQueue = new PendingFileQueue(logger);
+var ftpManager = new FtpWatcherManager(wsClient, pendingQueue, logger);
 ftpManager.Initialize(ftpConfig, config.SiteId, config.TenantId);
 
 builder.Services.AddSingleton(logger);
 builder.Services.AddSingleton(configManager);
 builder.Services.AddSingleton(wsClient);
+builder.Services.AddSingleton(pendingQueue);
 builder.Services.AddSingleton(ftpManager);
 builder.Services.AddHostedService<Worker>();
 

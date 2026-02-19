@@ -23,6 +23,7 @@ public class SessionInfo
 
 public class FtpServerCreateRequest
 {
+    public string Name { get; set; } = "";
     public string FtpHost { get; set; } = "";
     public string FtpPath { get; set; } = "/";
     public int FtpPollInterval { get; set; } = 900;
@@ -30,6 +31,7 @@ public class FtpServerCreateRequest
 
 public class FtpServerUpdateRequest
 {
+    public string? Name { get; set; }
     public string? FtpHost { get; set; }
     public string? FtpPath { get; set; }
     public int? FtpPollInterval { get; set; }
@@ -77,6 +79,7 @@ public class FtpDirectoryEntry
 public class FtpWatcherStatus
 {
     public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
     public string Host { get; set; } = "";
     public string Path { get; set; } = "";
     public int PollInterval { get; set; }

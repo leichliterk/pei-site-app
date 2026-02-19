@@ -6,16 +6,20 @@ public class FtpWatcherManager
 {
     private readonly Dictionary<string, FtpWatcher> _watchers = new();
     private readonly WebSocketClient _wsClient;
+    private readonly PendingFileQueue _pendingQueue;
     private readonly FileLogger _logger;
     private readonly object _lock = new();
     private int _siteId;
     private int _tenantId;
     private bool _enabled;
 
-    public FtpWatcherManager(WebSocketClient wsClient, FileLogger logger)
+    public FtpWatcherManager(WebSocketClient wsClient, PendingFileQueue pendingQueue, FileLogger logger)
     {
         _wsClient = wsClient;
+        _pendingQueue = pendingQueue;
         _logger = logger;
+
+        _wsClient.StatusChanged += OnWebSocketStatusChanged;
     }
 
     public void Initialize(FtpConfig ftpConfig, int siteId, int tenantId)
@@ -28,7 +32,7 @@ public class FtpWatcherManager
         {
             foreach (var server in ftpConfig.Servers)
             {
-                var watcher = new FtpWatcher(server, _wsClient, _siteId, _tenantId, _logger);
+                var watcher = new FtpWatcher(server, _wsClient, _pendingQueue, _siteId, _tenantId, _logger);
                 _watchers[server.Id] = watcher;
             }
         }
@@ -73,7 +77,7 @@ public class FtpWatcherManager
     {
         lock (_lock)
         {
-            var watcher = new FtpWatcher(server, _wsClient, _siteId, _tenantId, _logger);
+            var watcher = new FtpWatcher(server, _wsClient, _pendingQueue, _siteId, _tenantId, _logger);
             _watchers[server.Id] = watcher;
             if (_enabled) watcher.Start();
             _logger.Log($"[FtpWatcherManager] Added server {server.Id}: {server.FtpHost}");
@@ -128,7 +132,7 @@ public class FtpWatcherManager
         try
         {
             var tempConfig = new FtpServerConfig { FtpHost = host, FtpPath = path };
-            var tempWatcher = new FtpWatcher(tempConfig, _wsClient, _siteId, _tenantId, _logger);
+            var tempWatcher = new FtpWatcher(tempConfig, _wsClient, _pendingQueue, _siteId, _tenantId, _logger);
             return await tempWatcher.TestConnectionAsync(host, path);
         }
         finally
@@ -143,13 +147,53 @@ public class FtpWatcherManager
         try
         {
             var tempConfig = new FtpServerConfig { FtpHost = host, FtpPath = path };
-            var tempWatcher = new FtpWatcher(tempConfig, _wsClient, _siteId, _tenantId, _logger);
+            var tempWatcher = new FtpWatcher(tempConfig, _wsClient, _pendingQueue, _siteId, _tenantId, _logger);
             return await tempWatcher.ListDirectoriesAsync(host, path);
         }
         finally
         {
             ResumeWatchersForHost(host);
         }
+    }
+
+    private void OnWebSocketStatusChanged(ConnectionStatus status)
+    {
+        if (status == ConnectionStatus.connected)
+        {
+            _logger.Log("[FtpWatcherManager] WebSocket connected, flushing pending file queue");
+            FlushPendingQueue();
+        }
+    }
+
+    private void FlushPendingQueue()
+    {
+        var pending = _pendingQueue.GetAll();
+        if (pending.Count == 0) return;
+
+        _logger.Log($"[FtpWatcherManager] Flushing {pending.Count} pending file(s)");
+        var flushed = 0;
+
+        foreach (var entry in pending)
+        {
+            try
+            {
+                if (_wsClient.Status != ConnectionStatus.connected)
+                {
+                    _logger.Log($"[FtpWatcherManager] WebSocket disconnected during flush, stopping. {flushed}/{pending.Count} flushed.");
+                    break;
+                }
+
+                _wsClient.EmitToServer("ftp:file", FtpWatcher.CreatePayloadFromEntry(entry));
+                _pendingQueue.Remove(entry.PendingFileId);
+                flushed++;
+            }
+            catch (Exception ex)
+            {
+                _logger.Log($"[FtpWatcherManager] Error flushing {entry.Filename}: {ex.Message}");
+            }
+        }
+
+        _logger.Log($"[FtpWatcherManager] Flush complete: {flushed}/{pending.Count} files sent, {_pendingQueue.GetPendingCount()} remaining");
     }
 
     /// <summary>

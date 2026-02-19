@@ -3,6 +3,7 @@ namespace PeiSiteService.Models;
 public class FtpServerConfig
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N")[..8];
+    public string Name { get; set; } = "";
     public string FtpHost { get; set; } = "";
     public string FtpPath { get; set; } = "/";
     public int FtpPollInterval { get; set; } = 60;

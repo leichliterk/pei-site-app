@@ -75,6 +75,9 @@ public partial class SettingsViewModel : ObservableObject
     private string _editingServerId = "";
 
     [ObservableProperty]
+    private string _dialogServerName = "";
+
+    [ObservableProperty]
     private string _dialogFtpHost = "";
 
     [ObservableProperty]
@@ -310,6 +313,7 @@ public partial class SettingsViewModel : ObservableObject
     {
         FtpDialogTitle = "Add FTP Server";
         EditingServerId = "";
+        DialogServerName = "";
         DialogFtpHost = "";
         DialogFtpPath = "/";
         DialogFtpIntervalMinutes = 15;
@@ -323,6 +327,7 @@ public partial class SettingsViewModel : ObservableObject
     {
         FtpDialogTitle = "Edit FTP Server";
         EditingServerId = server.Id;
+        DialogServerName = server.Name;
         DialogFtpHost = server.Host;
         DialogFtpPath = server.Path;
         DialogFtpIntervalMinutes = server.PollInterval / 60;
@@ -373,7 +378,7 @@ public partial class SettingsViewModel : ObservableObject
 
         if (string.IsNullOrEmpty(EditingServerId))
         {
-            var result = await _localService.FtpAddServerAsync(DialogFtpHost, DialogFtpPath, intervalSeconds);
+            var result = await _localService.FtpAddServerAsync(DialogServerName, DialogFtpHost, DialogFtpPath, intervalSeconds);
             if (result != null)
             {
                 ShowFtpServerDialog = false;
@@ -387,7 +392,7 @@ public partial class SettingsViewModel : ObservableObject
         }
         else
         {
-            var success = await _localService.FtpUpdateServerAsync(EditingServerId, DialogFtpHost, DialogFtpPath, intervalSeconds);
+            var success = await _localService.FtpUpdateServerAsync(EditingServerId, DialogServerName, DialogFtpHost, DialogFtpPath, intervalSeconds);
             if (success)
             {
                 ShowFtpServerDialog = false;

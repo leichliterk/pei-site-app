@@ -155,12 +155,13 @@ public class LocalServiceClient : IDisposable
         catch { return false; }
     }
 
-    public async Task<FtpServerResponse?> FtpAddServerAsync(string host, string path, int pollInterval)
+    public async Task<FtpServerResponse?> FtpAddServerAsync(string name, string host, string path, int pollInterval)
     {
         try
         {
             var response = await _http.PostAsJsonAsync("/ftp/servers", new
             {
+                name,
                 ftpHost = host,
                 ftpPath = path,
                 ftpPollInterval = pollInterval
@@ -175,12 +176,13 @@ public class LocalServiceClient : IDisposable
         catch { return null; }
     }
 
-    public async Task<bool> FtpUpdateServerAsync(string id, string host, string path, int pollInterval)
+    public async Task<bool> FtpUpdateServerAsync(string id, string name, string host, string path, int pollInterval)
     {
         try
         {
             var response = await _http.PutAsJsonAsync($"/ftp/servers/{id}", new
             {
+                name,
                 ftpHost = host,
                 ftpPath = path,
                 ftpPollInterval = pollInterval
