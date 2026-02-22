@@ -273,8 +273,13 @@ public class FtpWatcher
                 return;
             }
 
-            var fileNames = nlstData.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-            _logger.Log($"[FtpWatcher:{Id}] NLST returned {fileNames.Length} files");
+            var rawLines = nlstData.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            var fileNames = rawLines
+                .Select(ParseNlstLine)
+                .Where(f => f != null)
+                .Select(f => f!)
+                .ToArray();
+            _logger.Log($"[FtpWatcher:{Id}] NLST returned {rawLines.Length} lines, {fileNames.Length} files parsed");
             int newOrChanged = 0;
 
             // Switch to binary mode for file transfers (forensic byte-for-byte fidelity)
@@ -528,6 +533,40 @@ public class FtpWatcher
             tenantId = entry.TenantId,
             timestamp = entry.Timestamp
         };
+    }
+
+    /// <summary>
+    /// Extracts a plain filename from an NLST response line.
+    /// Handles two formats:
+    ///   - Plain name (most servers):     "001870_251114_000500.DAE"
+    ///   - Windows CE / IIS full listing: "11-15-25  00:00AM       11786 001870_251114_000500.DAE"
+    ///   - Unix full listing:             "-rw-r--r-- 1 user grp 11786 Jan 15 00:00 001870_251114_000500.DAE"
+    /// Returns null for directory entries (skipped during polling).
+    /// </summary>
+    private static string? ParseNlstLine(string line)
+    {
+        line = line.Trim();
+        if (string.IsNullOrEmpty(line)) return null;
+
+        // Windows CE / IIS: "MM-DD-YY  HH:MMAM  [<DIR>|size]  name"
+        if (line.Length > 6 && char.IsDigit(line[0]) && line[2] == '-')
+        {
+            if (line.Contains("<DIR>")) return null; // skip directories
+            var parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            // parts: [0]=date [1]=time [2]=size [3..]=filename
+            return parts.Length >= 4 ? string.Join(" ", parts.Skip(3)) : null;
+        }
+
+        // Unix: "drwx..." = dir (skip), "-rwx..." or "lrwx..." = file
+        if (line[0] == 'd') return null;
+        if (line[0] == '-' || line[0] == 'l')
+        {
+            var parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            return parts.Length >= 9 ? string.Join(" ", parts.Skip(8)) : null;
+        }
+
+        // Plain filename
+        return line;
     }
 
     private void OnFtpFileAck(FtpFileAck ack)
