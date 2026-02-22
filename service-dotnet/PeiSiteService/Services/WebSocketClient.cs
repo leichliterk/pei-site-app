@@ -1,3 +1,4 @@
+using System.Text.Json;
 using PeiSiteService.Models;
 using SocketIOClient;
 using SocketIOClient.Transport;
@@ -192,11 +193,20 @@ public class WebSocketClient : IDisposable
         SetStatus(ConnectionStatus.disconnected);
     }
 
+    private static readonly JsonSerializerOptions _emitJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
     public void EmitToServer(string eventName, object data)
     {
         if (_socket?.Connected == true)
         {
-            _ = _socket.EmitAsync(eventName, new[] { data });
+            // Serialize explicitly with camelCase so the library sends exactly
+            // what we expect — no ambiguity from params-array wrapping.
+            var json = JsonSerializer.Serialize(data, data.GetType(), _emitJsonOptions);
+            using var doc = JsonDocument.Parse(json);
+            _ = _socket.EmitAsync(eventName, doc.RootElement);
         }
     }
 

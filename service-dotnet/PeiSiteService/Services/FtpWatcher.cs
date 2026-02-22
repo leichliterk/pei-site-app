@@ -494,7 +494,7 @@ public class FtpWatcher
             ContentBase64 = Convert.ToBase64String(content),
             Sha256 = sha256Hash,
             Size = content.Length,
-            Source = _serverConfig.Name,
+            Source = string.IsNullOrEmpty(_serverConfig.Name) ? _serverConfig.FtpHost : _serverConfig.Name,
             SiteId = _siteId,
             TenantId = _tenantId,
             Timestamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
@@ -582,9 +582,15 @@ public class FtpWatcher
         }
         else
         {
-            _logger.Log($"[FtpWatcher:{Id}] ACK failure: {ack.Filename} - {ack.Error}. Retrying...");
-            if (_wsClient.Status == ConnectionStatus.connected)
-                _wsClient.EmitToServer("ftp:file", CreatePayloadFromEntry(match));
+            _logger.Log($"[FtpWatcher:{Id}] ACK failure: {ack.Filename} - {ack.Error}. Clearing for re-poll.");
+            // Remove from pending queue so we don't retry the stale queued data
+            _pendingQueue.Remove(match.PendingFileId);
+            // Remove from FTP state so the next poll cycle re-downloads and re-transmits fresh
+            lock (_stateLock)
+            {
+                _state.Files.Remove(ack.Filename);
+            }
+            SaveState();
         }
     }
 
