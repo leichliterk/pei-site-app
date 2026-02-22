@@ -19,7 +19,6 @@ public class FtpWatcherManager
         _pendingQueue = pendingQueue;
         _logger = logger;
 
-        _wsClient.StatusChanged += OnWebSocketStatusChanged;
     }
 
     public void Initialize(FtpConfig ftpConfig, int siteId, int tenantId)
@@ -154,46 +153,6 @@ public class FtpWatcherManager
         {
             ResumeWatchersForHost(host);
         }
-    }
-
-    private void OnWebSocketStatusChanged(ConnectionStatus status)
-    {
-        if (status == ConnectionStatus.connected)
-        {
-            _logger.Log("[FtpWatcherManager] WebSocket connected, flushing pending file queue");
-            FlushPendingQueue();
-        }
-    }
-
-    private void FlushPendingQueue()
-    {
-        var pending = _pendingQueue.GetAll();
-        if (pending.Count == 0) return;
-
-        _logger.Log($"[FtpWatcherManager] Flushing {pending.Count} pending file(s)");
-        var flushed = 0;
-
-        foreach (var entry in pending)
-        {
-            try
-            {
-                if (_wsClient.Status != ConnectionStatus.connected)
-                {
-                    _logger.Log($"[FtpWatcherManager] WebSocket disconnected during flush, stopping. {flushed}/{pending.Count} flushed.");
-                    break;
-                }
-
-                _wsClient.EmitToServer("ftp:file", FtpWatcher.CreatePayloadFromEntry(entry));
-                _pendingQueue.Remove(entry.PendingFileId);
-                flushed++;
-            }
-            catch (Exception ex)
-            {
-                _logger.Log($"[FtpWatcherManager] Error flushing {entry.Filename}: {ex.Message}");
-            }
-        }
-
-        _logger.Log($"[FtpWatcherManager] Flush complete: {flushed}/{pending.Count} files sent, {_pendingQueue.GetPendingCount()} remaining");
     }
 
     /// <summary>

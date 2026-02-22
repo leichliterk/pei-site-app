@@ -18,6 +18,7 @@ public class WebSocketClient : IDisposable
     private volatile bool _stopping;
 
     public event Action<ConnectionStatus>? StatusChanged;
+    public event Action<FtpFileAck>? FtpFileAckReceived;
 
     public ConnectionStatus Status
     {
@@ -126,6 +127,19 @@ public class WebSocketClient : IDisposable
         {
             _logger.Log($"[WebSocketClient] Event: {name}");
             await Task.CompletedTask;
+        });
+
+        _socket.On("ftp:file_ack", response =>
+        {
+            try
+            {
+                var ack = response.GetValue<FtpFileAck>();
+                FtpFileAckReceived?.Invoke(ack);
+            }
+            catch (Exception ex)
+            {
+                _logger.Log($"[WebSocketClient] Error parsing ftp:file_ack: {ex.Message}");
+            }
         });
 
         // We handle reconnection ourselves in OnDisconnected, so Reconnection = false.

@@ -88,6 +88,9 @@ public class FtpWatcher
             return;
         }
 
+        _wsClient.FtpFileAckReceived += OnFtpFileAck;
+        _wsClient.StatusChanged += OnWsStatusChanged;
+
         _logger.Log($"[FtpWatcher:{Id}] Starting - host: {_serverConfig.FtpHost}, path: {_serverConfig.FtpPath}, interval: {_serverConfig.FtpPollInterval}s");
 
         _ = PollAsync();
@@ -102,6 +105,8 @@ public class FtpWatcher
         {
             _pollTimer.Dispose();
             _pollTimer = null;
+            _wsClient.FtpFileAckReceived -= OnFtpFileAck;
+            _wsClient.StatusChanged -= OnWsStatusChanged;
             _logger.Log($"[FtpWatcher:{Id}] Stopped");
         }
     }
@@ -284,9 +289,21 @@ public class FtpWatcher
             {
                 FtpFileState? existing;
                 lock (_stateLock) { _state.Files.TryGetValue(fileName, out existing); }
-                if (existing != null) continue;
 
-                _logger.Log($"[FtpWatcher:{Id}] New file: {fileName}");
+                // Use SIZE to detect new files and updates to existing files
+                var sizeResp = await SendFtpCommandAsync(writer, reader, $"SIZE {fileName}", $"SIZE {fileName}");
+                long remoteSize = -1;
+                if (sizeResp != null && sizeResp.StartsWith("213") &&
+                    long.TryParse(sizeResp[4..].Trim(), out var parsedSize))
+                    remoteSize = parsedSize;
+
+                bool isNew = existing == null;
+                bool isChanged = existing != null && remoteSize >= 0 && remoteSize != existing.Size;
+
+                if (!isNew && !isChanged) continue;
+
+                _logger.Log($"[FtpWatcher:{Id}] {(isNew ? "New" : "Updated")} file: {fileName} " +
+                            $"(remote={remoteSize} bytes, stored={existing?.Size.ToString() ?? "n/a"})");
                 try
                 {
                     var fileBytes = await FtpActiveDataTransferBytesAsync(writer, reader, localIp, $"RETR {fileName}", $"RETR {fileName}");
@@ -314,7 +331,7 @@ public class FtpWatcher
             lock (_stateLock) { _state.LastPoll = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"); }
             SaveState();
 
-            _lastResult = $"OK - {fileNames.Length} files listed, {newOrChanged} forwarded";
+            _lastResult = $"OK - {fileNames.Length} files listed, {newOrChanged} new/updated forwarded";
             _logger.Log($"[FtpWatcher:{Id}] Poll complete: {_lastResult}");
 
             await writer.WriteLineAsync("QUIT");
@@ -483,12 +500,11 @@ public class FtpWatcher
         _pendingQueue.Enqueue(entry);
         _logger.Log($"[FtpWatcher:{Id}] Queued: {filename} ({content.Length} bytes, SHA256: {sha256Hash[..12]}...)");
 
-        // Attempt immediate send if WebSocket is connected
+        // Attempt immediate send if WebSocket is connected; removal happens on ack
         if (_wsClient.Status == ConnectionStatus.connected)
         {
             _wsClient.EmitToServer("ftp:file", CreatePayloadFromEntry(entry));
-            _pendingQueue.Remove(entry.PendingFileId);
-            _logger.Log($"[FtpWatcher:{Id}] Sent immediately: {filename}");
+            _logger.Log($"[FtpWatcher:{Id}] Sent, awaiting ack: {filename}");
         }
         else
         {
@@ -512,6 +528,48 @@ public class FtpWatcher
             tenantId = entry.TenantId,
             timestamp = entry.Timestamp
         };
+    }
+
+    private void OnFtpFileAck(FtpFileAck ack)
+    {
+        // Only handle acks for files belonging to this watcher
+        var match = _pendingQueue.GetAll().FirstOrDefault(e => e.ServerId == Id && e.Filename == ack.Filename);
+        if (match == null) return;
+
+        if (ack.Success)
+        {
+            _pendingQueue.Remove(match.PendingFileId);
+            _logger.Log($"[FtpWatcher:{Id}] ACK success: {ack.Filename} (server file_id={ack.FileId})");
+        }
+        else
+        {
+            _logger.Log($"[FtpWatcher:{Id}] ACK failure: {ack.Filename} - {ack.Error}. Retrying...");
+            if (_wsClient.Status == ConnectionStatus.connected)
+                _wsClient.EmitToServer("ftp:file", CreatePayloadFromEntry(match));
+        }
+    }
+
+    private void OnWsStatusChanged(ConnectionStatus status)
+    {
+        if (status == ConnectionStatus.connected)
+        {
+            _logger.Log($"[FtpWatcher:{Id}] WebSocket reconnected, flushing own pending queue");
+            FlushOwnPending();
+        }
+    }
+
+    private void FlushOwnPending()
+    {
+        var entries = _pendingQueue.GetAll().Where(e => e.ServerId == Id).ToList();
+        if (entries.Count == 0) return;
+
+        _logger.Log($"[FtpWatcher:{Id}] Flushing {entries.Count} pending file(s)");
+        foreach (var entry in entries)
+        {
+            if (_wsClient.Status != ConnectionStatus.connected) break;
+            _wsClient.EmitToServer("ftp:file", CreatePayloadFromEntry(entry));
+            _logger.Log($"[FtpWatcher:{Id}] Re-sent, awaiting ack: {entry.Filename}");
+        }
     }
 
     private void LoadState()
