@@ -9,11 +9,11 @@
     ".NETCoreApp,Version=v8.0/win-x64": {
       "pei-site-service/1.0.0": {
         "dependencies": {
-          "FluentFTP": "53.0.2",
           "Microsoft.Extensions.Hosting.WindowsServices": "10.0.3",
           "Microsoft.NET.ILLink.Tasks": "8.0.24",
           "Microsoft.Win32.Registry": "5.0.0",
           "SocketIOClient": "3.1.2",
+          "System.Security.Cryptography.ProtectedData": "10.0.3",
           "runtimepack.Microsoft.NETCore.App.Runtime.win-x64": "8.0.24",
           "runtimepack.Microsoft.AspNetCore.App.Runtime.win-x64": "8.0.24"
         },
@@ -1134,14 +1134,6 @@
           }
         }
       },
-      "FluentFTP/53.0.2": {
-        "runtime": {
-          "lib/net8.0/FluentFTP.dll": {
-            "assemblyVersion": "53.0.2.0",
-            "fileVersion": "53.0.2.0"
-          }
-        }
-      },
       "Microsoft.Extensions.Configuration/10.0.3": {
         "dependencies": {
           "Microsoft.Extensions.Configuration.Abstractions": "10.0.3",
@@ -1606,6 +1598,14 @@
           "System.Security.Principal.Windows": "5.0.0"
         }
       },
+      "System.Security.Cryptography.ProtectedData/10.0.3": {
+        "runtime": {
+          "lib/net8.0/System.Security.Cryptography.ProtectedData.dll": {
+            "assemblyVersion": "10.0.0.0",
+            "fileVersion": "10.0.326.7603"
+          }
+        }
+      },
       "System.Security.Principal.Windows/5.0.0": {},
       "System.ServiceProcess.ServiceController/10.0.3": {
         "dependencies": {
@@ -1655,13 +1655,6 @@
       "type": "runtimepack",
       "serviceable": false,
       "sha512": ""
-    },
-    "FluentFTP/53.0.2": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-EaBY+FECGqlfDL1HnxaSrPCuakebW6xlfNt/VsH5daPS76kfKA3hZiJjH6OTceNzNDWl9HTpwRXOP96mHWhbIg==",
-      "path": "fluentftp/53.0.2",
-      "hashPath": "fluentftp.53.0.2.nupkg.sha512"
     },
     "Microsoft.Extensions.Configuration/10.0.3": {
       "type": "package",
@@ -1935,6 +1928,13 @@
       "sha512": "sha512-dagJ1mHZO3Ani8GH0PHpPEe/oYO+rVdbQjvjJkBRNQkX4t0r1iaeGn8+/ybkSLEan3/slM0t59SVdHzuHf2jmw==",
       "path": "system.security.accesscontrol/5.0.0",
       "hashPath": "system.security.accesscontrol.5.0.0.nupkg.sha512"
+    },
+    "System.Security.Cryptography.ProtectedData/10.0.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-JCKbH/CN5l0CSoJBILEvJmNQVp5vV+FY3q2ue4K9p4eDT4mFEv0bjTQCV+MD6Qk1b/qk9fWmZZKhG1TklbXw1Q==",
+      "path": "system.security.cryptography.protecteddata/10.0.3",
+      "hashPath": "system.security.cryptography.protecteddata.10.0.3.nupkg.sha512"
     },
     "System.Security.Principal.Windows/5.0.0": {
       "type": "package",
