@@ -21,7 +21,7 @@ public class FileLogger
         {
             try
             {
-                var logFile = Path.Combine(_logDir, $"service-{DateTime.Now:yyyy-MM-dd}.log");
+                var logFile = Path.Combine(_logDir, $"service-{DateTime.UtcNow:yyyy-MM-dd}.log");
                 File.AppendAllText(logFile, logMessage + Environment.NewLine);
             }
             catch { }
