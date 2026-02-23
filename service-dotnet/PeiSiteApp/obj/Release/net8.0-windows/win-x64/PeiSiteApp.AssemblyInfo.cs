@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("pei-site-app")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+3be410e0d09219c5edc93d0e885d7b9e85a4e072")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+07ab1cb9d9ce947967bd269a2e36303ac920b40b")]
 [assembly: System.Reflection.AssemblyProductAttribute("pei-site-app")]
 [assembly: System.Reflection.AssemblyTitleAttribute("pei-site-app")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

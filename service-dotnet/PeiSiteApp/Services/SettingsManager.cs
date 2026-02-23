@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Win32;
 using PeiSiteApp.Models;
 
@@ -142,14 +143,25 @@ public class SettingsManager
     {
         try
         {
-            var config = new
+            // Read the existing config to preserve fields we don't own (ftpEnabled, ftpServers, etc.)
+            JsonObject node = new();
+            if (File.Exists(_configPath))
             {
-                apiUrl = _settings.ApiUrl,
-                apiKey = _settings.ApiKey,
-                siteId = _settings.SiteNumber,
-                tenantId = _settings.TenantId
-            };
-            File.WriteAllText(_configPath, JsonSerializer.Serialize(config, JsonOptions));
+                try
+                {
+                    var raw = File.ReadAllText(_configPath);
+                    node = JsonNode.Parse(raw)?.AsObject() ?? new();
+                }
+                catch { }
+            }
+
+            // Patch only the fields the app is responsible for
+            node["apiUrl"] = _settings.ApiUrl;
+            node["apiKey"] = _settings.ApiKey;
+            node["siteId"] = _settings.SiteNumber;
+            node["tenantId"] = _settings.TenantId;
+
+            File.WriteAllText(_configPath, node.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
         }
         catch { }
     }
