@@ -8,12 +8,14 @@ public class Worker : BackgroundService
     private readonly FileLogger _logger;
     private readonly WebSocketClient _wsClient;
     private readonly FtpWatcherManager _ftpManager;
+    private readonly ConfigManager _configManager;
 
-    public Worker(FileLogger logger, WebSocketClient wsClient, FtpWatcherManager ftpManager)
+    public Worker(FileLogger logger, WebSocketClient wsClient, FtpWatcherManager ftpManager, ConfigManager configManager)
     {
         _logger = logger;
         _wsClient = wsClient;
         _ftpManager = ftpManager;
+        _configManager = configManager;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -71,13 +73,20 @@ public class Worker : BackgroundService
 
     private async Task WaitForNetworkAsync(CancellationToken ct, int maxAttempts = 30, int delayMs = 2000)
     {
+        // Derive the hostname to check from the configured API URL so staging and
+        // production installs both verify connectivity against the right server.
+        var apiUrl = _configManager.GetConfig().ApiUrl;
+        string host;
+        try { host = new Uri(apiUrl).Host; }
+        catch { host = "pei-web-server.onrender.com"; }
+
         for (int attempt = 1; attempt <= maxAttempts; attempt++)
         {
             ct.ThrowIfCancellationRequested();
             try
             {
-                _logger.Log($"[PEI Site Service] Checking network availability (attempt {attempt}/{maxAttempts})...");
-                var addresses = await Dns.GetHostAddressesAsync("pei-web-server.onrender.com", ct);
+                _logger.Log($"[PEI Site Service] Checking network availability (attempt {attempt}/{maxAttempts}, host={host})...");
+                var addresses = await Dns.GetHostAddressesAsync(host, ct);
                 if (addresses.Length > 0)
                 {
                     _logger.Log("[PEI Site Service] Network is available");
