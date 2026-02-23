@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Win32;
 using PeiSiteService.Models;
 
@@ -20,7 +21,7 @@ public class ConfigManager
     private static readonly FullConfig DefaultConfig = new()
     {
         ApiUrl = "https://pei-web-server-staging.onrender.com/api/data",
-        ApiKey = "_6@L<Q*SC?mSdp$a1E4?L{\"M+8QQ0|Cw",
+        ApiKey = "",
         SiteId = 1000,
         TenantId = 1001,
         FtpEnabled = false,
@@ -48,6 +49,13 @@ public class ConfigManager
                 var fileConfig = JsonSerializer.Deserialize<FullConfig>(data, JsonOptions);
                 if (fileConfig != null)
                 {
+                    // Decrypt API key if stored as DPAPI-protected blob; migrate plaintext on next save
+                    var raw = JsonSerializer.Deserialize<JsonObject>(data, JsonOptions);
+                    if (raw != null && raw["apiKeyProtected"] is JsonNode protectedNode)
+                    {
+                        fileConfig.ApiKey = CredentialProtection.TryUnprotect(protectedNode.GetValue<string>()) ?? fileConfig.ApiKey;
+                    }
+
                     _logger.Log($"[ConfigManager] Loaded config from file: {_configPath}");
                     var merged = MergeWithDefaults(fileConfig);
                     return MigrateIfNeeded(merged);
@@ -294,8 +302,14 @@ public class ConfigManager
     {
         try
         {
-            var json = JsonSerializer.Serialize(config, JsonOptions);
-            File.WriteAllText(_configPath, json);
+            // Serialize the full config, then replace the plaintext apiKey with an encrypted blob
+            var node = JsonNode.Parse(JsonSerializer.Serialize(config, JsonOptions))!.AsObject();
+            if (!string.IsNullOrEmpty(config.ApiKey))
+            {
+                node["apiKeyProtected"] = CredentialProtection.Protect(config.ApiKey);
+            }
+            node.Remove("apiKey"); // never persist plaintext
+            File.WriteAllText(_configPath, node.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
             _logger.Log($"[ConfigManager] Saved config to: {_configPath}");
         }
         catch (Exception ex)

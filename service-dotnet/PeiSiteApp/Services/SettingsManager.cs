@@ -50,7 +50,10 @@ public class SettingsManager
                 {
                     if (config.TryGetValue("apiUrl", out var apiUrl) && apiUrl.ValueKind == JsonValueKind.String)
                         settings.ApiUrl = apiUrl.GetString()!;
-                    if (config.TryGetValue("apiKey", out var apiKey) && apiKey.ValueKind == JsonValueKind.String)
+                    // Prefer DPAPI-protected key; fall back to plaintext for migration of existing installs
+                    if (config.TryGetValue("apiKeyProtected", out var apiKeyProtected) && apiKeyProtected.ValueKind == JsonValueKind.String)
+                        settings.ApiKey = CredentialProtection.TryUnprotect(apiKeyProtected.GetString()!) ?? settings.ApiKey;
+                    else if (config.TryGetValue("apiKey", out var apiKey) && apiKey.ValueKind == JsonValueKind.String)
                         settings.ApiKey = apiKey.GetString()!;
                     if (config.TryGetValue("siteId", out var siteId) && siteId.ValueKind == JsonValueKind.Number)
                         settings.SiteNumber = siteId.GetInt32();
@@ -155,9 +158,11 @@ public class SettingsManager
                 catch { }
             }
 
-            // Patch only the fields the app is responsible for
+            // Patch only the fields the app is responsible for; encrypt the API key
             node["apiUrl"] = _settings.ApiUrl;
-            node["apiKey"] = _settings.ApiKey;
+            if (!string.IsNullOrEmpty(_settings.ApiKey))
+                node["apiKeyProtected"] = CredentialProtection.Protect(_settings.ApiKey);
+            node.Remove("apiKey"); // never persist plaintext
             node["siteId"] = _settings.SiteNumber;
             node["tenantId"] = _settings.TenantId;
 

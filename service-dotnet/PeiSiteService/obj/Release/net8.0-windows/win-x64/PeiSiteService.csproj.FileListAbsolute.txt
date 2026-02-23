@@ -356,3 +356,4 @@ C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteServic
 C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\SocketIO.Core.dll
 C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\SocketIO.Serializer.Core.dll
 C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\SocketIO.Serializer.SystemTextJson.dll
+C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\System.Security.Cryptography.ProtectedData.dll
