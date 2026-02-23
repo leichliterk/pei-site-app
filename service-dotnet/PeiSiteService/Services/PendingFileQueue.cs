@@ -30,6 +30,14 @@ public class PendingFileQueue
         }
     }
 
+    // For unit testing: inject a custom directory instead of the system ProgramData path
+    internal PendingFileQueue(string pendingDir, FileLogger logger)
+    {
+        _logger = logger;
+        _pendingDir = pendingDir;
+        try { Directory.CreateDirectory(_pendingDir); } catch { }
+    }
+
     public void Enqueue(PendingFileEntry entry)
     {
         lock (_lock)

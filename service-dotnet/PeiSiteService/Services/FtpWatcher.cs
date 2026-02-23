@@ -546,7 +546,7 @@ public class FtpWatcher
     ///   - Unix full listing:             "-rw-r--r-- 1 user grp 11786 Jan 15 00:00 001870_251114_000500.DAE"
     /// Returns null for directory entries (skipped during polling).
     /// </summary>
-    private static string? ParseNlstLine(string line)
+    internal static string? ParseNlstLine(string line)
     {
         line = line.Trim();
         if (string.IsNullOrEmpty(line)) return null;

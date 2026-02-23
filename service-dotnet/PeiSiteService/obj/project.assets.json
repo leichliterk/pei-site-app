@@ -2,19 +2,6 @@
   "version": 3,
   "targets": {
     "net8.0-windows7.0": {
-      "FluentFTP/53.0.2": {
-        "type": "package",
-        "compile": {
-          "lib/net8.0/FluentFTP.dll": {
-            "related": ".xml"
-          }
-        },
-        "runtime": {
-          "lib/net8.0/FluentFTP.dll": {
-            "related": ".xml"
-          }
-        }
-      },
       "Microsoft.Extensions.Configuration/10.0.3": {
         "type": "package",
         "dependencies": {
@@ -897,19 +884,6 @@
       }
     },
     "net8.0-windows7.0/win-x64": {
-      "FluentFTP/53.0.2": {
-        "type": "package",
-        "compile": {
-          "lib/net8.0/FluentFTP.dll": {
-            "related": ".xml"
-          }
-        },
-        "runtime": {
-          "lib/net8.0/FluentFTP.dll": {
-            "related": ".xml"
-          }
-        }
-      },
       "Microsoft.Extensions.Configuration/10.0.3": {
         "type": "package",
         "dependencies": {
@@ -1750,33 +1724,6 @@
     }
   },
   "libraries": {
-    "FluentFTP/53.0.2": {
-      "sha512": "EaBY+FECGqlfDL1HnxaSrPCuakebW6xlfNt/VsH5daPS76kfKA3hZiJjH6OTceNzNDWl9HTpwRXOP96mHWhbIg==",
-      "type": "package",
-      "path": "fluentftp/53.0.2",
-      "files": [
-        ".nupkg.metadata",
-        ".signature.p7s",
-        "LICENSE.TXT",
-        "fluentftp.53.0.2.nupkg.sha512",
-        "fluentftp.nuspec",
-        "lib/net462/FluentFTP.dll",
-        "lib/net462/FluentFTP.xml",
-        "lib/net472/FluentFTP.dll",
-        "lib/net472/FluentFTP.xml",
-        "lib/net7.0/FluentFTP.dll",
-        "lib/net7.0/FluentFTP.xml",
-        "lib/net8.0/FluentFTP.dll",
-        "lib/net8.0/FluentFTP.xml",
-        "lib/net9.0/FluentFTP.dll",
-        "lib/net9.0/FluentFTP.xml",
-        "lib/netstandard2.0/FluentFTP.dll",
-        "lib/netstandard2.0/FluentFTP.xml",
-        "lib/netstandard2.1/FluentFTP.dll",
-        "lib/netstandard2.1/FluentFTP.xml",
-        "logo-nuget.png"
-      ]
-    },
     "Microsoft.Extensions.Configuration/10.0.3": {
       "sha512": "H1Cjv2xmm7O3iAGmFTcnSM0ZhLQ/7SqefmAvSJoT1PbXoxeYc2fo0mCLn2JlVbr9E6YpoU9q/o0fI9neDJB0xQ==",
       "type": "package",
@@ -3218,7 +3165,6 @@
   },
   "projectFileDependencyGroups": {
     "net8.0-windows7.0": [
-      "FluentFTP >= 53.0.2",
       "Microsoft.Extensions.Hosting.WindowsServices >= 10.0.3",
       "Microsoft.NET.ILLink.Tasks >= 8.0.24",
       "Microsoft.Win32.Registry >= 5.0.0",
@@ -3268,10 +3214,6 @@
       "net8.0-windows7.0": {
         "targetAlias": "net8.0-windows",
         "dependencies": {
-          "FluentFTP": {
-            "target": "Package",
-            "version": "[53.0.2, )"
-          },
           "Microsoft.Extensions.Hosting.WindowsServices": {
             "target": "Package",
             "version": "[10.0.3, )"

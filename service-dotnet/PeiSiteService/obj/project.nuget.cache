@@ -1,10 +1,9 @@
 {
   "version": 2,
-  "dgSpecHash": "c7bW+VqFhPE=",
+  "dgSpecHash": "itWBf3cNd7E=",
   "success": true,
   "projectFilePath": "C:\\Users\\leich\\Documents\\GitHub\\SV\\PEI\\pei-site-app\\service-dotnet\\PeiSiteService\\PeiSiteService.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\leich\\.nuget\\packages\\fluentftp\\53.0.2\\fluentftp.53.0.2.nupkg.sha512",
     "C:\\Users\\leich\\.nuget\\packages\\microsoft.extensions.configuration\\10.0.3\\microsoft.extensions.configuration.10.0.3.nupkg.sha512",
     "C:\\Users\\leich\\.nuget\\packages\\microsoft.extensions.configuration.abstractions\\10.0.3\\microsoft.extensions.configuration.abstractions.10.0.3.nupkg.sha512",
     "C:\\Users\\leich\\.nuget\\packages\\microsoft.extensions.configuration.binder\\10.0.3\\microsoft.extensions.configuration.binder.10.0.3.nupkg.sha512",
@@ -49,9 +48,9 @@
     "C:\\Users\\leich\\.nuget\\packages\\system.serviceprocess.servicecontroller\\10.0.3\\system.serviceprocess.servicecontroller.10.0.3.nupkg.sha512",
     "C:\\Users\\leich\\.nuget\\packages\\system.text.encodings.web\\10.0.3\\system.text.encodings.web.10.0.3.nupkg.sha512",
     "C:\\Users\\leich\\.nuget\\packages\\system.text.json\\10.0.3\\system.text.json.10.0.3.nupkg.sha512",
-    "C:\\Users\\leich\\.nuget\\packages\\microsoft.aspnetcore.app.runtime.win-x64\\8.0.24\\microsoft.aspnetcore.app.runtime.win-x64.8.0.24.nupkg.sha512",
     "C:\\Users\\leich\\.nuget\\packages\\microsoft.netcore.app.runtime.win-x64\\8.0.24\\microsoft.netcore.app.runtime.win-x64.8.0.24.nupkg.sha512",
-    "C:\\Users\\leich\\.nuget\\packages\\microsoft.windowsdesktop.app.runtime.win-x64\\8.0.24\\microsoft.windowsdesktop.app.runtime.win-x64.8.0.24.nupkg.sha512"
+    "C:\\Users\\leich\\.nuget\\packages\\microsoft.windowsdesktop.app.runtime.win-x64\\8.0.24\\microsoft.windowsdesktop.app.runtime.win-x64.8.0.24.nupkg.sha512",
+    "C:\\Users\\leich\\.nuget\\packages\\microsoft.aspnetcore.app.runtime.win-x64\\8.0.24\\microsoft.aspnetcore.app.runtime.win-x64.8.0.24.nupkg.sha512"
   ],
   "logs": []
 }

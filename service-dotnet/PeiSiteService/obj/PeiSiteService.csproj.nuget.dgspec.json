@@ -43,10 +43,6 @@
         "net8.0-windows7.0": {
           "targetAlias": "net8.0-windows",
           "dependencies": {
-            "FluentFTP": {
-              "target": "Package",
-              "version": "[53.0.2, )"
-            },
             "Microsoft.Extensions.Hosting.WindowsServices": {
               "target": "Package",
               "version": "[10.0.3, )"

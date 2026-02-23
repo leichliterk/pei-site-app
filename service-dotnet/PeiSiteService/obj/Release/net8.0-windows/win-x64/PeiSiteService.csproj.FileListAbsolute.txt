@@ -5,7 +5,6 @@ C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteServic
 C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\pei-site-service.runtimeconfig.json
 C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\pei-site-service.dll
 C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\pei-site-service.pdb
-C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\FluentFTP.dll
 C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\Microsoft.Extensions.Configuration.dll
 C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\Microsoft.Extensions.Configuration.Abstractions.dll
 C:\Users\leich\Documents\GitHub\SV\PEI\pei-site-app\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\Microsoft.Extensions.Configuration.Binder.dll

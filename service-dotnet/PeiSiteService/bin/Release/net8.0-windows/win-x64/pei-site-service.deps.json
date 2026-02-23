@@ -9,7 +9,6 @@
     ".NETCoreApp,Version=v8.0/win-x64": {
       "pei-site-service/1.0.0": {
         "dependencies": {
-          "FluentFTP": "53.0.2",
           "Microsoft.Extensions.Hosting.WindowsServices": "10.0.3",
           "Microsoft.NET.ILLink.Tasks": "8.0.24",
           "Microsoft.Win32.Registry": "5.0.0",
@@ -1179,14 +1178,6 @@
           }
         }
       },
-      "FluentFTP/53.0.2": {
-        "runtime": {
-          "lib/net8.0/FluentFTP.dll": {
-            "assemblyVersion": "53.0.2.0",
-            "fileVersion": "53.0.2.0"
-          }
-        }
-      },
       "Microsoft.Extensions.Configuration/10.0.3": {
         "dependencies": {
           "Microsoft.Extensions.Configuration.Abstractions": "10.0.3",
@@ -1708,13 +1699,6 @@
       "type": "runtimepack",
       "serviceable": false,
       "sha512": ""
-    },
-    "FluentFTP/53.0.2": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-EaBY+FECGqlfDL1HnxaSrPCuakebW6xlfNt/VsH5daPS76kfKA3hZiJjH6OTceNzNDWl9HTpwRXOP96mHWhbIg==",
-      "path": "fluentftp/53.0.2",
-      "hashPath": "fluentftp.53.0.2.nupkg.sha512"
     },
     "Microsoft.Extensions.Configuration/10.0.3": {
       "type": "package",
