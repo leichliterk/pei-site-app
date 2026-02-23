@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("pei-site-service")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9fa189567119b744a4a8e1a7a550a8460de79a41")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+fc1b2d9a1b8383a0636bdeadffc8a2e19cc5956e")]
 [assembly: System.Reflection.AssemblyProductAttribute("pei-site-service")]
 [assembly: System.Reflection.AssemblyTitleAttribute("pei-site-service")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

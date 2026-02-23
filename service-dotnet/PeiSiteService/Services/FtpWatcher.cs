@@ -592,29 +592,39 @@ public class FtpWatcher
             }
             SaveState();
         }
+
+        // After handling this ACK (success or failure), send the next queued file if any.
+        // Run on the thread pool to avoid re-entrancy on the socket event thread.
+        _ = Task.Run(FlushNextPending);
     }
 
     private void OnWsStatusChanged(ConnectionStatus status)
     {
         if (status == ConnectionStatus.connected)
         {
-            _logger.Log($"[FtpWatcher:{Id}] WebSocket reconnected, flushing own pending queue");
-            FlushOwnPending();
+            _logger.Log($"[FtpWatcher:{Id}] WebSocket reconnected, starting sequential flush");
+            _ = Task.Run(FlushNextPending);
         }
     }
 
-    private void FlushOwnPending()
+    /// <summary>
+    /// Sends the single oldest pending file for this watcher and returns.
+    /// The next file is sent after its ACK is received, keeping the pipeline
+    /// sequential and avoiding server-side burst pressure.
+    /// </summary>
+    private void FlushNextPending()
     {
-        var entries = _pendingQueue.GetAll().Where(e => e.ServerId == Id).ToList();
-        if (entries.Count == 0) return;
+        if (_wsClient.Status != ConnectionStatus.connected) return;
 
-        _logger.Log($"[FtpWatcher:{Id}] Flushing {entries.Count} pending file(s)");
-        foreach (var entry in entries)
-        {
-            if (_wsClient.Status != ConnectionStatus.connected) break;
-            _wsClient.EmitToServer("ftp:file", CreatePayloadFromEntry(entry));
-            _logger.Log($"[FtpWatcher:{Id}] Re-sent, awaiting ack: {entry.Filename}");
-        }
+        var next = _pendingQueue.GetAll()
+            .Where(e => e.ServerId == Id)
+            .OrderBy(e => e.QueuedAt)
+            .FirstOrDefault();
+
+        if (next == null) return;
+
+        _wsClient.EmitToServer("ftp:file", CreatePayloadFromEntry(next));
+        _logger.Log($"[FtpWatcher:{Id}] Flush: sent {next.Filename}, awaiting ack");
     }
 
     private void LoadState()
