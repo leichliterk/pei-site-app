@@ -1,3 +1,4 @@
+using System.Text.Json;
 using PeiSiteService.Models;
 using SocketIOClient;
 using SocketIOClient.Transport;
@@ -18,6 +19,7 @@ public class WebSocketClient : IDisposable
     private volatile bool _stopping;
 
     public event Action<ConnectionStatus>? StatusChanged;
+    public event Action<FtpFileAck>? FtpFileAckReceived;
 
     public ConnectionStatus Status
     {
@@ -128,6 +130,19 @@ public class WebSocketClient : IDisposable
             await Task.CompletedTask;
         });
 
+        _socket.On("ftp:file_ack", response =>
+        {
+            try
+            {
+                var ack = response.GetValue<FtpFileAck>();
+                FtpFileAckReceived?.Invoke(ack);
+            }
+            catch (Exception ex)
+            {
+                _logger.Log($"[WebSocketClient] Error parsing ftp:file_ack: {ex.Message}");
+            }
+        });
+
         // We handle reconnection ourselves in OnDisconnected, so Reconnection = false.
         // Outer retry loop handles initial connection failures.
         _ = Task.Run(async () =>
@@ -178,11 +193,20 @@ public class WebSocketClient : IDisposable
         SetStatus(ConnectionStatus.disconnected);
     }
 
+    private static readonly JsonSerializerOptions _emitJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
     public void EmitToServer(string eventName, object data)
     {
         if (_socket?.Connected == true)
         {
-            _ = _socket.EmitAsync(eventName, new[] { data });
+            // Serialize explicitly with camelCase so the library sends exactly
+            // what we expect — no ambiguity from params-array wrapping.
+            var json = JsonSerializer.Serialize(data, data.GetType(), _emitJsonOptions);
+            using var doc = JsonDocument.Parse(json);
+            _ = _socket.EmitAsync(eventName, doc.RootElement);
         }
     }
 
