@@ -256,7 +256,9 @@ public class ConfigManager
                 Name = req.Name,
                 FtpHost = req.FtpHost,
                 FtpPath = req.FtpPath,
-                FtpPollInterval = req.FtpPollInterval
+                FtpPollInterval = req.FtpPollInterval,
+                Username = req.Username,
+                Password = req.Password
             };
             _config.FtpServers.Add(server);
             SaveConfig(_config);
@@ -276,6 +278,8 @@ public class ConfigManager
             if (req.FtpHost != null) server.FtpHost = req.FtpHost;
             if (req.FtpPath != null) server.FtpPath = req.FtpPath;
             if (req.FtpPollInterval.HasValue) server.FtpPollInterval = req.FtpPollInterval.Value;
+            if (req.Username != null) server.Username = req.Username;
+            if (req.Password != null) server.Password = req.Password;
 
             SaveConfig(_config);
             _logger.Log($"[ConfigManager] Updated FTP server {id}: {server.FtpHost}");

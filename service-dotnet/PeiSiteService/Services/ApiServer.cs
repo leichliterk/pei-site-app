@@ -114,7 +114,7 @@ public static class ApiServer
         {
             if (string.IsNullOrEmpty(req.Host))
                 return Results.BadRequest(new { success = false, message = "host is required" });
-            var result = await mgr.TestConnectionAsync(req.Host, req.Path ?? "/");
+            var result = await mgr.TestConnectionAsync(req.Host, req.Path ?? "/", req.Username, req.Password);
             return Results.Ok(result);
         });
 
@@ -123,7 +123,7 @@ public static class ApiServer
         {
             if (string.IsNullOrEmpty(req.Host))
                 return Results.BadRequest(new { success = false, message = "host is required" });
-            var result = await mgr.BrowseDirectoryAsync(req.Host, req.Path);
+            var result = await mgr.BrowseDirectoryAsync(req.Host, req.Path, req.Username, req.Password);
             return Results.Ok(result);
         });
     }

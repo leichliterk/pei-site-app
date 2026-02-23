@@ -33,6 +33,7 @@ public class FtpServerStatusResponse
     public string Name { get; set; } = "";
     public string Host { get; set; } = "";
     public string Path { get; set; } = "";
+    public string Username { get; set; } = "";
     public int PollInterval { get; set; }
     public string? LastPoll { get; set; }
     public string LastResult { get; set; } = "";
@@ -47,6 +48,7 @@ public class FtpServerResponse
     public string FtpHost { get; set; } = "";
     public string FtpPath { get; set; } = "/";
     public int FtpPollInterval { get; set; }
+    public string Username { get; set; } = "";
 }
 
 public class FtpBrowseResponse

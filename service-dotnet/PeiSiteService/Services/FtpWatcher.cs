@@ -60,6 +60,7 @@ public class FtpWatcher
                 Name = _serverConfig.Name,
                 Host = _serverConfig.FtpHost,
                 Path = _serverConfig.FtpPath,
+                Username = _serverConfig.Username,
                 PollInterval = _serverConfig.FtpPollInterval,
                 LastPoll = _state.LastPoll,
                 LastResult = _lastResult,
@@ -209,8 +210,10 @@ public class FtpWatcher
 
             await reader.ReadLineAsync(); // banner
 
-            await SendFtpCommandAsync(writer, reader, "USER anonymous", "USER");
-            var resp = await SendFtpCommandAsync(writer, reader, "PASS anonymous@", "PASS");
+            var username = string.IsNullOrEmpty(_serverConfig.Username) ? "anonymous" : _serverConfig.Username;
+            var password = string.IsNullOrEmpty(_serverConfig.Password) ? "anonymous@" : _serverConfig.Password;
+            await SendFtpCommandAsync(writer, reader, $"USER {username}", "USER");
+            var resp = await SendFtpCommandAsync(writer, reader, $"PASS {password}", "PASS");
             if (resp == null || !resp.StartsWith("230"))
             {
                 control.Dispose();

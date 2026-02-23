@@ -125,12 +125,12 @@ public class FtpWatcherManager
         }
     }
 
-    public async Task<FtpTestResult> TestConnectionAsync(string host, string path)
+    public async Task<FtpTestResult> TestConnectionAsync(string host, string path, string username = "", string password = "")
     {
         await PauseWatchersForHostAsync(host);
         try
         {
-            var tempConfig = new FtpServerConfig { FtpHost = host, FtpPath = path };
+            var tempConfig = new FtpServerConfig { FtpHost = host, FtpPath = path, Username = username, Password = password };
             var tempWatcher = new FtpWatcher(tempConfig, _wsClient, _pendingQueue, _siteId, _tenantId, _logger);
             return await tempWatcher.TestConnectionAsync(host, path);
         }
@@ -140,12 +140,12 @@ public class FtpWatcherManager
         }
     }
 
-    public async Task<FtpBrowseResult> BrowseDirectoryAsync(string host, string path)
+    public async Task<FtpBrowseResult> BrowseDirectoryAsync(string host, string path, string username = "", string password = "")
     {
         await PauseWatchersForHostAsync(host);
         try
         {
-            var tempConfig = new FtpServerConfig { FtpHost = host, FtpPath = path };
+            var tempConfig = new FtpServerConfig { FtpHost = host, FtpPath = path, Username = username, Password = password };
             var tempWatcher = new FtpWatcher(tempConfig, _wsClient, _pendingQueue, _siteId, _tenantId, _logger);
             return await tempWatcher.ListDirectoriesAsync(host, path);
         }

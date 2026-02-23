@@ -87,6 +87,12 @@ public partial class SettingsViewModel : ObservableObject
     private int _dialogFtpIntervalMinutes = 15;
 
     [ObservableProperty]
+    private string _dialogUsername = "";
+
+    [ObservableProperty]
+    private string _dialogPassword = "";
+
+    [ObservableProperty]
     private string _dialogTestMessage = "";
 
     [ObservableProperty]
@@ -317,6 +323,8 @@ public partial class SettingsViewModel : ObservableObject
         DialogFtpHost = "";
         DialogFtpPath = "/";
         DialogFtpIntervalMinutes = 15;
+        DialogUsername = "";
+        DialogPassword = "";
         DialogTestMessage = "";
         DialogTestSuccess = null;
         ShowFtpServerDialog = true;
@@ -332,6 +340,8 @@ public partial class SettingsViewModel : ObservableObject
         DialogFtpPath = server.Path;
         DialogFtpIntervalMinutes = server.PollInterval / 60;
         if (DialogFtpIntervalMinutes < 1) DialogFtpIntervalMinutes = 1;
+        DialogUsername = server.Username;
+        DialogPassword = ""; // passwords are never returned from the service; leave blank to keep existing
         DialogTestMessage = "";
         DialogTestSuccess = null;
         ShowFtpServerDialog = true;
@@ -357,7 +367,7 @@ public partial class SettingsViewModel : ObservableObject
         DialogTestMessage = "Testing connection...";
         DialogTestSuccess = null;
 
-        var result = await _localService.FtpTestConnectionAsync(DialogFtpHost, DialogFtpPath);
+        var result = await _localService.FtpTestConnectionAsync(DialogFtpHost, DialogFtpPath, DialogUsername, DialogPassword);
         DialogTestMessage = result.Message;
         DialogTestSuccess = result.Success;
         IsDialogTesting = false;
@@ -378,7 +388,7 @@ public partial class SettingsViewModel : ObservableObject
 
         if (string.IsNullOrEmpty(EditingServerId))
         {
-            var result = await _localService.FtpAddServerAsync(DialogServerName, DialogFtpHost, DialogFtpPath, intervalSeconds);
+            var result = await _localService.FtpAddServerAsync(DialogServerName, DialogFtpHost, DialogFtpPath, intervalSeconds, DialogUsername, DialogPassword);
             if (result != null)
             {
                 ShowFtpServerDialog = false;
@@ -392,7 +402,7 @@ public partial class SettingsViewModel : ObservableObject
         }
         else
         {
-            var success = await _localService.FtpUpdateServerAsync(EditingServerId, DialogServerName, DialogFtpHost, DialogFtpPath, intervalSeconds);
+            var success = await _localService.FtpUpdateServerAsync(EditingServerId, DialogServerName, DialogFtpHost, DialogFtpPath, intervalSeconds, DialogUsername, DialogPassword);
             if (success)
             {
                 ShowFtpServerDialog = false;
@@ -450,7 +460,7 @@ public partial class SettingsViewModel : ObservableObject
         if (node.HasLoadedChildren) return;
 
         node.IsLoading = true;
-        var result = await _localService.FtpBrowseAsync(DialogFtpHost, node.FullPath);
+        var result = await _localService.FtpBrowseAsync(DialogFtpHost, node.FullPath, DialogUsername, DialogPassword);
         node.IsLoading = false;
 
         if (result.Success)
@@ -474,7 +484,7 @@ public partial class SettingsViewModel : ObservableObject
         IsBrowseLoading = true;
         BrowseErrorMessage = "";
 
-        var result = await _localService.FtpBrowseAsync(DialogFtpHost, path);
+        var result = await _localService.FtpBrowseAsync(DialogFtpHost, path, DialogUsername, DialogPassword);
         IsBrowseLoading = false;
 
         if (result.Success)
