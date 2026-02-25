@@ -59,6 +59,8 @@ public class SettingsManager
                         settings.SiteNumber = siteId.GetInt32();
                     if (config.TryGetValue("tenantId", out var tenantId) && tenantId.ValueKind == JsonValueKind.Number)
                         settings.TenantId = tenantId.GetInt32();
+                    if (config.TryGetValue("logLevel", out var logLevel) && logLevel.ValueKind == JsonValueKind.String)
+                        settings.LogLevel = logLevel.GetString()!;
                 }
             }
             catch { }
@@ -132,6 +134,12 @@ public class SettingsManager
         SaveServiceConfig();
     }
 
+    public void SaveLogLevel(string level)
+    {
+        _settings.LogLevel = level;
+        SaveServiceConfig();
+    }
+
     private void SaveUserSettings()
     {
         try
@@ -165,6 +173,7 @@ public class SettingsManager
             node.Remove("apiKey"); // never persist plaintext
             node["siteId"] = _settings.SiteNumber;
             node["tenantId"] = _settings.TenantId;
+            node["logLevel"] = _settings.LogLevel;
 
             File.WriteAllText(_configPath, node.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
         }

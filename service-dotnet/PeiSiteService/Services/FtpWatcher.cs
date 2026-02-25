@@ -79,20 +79,20 @@ public class FtpWatcher
     {
         if (string.IsNullOrEmpty(_serverConfig.FtpHost))
         {
-            _logger.Log($"[FtpWatcher:{Id}] Not starting - no host configured");
+            _logger.Log(ServiceLogLevel.Warning, $"[FtpWatcher:{Id}] Not starting - no host configured");
             return;
         }
 
         if (_pollTimer != null)
         {
-            _logger.Log($"[FtpWatcher:{Id}] Already running");
+            _logger.Log(ServiceLogLevel.Debug, $"[FtpWatcher:{Id}] Already running");
             return;
         }
 
         _wsClient.FtpFileAckReceived += OnFtpFileAck;
         _wsClient.StatusChanged += OnWsStatusChanged;
 
-        _logger.Log($"[FtpWatcher:{Id}] Starting - host: {_serverConfig.FtpHost}, path: {_serverConfig.FtpPath}, interval: {_serverConfig.FtpPollInterval}s");
+        _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] Starting - host: {_serverConfig.FtpHost}, path: {_serverConfig.FtpPath}, interval: {_serverConfig.FtpPollInterval}s");
 
         _ = PollAsync();
         _pollTimer = new Timer(_ => _ = PollAsync(), null,
@@ -108,7 +108,7 @@ public class FtpWatcher
             _pollTimer = null;
             _wsClient.FtpFileAckReceived -= OnFtpFileAck;
             _wsClient.StatusChanged -= OnWsStatusChanged;
-            _logger.Log($"[FtpWatcher:{Id}] Stopped");
+            _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] Stopped");
         }
     }
 
@@ -134,7 +134,7 @@ public class FtpWatcher
     {
         await writer.WriteLineAsync(command);
         var resp = await reader.ReadLineAsync();
-        _logger.Log($"[RawFTP:{Id}] {label}: {resp}");
+        _logger.Log(ServiceLogLevel.Debug, $"[RawFTP:{Id}] {label}: {resp}");
         return resp;
     }
 
@@ -170,7 +170,7 @@ public class FtpWatcher
             var completed = await Task.WhenAny(acceptTask, Task.Delay(30000));
             if (completed != acceptTask)
             {
-                _logger.Log($"[RawFTP:{Id}] Timeout waiting for data connection ({label})");
+                _logger.Log(ServiceLogLevel.Warning, $"[RawFTP:{Id}] Timeout waiting for data connection ({label})");
                 return null;
             }
 
@@ -182,7 +182,7 @@ public class FtpWatcher
             await dataStream.CopyToAsync(ms);
 
             resp = await reader.ReadLineAsync();
-            _logger.Log($"[RawFTP:{Id}] {label} transfer: {resp}");
+            _logger.Log(ServiceLogLevel.Debug, $"[RawFTP:{Id}] {label} transfer: {resp}");
 
             return ms.ToArray();
         }
@@ -247,14 +247,14 @@ public class FtpWatcher
     {
         if (Interlocked.CompareExchange(ref _isPolling, 1, 0) != 0)
         {
-            _logger.Log($"[FtpWatcher:{Id}] Poll already in progress, skipping");
+            _logger.Log(ServiceLogLevel.Debug, $"[FtpWatcher:{Id}] Poll already in progress, skipping");
             return;
         }
 
         TcpClient? control = null;
         try
         {
-            _logger.Log($"[FtpWatcher:{Id}] Connecting to {_serverConfig.FtpHost}...");
+            _logger.Log(ServiceLogLevel.Debug, $"[FtpWatcher:{Id}] Connecting to {_serverConfig.FtpHost}...");
             var conn = await ConnectAndLoginAsync(_serverConfig.FtpHost, _serverConfig.FtpPath);
             if (conn == null)
             {
@@ -282,7 +282,7 @@ public class FtpWatcher
                 .Where(f => f != null)
                 .Select(f => f!)
                 .ToArray();
-            _logger.Log($"[FtpWatcher:{Id}] NLST returned {rawLines.Length} lines, {fileNames.Length} files parsed");
+            _logger.Log(ServiceLogLevel.Debug, $"[FtpWatcher:{Id}] NLST returned {rawLines.Length} lines, {fileNames.Length} files parsed");
             int newOrChanged = 0;
 
             // Switch to binary mode for file transfers (forensic byte-for-byte fidelity)
@@ -310,7 +310,7 @@ public class FtpWatcher
 
                 if (!isNew && !isChanged) continue;
 
-                _logger.Log($"[FtpWatcher:{Id}] {(isNew ? "New" : "Updated")} file: {fileName} " +
+                _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] {(isNew ? "New" : "Updated")} file: {fileName} " +
                             $"(remote={remoteSize} bytes, stored={existing?.Size.ToString() ?? "n/a"})");
                 try
                 {
@@ -332,7 +332,7 @@ public class FtpWatcher
                 }
                 catch (Exception ex)
                 {
-                    _logger.Log($"[FtpWatcher:{Id}] Error downloading {fileName}: {ex.Message}");
+                    _logger.Log(ServiceLogLevel.Error, $"[FtpWatcher:{Id}] Error downloading {fileName}: {ex.Message}");
                 }
             }
 
@@ -340,14 +340,14 @@ public class FtpWatcher
             SaveState();
 
             _lastResult = $"OK - {fileNames.Length} files listed, {newOrChanged} new/updated forwarded";
-            _logger.Log($"[FtpWatcher:{Id}] Poll complete: {_lastResult}");
+            _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] Poll complete: {_lastResult}");
 
             await writer.WriteLineAsync("QUIT");
         }
         catch (Exception ex)
         {
             _lastResult = $"Error: {ex.Message}";
-            _logger.Log($"[FtpWatcher:{Id}] Poll failed: {_lastResult}");
+            _logger.Log(ServiceLogLevel.Error, $"[FtpWatcher:{Id}] Poll failed: {_lastResult}");
         }
         finally
         {
@@ -358,7 +358,7 @@ public class FtpWatcher
 
     public async Task<FtpTestResult> TestConnectionAsync(string host, string remotePath)
     {
-        _logger.Log($"[FtpWatcher] Testing connection (raw TCP) to {host}{remotePath}...");
+        _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher] Testing connection (raw TCP) to {host}{remotePath}...");
 
         TcpClient? control = null;
         try
@@ -377,7 +377,7 @@ public class FtpWatcher
                 return new FtpTestResult { Success = false, Message = "Could not retrieve file listing (data connection failed)" };
 
             var fileNames = nlstData.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-            _logger.Log($"[RawFTP] Parsed {fileNames.Length} file names");
+            _logger.Log(ServiceLogLevel.Debug, $"[RawFTP] Parsed {fileNames.Length} file names");
 
             await writer.WriteLineAsync("QUIT");
 
@@ -390,7 +390,7 @@ public class FtpWatcher
         }
         catch (Exception ex)
         {
-            _logger.Log($"[RawFTP] Test failed: {ex.Message}");
+            _logger.Log(ServiceLogLevel.Error, $"[RawFTP] Test failed: {ex.Message}");
             return new FtpTestResult { Success = false, Message = ex.Message };
         }
         finally
@@ -405,7 +405,7 @@ public class FtpWatcher
     /// </summary>
     public async Task<FtpBrowseResult> ListDirectoriesAsync(string host, string path)
     {
-        _logger.Log($"[FtpWatcher] Browsing directories at {host}{path}...");
+        _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher] Browsing directories at {host}{path}...");
 
         TcpClient? control = null;
         try
@@ -460,7 +460,7 @@ public class FtpWatcher
 
             await writer.WriteLineAsync("QUIT");
 
-            _logger.Log($"[FtpWatcher] Found {dirs.Count} directories at {path}");
+            _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher] Found {dirs.Count} directories at {path}");
             return new FtpBrowseResult
             {
                 Success = true,
@@ -470,7 +470,7 @@ public class FtpWatcher
         }
         catch (Exception ex)
         {
-            _logger.Log($"[FtpWatcher] Browse failed: {ex.Message}");
+            _logger.Log(ServiceLogLevel.Error, $"[FtpWatcher] Browse failed: {ex.Message}");
             return new FtpBrowseResult { Success = false, Message = ex.Message };
         }
         finally
@@ -506,17 +506,17 @@ public class FtpWatcher
 
         // Save to pending queue FIRST (guarantees no data loss)
         _pendingQueue.Enqueue(entry);
-        _logger.Log($"[FtpWatcher:{Id}] Queued: {filename} ({content.Length} bytes, SHA256: {sha256Hash[..12]}...)");
+        _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] Queued: {filename} ({content.Length} bytes, SHA256: {sha256Hash[..12]}...)");
 
         // Attempt immediate send if WebSocket is connected; removal happens on ack
         if (_wsClient.Status == ConnectionStatus.connected)
         {
             _wsClient.EmitToServer("ftp:file", CreatePayloadFromEntry(entry));
-            _logger.Log($"[FtpWatcher:{Id}] Sent, awaiting ack: {filename}");
+            _logger.Log(ServiceLogLevel.Debug, $"[FtpWatcher:{Id}] Sent, awaiting ack: {filename}");
         }
         else
         {
-            _logger.Log($"[FtpWatcher:{Id}] WebSocket disconnected, file queued for later: {filename}");
+            _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] WebSocket disconnected, file queued for later: {filename}");
         }
 
         Interlocked.Increment(ref _filesForwarded);
@@ -581,11 +581,11 @@ public class FtpWatcher
         if (ack.Success)
         {
             _pendingQueue.Remove(match.PendingFileId);
-            _logger.Log($"[FtpWatcher:{Id}] ACK success: {ack.Filename} (server file_id={ack.FileId})");
+            _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] ACK success: {ack.Filename} (server file_id={ack.FileId})");
         }
         else
         {
-            _logger.Log($"[FtpWatcher:{Id}] ACK failure: {ack.Filename} - {ack.Error}. Clearing for re-poll.");
+            _logger.Log(ServiceLogLevel.Warning, $"[FtpWatcher:{Id}] ACK failure: {ack.Filename} - {ack.Error}. Clearing for re-poll.");
             // Remove from pending queue so we don't retry the stale queued data
             _pendingQueue.Remove(match.PendingFileId);
             // Remove from FTP state so the next poll cycle re-downloads and re-transmits fresh
@@ -605,7 +605,7 @@ public class FtpWatcher
     {
         if (status == ConnectionStatus.connected)
         {
-            _logger.Log($"[FtpWatcher:{Id}] WebSocket reconnected, starting sequential flush");
+            _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] WebSocket reconnected, starting sequential flush");
             _ = Task.Run(FlushNextPending);
         }
     }
@@ -627,7 +627,7 @@ public class FtpWatcher
         if (next == null) return;
 
         _wsClient.EmitToServer("ftp:file", CreatePayloadFromEntry(next));
-        _logger.Log($"[FtpWatcher:{Id}] Flush: sent {next.Filename}, awaiting ack");
+        _logger.Log(ServiceLogLevel.Debug, $"[FtpWatcher:{Id}] Flush: sent {next.Filename}, awaiting ack");
     }
 
     private void LoadState()
@@ -641,13 +641,13 @@ public class FtpWatcher
                 if (state != null)
                 {
                     _state = state;
-                    _logger.Log($"[FtpWatcher:{Id}] Loaded state: {_state.Files.Count} tracked files");
+                    _logger.Log(ServiceLogLevel.Debug, $"[FtpWatcher:{Id}] Loaded state: {_state.Files.Count} tracked files");
                 }
             }
         }
         catch (Exception ex)
         {
-            _logger.Log($"[FtpWatcher:{Id}] Could not load state: {ex.Message}");
+            _logger.Log(ServiceLogLevel.Error, $"[FtpWatcher:{Id}] Could not load state: {ex.Message}");
             _state = new FtpState();
         }
     }
@@ -662,7 +662,7 @@ public class FtpWatcher
         }
         catch (Exception ex)
         {
-            _logger.Log($"[FtpWatcher:{Id}] Could not save state: {ex.Message}");
+            _logger.Log(ServiceLogLevel.Error, $"[FtpWatcher:{Id}] Could not save state: {ex.Message}");
         }
     }
 }

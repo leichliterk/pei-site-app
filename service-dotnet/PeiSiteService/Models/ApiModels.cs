@@ -46,6 +46,11 @@ public class FtpEnabledRequest
     public bool Enabled { get; set; }
 }
 
+public class LogLevelRequest
+{
+    public ServiceLogLevel Level { get; set; } = ServiceLogLevel.Info;
+}
+
 public class FtpTestRequest
 {
     public string Host { get; set; } = "";

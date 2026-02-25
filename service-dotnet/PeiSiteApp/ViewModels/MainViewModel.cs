@@ -24,6 +24,8 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string _windowTitle = "PEI Site App";
 
+    public string Version { get; }
+
     private HomeViewModel? _homeViewModel;
     private SettingsViewModel? _settingsViewModel;
 
@@ -44,6 +46,7 @@ public partial class MainViewModel : ObservableObject
         SiteNumber = settings.SiteNumber.ToString();
         SiteName = settings.SiteName;
         WindowTitle = settings.AppName;
+        Version = $"v{settings.Version}";
     }
 
     public async Task InitializeAsync()

@@ -253,6 +253,16 @@ public class LocalServiceClient : IDisposable
         }
     }
 
+    public async Task<bool> SetLogLevelAsync(string level)
+    {
+        try
+        {
+            var response = await _http.PutAsJsonAsync("/log-level", new { level });
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
     public void Dispose()
     {
         StopPolling();

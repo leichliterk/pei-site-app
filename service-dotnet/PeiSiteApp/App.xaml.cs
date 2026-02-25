@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+using System.Threading;
 using System.Windows;
 using Hardcodet.Wpf.TaskbarNotification;
 using PeiSiteApp.Services;
@@ -8,13 +10,52 @@ namespace PeiSiteApp;
 
 public partial class App : Application
 {
+    // Single-instance enforcement via named mutex + broadcast window message
+    private static Mutex? _singleInstanceMutex;
+    private bool _ownsMutex;
+    public static readonly int WmShowApp =
+        RegisterWindowMessage("PeiSiteApp_ShowWindow_9F3D2A1B");
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern int RegisterWindowMessage(string message);
+
+    [DllImport("user32.dll")]
+    private static extern bool PostMessage(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam);
+
+    private static readonly IntPtr HwndBroadcast = new(0xFFFF);
+
     private TaskbarIcon? _trayIcon;
     private MainWindow? _mainWindow;
     private MainViewModel? _mainViewModel;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
+        _singleInstanceMutex = new Mutex(false, "PeiSiteApp_SingleInstance_9F3D2A1B");
+        bool isNewInstance;
+        try { isNewInstance = _singleInstanceMutex.WaitOne(0); }
+        catch (AbandonedMutexException) { isNewInstance = true; } // previous owner crashed; we can proceed
+        if (!isNewInstance)
+        {
+            // Signal the running instance to restore itself, then exit
+            PostMessage(HwndBroadcast, WmShowApp, IntPtr.Zero, IntPtr.Zero);
+            _singleInstanceMutex.Dispose();
+            _singleInstanceMutex = null;
+            Shutdown();
+            return;
+        }
+        _ownsMutex = true;
+
         base.OnStartup(e);
+
+        // Catch any startup crash so it's visible instead of silently disappearing
+        DispatcherUnhandledException += (s, ex) =>
+        {
+            System.Windows.MessageBox.Show(
+                $"Startup error:\n\n{ex.Exception.GetType().Name}: {ex.Exception.Message}\n\n{ex.Exception.StackTrace}",
+                "PEI Site App – Startup Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            ex.Handled = true;
+            Shutdown(1);
+        };
 
         // Initialize services
         var settingsManager = new SettingsManager();
@@ -95,6 +136,9 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         _trayIcon?.Dispose();
+        if (_ownsMutex)
+            _singleInstanceMutex?.ReleaseMutex();
+        _singleInstanceMutex?.Dispose();
         base.OnExit(e);
     }
 }

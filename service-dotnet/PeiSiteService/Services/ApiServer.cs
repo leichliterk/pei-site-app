@@ -60,6 +60,20 @@ public static class ApiServer
             return new { success = true };
         });
 
+        // PUT /log-level
+        app.MapPut("/log-level", (LogLevelRequest req, FileLogger logger, ConfigManager cfg) =>
+        {
+            logger.MinLevel = req.Level;
+            cfg.SetLogLevel(req.Level);
+            return new { success = true, level = req.Level.ToString().ToLowerInvariant() };
+        });
+
+        // GET /log-level
+        app.MapGet("/log-level", (FileLogger logger) => new
+        {
+            level = logger.MinLevel.ToString().ToLowerInvariant()
+        });
+
         // POST /prepopulate-history
         app.MapPost("/prepopulate-history", (PrepopulateRequest req, WebSocketClient ws) =>
         {

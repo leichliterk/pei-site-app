@@ -26,7 +26,7 @@ public class PendingFileQueue
         }
         catch (Exception ex)
         {
-            _logger.Log($"[PendingFileQueue] Could not create pending directory: {ex.Message}");
+            _logger.Log(ServiceLogLevel.Error, $"[PendingFileQueue] Could not create pending directory: {ex.Message}");
         }
     }
 
@@ -50,7 +50,7 @@ public class PendingFileQueue
             }
             catch (Exception ex)
             {
-                _logger.Log($"[PendingFileQueue] Error enqueuing {entry.Filename}: {ex.Message}");
+                _logger.Log(ServiceLogLevel.Error, $"[PendingFileQueue] Error enqueuing {entry.Filename}: {ex.Message}");
             }
         }
     }
@@ -75,14 +75,14 @@ public class PendingFileQueue
                     }
                     catch (Exception ex)
                     {
-                        _logger.Log($"[PendingFileQueue] Corrupted pending file {Path.GetFileName(file)}, removing: {ex.Message}");
+                        _logger.Log(ServiceLogLevel.Warning, $"[PendingFileQueue] Corrupted pending file {Path.GetFileName(file)}, removing: {ex.Message}");
                         try { File.Delete(file); } catch { }
                     }
                 }
             }
             catch (Exception ex)
             {
-                _logger.Log($"[PendingFileQueue] Error reading pending directory: {ex.Message}");
+                _logger.Log(ServiceLogLevel.Error, $"[PendingFileQueue] Error reading pending directory: {ex.Message}");
             }
             return entries;
         }
@@ -100,7 +100,7 @@ public class PendingFileQueue
             }
             catch (Exception ex)
             {
-                _logger.Log($"[PendingFileQueue] Error removing {pendingFileId}: {ex.Message}");
+                _logger.Log(ServiceLogLevel.Error, $"[PendingFileQueue] Error removing {pendingFileId}: {ex.Message}");
             }
         }
     }

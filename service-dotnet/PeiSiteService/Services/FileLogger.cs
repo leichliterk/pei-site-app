@@ -1,3 +1,5 @@
+using PeiSiteService.Models;
+
 namespace PeiSiteService.Services;
 
 public class FileLogger
@@ -7,6 +9,10 @@ public class FileLogger
     private DateTime _lastPruneDate = DateTime.MinValue;
     private const int KeepDays = 30;
 
+    public ServiceLogLevel MinLevel { get; set; } = ServiceLogLevel.Info;
+
+    private static readonly string[] LevelLabels = { "DEBUG", "INFO ", "WARN ", "ERROR", "CRIT " };
+
     public FileLogger()
     {
         var programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
@@ -14,10 +20,15 @@ public class FileLogger
         try { Directory.CreateDirectory(_logDir); } catch { }
     }
 
-    public void Log(string message)
+    public void Log(string message) => Log(ServiceLogLevel.Info, message);
+
+    public void Log(ServiceLogLevel level, string message)
     {
+        if (level < MinLevel) return;
+
         var now = DateTime.UtcNow;
-        var logMessage = $"[{now:yyyy-MM-ddTHH:mm:ss.fffZ}] {message}";
+        var label = LevelLabels[(int)level];
+        var logMessage = $"[{now:yyyy-MM-ddTHH:mm:ss.fffZ}] [{label}] {message}";
         Console.WriteLine(logMessage);
         lock (_lock)
         {

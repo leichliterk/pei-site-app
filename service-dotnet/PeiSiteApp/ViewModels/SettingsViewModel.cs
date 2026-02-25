@@ -129,6 +129,16 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _deletingServerHost = "";
 
+    // Logging tab
+    [ObservableProperty]
+    private string _selectedLogLevel = "info";
+
+    public static IReadOnlyList<string> LogLevels { get; } =
+        new[] { "debug", "info", "warning", "error", "critical" };
+
+    public bool IsFtpDialogSaveEnabled =>
+        !string.IsNullOrWhiteSpace(DialogServerName) && !string.IsNullOrWhiteSpace(DialogFtpHost);
+
     public bool IsFormValid
     {
         get
@@ -162,6 +172,7 @@ public partial class SettingsViewModel : ObservableObject
         SiteName = settings.SiteName;
         TenantId = settings.TenantId.ToString();
         SiteNumber = settings.SiteNumber;
+        SelectedLogLevel = settings.LogLevel;
 
         _ = LoadFtpServersAsync();
     }
@@ -536,8 +547,19 @@ public partial class SettingsViewModel : ObservableObject
             await LoadFtpServersAsync();
     }
 
+    // --- Logging tab commands ---
+
+    [RelayCommand]
+    private async Task SaveLogLevelAsync()
+    {
+        _settingsManager.SaveLogLevel(SelectedLogLevel);
+        await _localService.SetLogLevelAsync(SelectedLogLevel);
+    }
+
     partial void OnConfirmationPhraseChanged(string value) => OnPropertyChanged(nameof(IsFormValid));
     partial void OnNewSiteNumberInputChanged(string value) => OnPropertyChanged(nameof(IsFormValid));
     partial void OnTenantConfirmationPhraseChanged(string value) => OnPropertyChanged(nameof(IsTenantFormValid));
     partial void OnNewTenantIdInputChanged(string value) => OnPropertyChanged(nameof(IsTenantFormValid));
+    partial void OnDialogServerNameChanged(string value) => OnPropertyChanged(nameof(IsFtpDialogSaveEnabled));
+    partial void OnDialogFtpHostChanged(string value) => OnPropertyChanged(nameof(IsFtpDialogSaveEnabled));
 }

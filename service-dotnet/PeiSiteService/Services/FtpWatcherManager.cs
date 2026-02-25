@@ -36,14 +36,14 @@ public class FtpWatcherManager
             }
         }
 
-        _logger.Log($"[FtpWatcherManager] Initialized with {ftpConfig.Servers.Count} servers, enabled={_enabled}");
+        _logger.Log(ServiceLogLevel.Info, $"[FtpWatcherManager] Initialized with {ftpConfig.Servers.Count} servers, enabled={_enabled}");
     }
 
     public void StartAll()
     {
         if (!_enabled)
         {
-            _logger.Log("[FtpWatcherManager] FTP is disabled, not starting watchers");
+            _logger.Log(ServiceLogLevel.Info, "[FtpWatcherManager] FTP is disabled, not starting watchers");
             return;
         }
 
@@ -79,7 +79,7 @@ public class FtpWatcherManager
             var watcher = new FtpWatcher(server, _wsClient, _pendingQueue, _siteId, _tenantId, _logger);
             _watchers[server.Id] = watcher;
             if (_enabled) watcher.Start();
-            _logger.Log($"[FtpWatcherManager] Added server {server.Id}: {server.FtpHost}");
+            _logger.Log(ServiceLogLevel.Info, $"[FtpWatcherManager] Added server {server.Id}: {server.FtpHost}");
             return server;
         }
     }
@@ -94,7 +94,7 @@ public class FtpWatcherManager
             watcher.Stop();
             watcher.UpdateConfig(updated);
             if (_enabled) watcher.Start();
-            _logger.Log($"[FtpWatcherManager] Updated server {updated.Id}: {updated.FtpHost}");
+            _logger.Log(ServiceLogLevel.Info, $"[FtpWatcherManager] Updated server {updated.Id}: {updated.FtpHost}");
             return true;
         }
     }
@@ -108,7 +108,7 @@ public class FtpWatcherManager
 
             watcher.Stop();
             _watchers.Remove(id);
-            _logger.Log($"[FtpWatcherManager] Removed server {id}");
+            _logger.Log(ServiceLogLevel.Info, $"[FtpWatcherManager] Removed server {id}");
             return true;
         }
     }
@@ -172,7 +172,7 @@ public class FtpWatcherManager
         foreach (var watcher in matchingWatchers)
         {
             watcher.Stop(); // Stop the timer so no new polls start
-            _logger.Log($"[FtpWatcherManager] Paused watcher {watcher.Id} for host {host}");
+            _logger.Log(ServiceLogLevel.Debug, $"[FtpWatcherManager] Paused watcher {watcher.Id} for host {host}");
         }
 
         // Wait for any in-progress polls to finish (up to 60 seconds)
@@ -184,7 +184,7 @@ public class FtpWatcherManager
 
         if (matchingWatchers.Any(w => w.IsCurrentlyPolling))
         {
-            _logger.Log($"[FtpWatcherManager] Warning: watcher for {host} still polling after timeout");
+            _logger.Log(ServiceLogLevel.Warning, $"[FtpWatcherManager] Watcher for {host} still polling after timeout");
         }
     }
 
@@ -201,7 +201,7 @@ public class FtpWatcherManager
                 .Where(w => w.Host.Equals(host, StringComparison.OrdinalIgnoreCase)))
             {
                 watcher.Start();
-                _logger.Log($"[FtpWatcherManager] Resumed watcher {watcher.Id} for host {host}");
+                _logger.Log(ServiceLogLevel.Debug, $"[FtpWatcherManager] Resumed watcher {watcher.Id} for host {host}");
             }
         }
     }
