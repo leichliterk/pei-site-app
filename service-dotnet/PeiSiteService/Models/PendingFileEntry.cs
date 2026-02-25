@@ -12,6 +12,6 @@ public class PendingFileEntry
     public string Source { get; set; } = "";
     public int SiteId { get; set; }
     public int TenantId { get; set; }
-    public string Timestamp { get; set; } = "";
+    public string ModifiedAt { get; set; } = "";  // FTP server's MDTM timestamp (YYYYMMDDHHmmss), or local time if server doesn't support MDTM
     public string QueuedAt { get; set; } = "";
 }

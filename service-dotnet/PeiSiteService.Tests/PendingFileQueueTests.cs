@@ -34,7 +34,7 @@ public class PendingFileQueueTests : IDisposable
         Source = "Test Server",
         SiteId = 1,
         TenantId = 2,
-        Timestamp = "2026-01-01T00:00:00.000Z",
+        ModifiedAt = "20260101000000",
         QueuedAt = "2026-01-01T00:00:00.000Z"
     };
 
@@ -88,7 +88,7 @@ public class PendingFileQueueTests : IDisposable
             Source = "Plant Floor FTP",
             SiteId = 1978,
             TenantId = 1001,
-            Timestamp = "2026-02-22T12:34:56.789Z",
+            ModifiedAt = "20260222123456",
             QueuedAt = "2026-02-22T12:34:57.000Z"
         };
 
@@ -105,7 +105,7 @@ public class PendingFileQueueTests : IDisposable
         Assert.Equal(entry.Source, loaded.Source);
         Assert.Equal(entry.SiteId, loaded.SiteId);
         Assert.Equal(entry.TenantId, loaded.TenantId);
-        Assert.Equal(entry.Timestamp, loaded.Timestamp);
+        Assert.Equal(entry.ModifiedAt, loaded.ModifiedAt);
         Assert.Equal(entry.QueuedAt, loaded.QueuedAt);
     }
 

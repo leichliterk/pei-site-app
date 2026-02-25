@@ -64,6 +64,30 @@ public class ParseNlstLineTests
         => Assert.Equal(expected, FtpWatcher.ParseNlstLine(input));
 }
 
+// ── ParseMdtmTimestamp ────────────────────────────────────────────────────────
+
+public class ParseMdtmTimestampTests
+{
+    [Theory]
+    [InlineData("213 20260115103045", "20260115103045")]
+    [InlineData("213 19991231235959", "19991231235959")]
+    [InlineData("213  20260115103045 ", "20260115103045")]   // extra whitespace
+    public void ValidResponse_ReturnsTimestamp(string input, string expected)
+        => Assert.Equal(expected, FtpWatcher.ParseMdtmTimestamp(input));
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("500 Unknown command")]           // not supported
+    [InlineData("550 No such file")]              // file not found
+    [InlineData("213 2026011510304")]             // 13 digits (too short)
+    [InlineData("213 202601151030456")]           // 15 digits (too long)
+    [InlineData("213 2026011510304X")]            // non-digit character
+    [InlineData("214 20260115103045")]            // wrong code
+    public void InvalidOrUnsupported_ReturnsNull(string? input)
+        => Assert.Null(FtpWatcher.ParseMdtmTimestamp(input));
+}
+
 // ── CreatePayloadFromEntry ────────────────────────────────────────────────────
 
 public class CreatePayloadFromEntryTests
@@ -83,7 +107,7 @@ public class CreatePayloadFromEntryTests
             Source = "Plant Floor FTP",
             SiteId = 1978,
             TenantId = 1001,
-            Timestamp = "2026-02-22T00:00:00.000Z",
+            ModifiedAt = "20260222120000",
             QueuedAt = "2026-02-22T00:00:00.000Z"
         };
 
@@ -100,7 +124,7 @@ public class CreatePayloadFromEntryTests
         Assert.Equal("Plant Floor FTP", root.GetProperty("source").GetString());
         Assert.Equal(1978, root.GetProperty("siteId").GetInt32());
         Assert.Equal(1001, root.GetProperty("tenantId").GetInt32());
-        Assert.Equal("2026-02-22T00:00:00.000Z", root.GetProperty("timestamp").GetString());
+        Assert.Equal("20260222120000", root.GetProperty("modifiedAt").GetString());
     }
 
     [Fact]
@@ -113,7 +137,7 @@ public class CreatePayloadFromEntryTests
             Filename = "test.txt",
             ContentBase64 = "",
             Sha256 = "",
-            Timestamp = "2026-02-22T00:00:00.000Z",
+            ModifiedAt = "20260222120000",
             QueuedAt = "2026-02-22T00:00:00.000Z"
         };
 
@@ -139,7 +163,7 @@ public class CreatePayloadFromEntryTests
             Filename = "data.txt",
             ContentBase64 = "",
             Sha256 = "",
-            Timestamp = "2026-02-22T00:00:00.000Z",
+            ModifiedAt = "20260222120000",
             QueuedAt = "2026-02-22T00:00:00.000Z"
         };
 

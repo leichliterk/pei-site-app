@@ -298,26 +298,39 @@ public class FtpWatcher
                 FtpFileState? existing;
                 lock (_stateLock) { _state.Files.TryGetValue(fileName, out existing); }
 
-                // Use SIZE to detect new files and updates to existing files
-                var sizeResp = await SendFtpCommandAsync(writer, reader, $"SIZE {fileName}", $"SIZE {fileName}");
+                // Use MDTM to get the server's last-modified timestamp for change detection.
+                // Falls back to SIZE if the server doesn't support MDTM.
+                var mdtmResp = await SendFtpCommandAsync(writer, reader, $"MDTM {fileName}", $"MDTM {fileName}");
+                var remoteModifiedAt = ParseMdtmTimestamp(mdtmResp);
+
                 long remoteSize = -1;
-                if (sizeResp != null && sizeResp.StartsWith("213") &&
-                    long.TryParse(sizeResp[4..].Trim(), out var parsedSize))
-                    remoteSize = parsedSize;
+                if (remoteModifiedAt == null)
+                {
+                    var sizeResp = await SendFtpCommandAsync(writer, reader, $"SIZE {fileName}", $"SIZE {fileName}");
+                    if (sizeResp != null && sizeResp.StartsWith("213") &&
+                        long.TryParse(sizeResp[4..].Trim(), out var parsedSize))
+                        remoteSize = parsedSize;
+                }
 
                 bool isNew = existing == null;
-                bool isChanged = existing != null && remoteSize >= 0 && remoteSize != existing.Size;
+                bool isChanged = existing != null && (
+                    remoteModifiedAt != null
+                        ? remoteModifiedAt != existing.ModifiedAt
+                        : remoteSize >= 0 && remoteSize != existing.Size);
 
                 if (!isNew && !isChanged) continue;
 
-                _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] {(isNew ? "New" : "Updated")} file: {fileName} " +
-                            $"(remote={remoteSize} bytes, stored={existing?.Size.ToString() ?? "n/a"})");
+                var changeDetail = remoteModifiedAt != null
+                    ? $"modified={remoteModifiedAt}, stored={existing?.ModifiedAt ?? "n/a"}"
+                    : $"remote={remoteSize} bytes, stored={existing?.Size.ToString() ?? "n/a"}";
+                _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] {(isNew ? "New" : "Updated")} file: {fileName} ({changeDetail})");
                 try
                 {
                     var fileBytes = await FtpActiveDataTransferBytesAsync(writer, reader, localIp, $"RETR {fileName}", $"RETR {fileName}");
                     if (fileBytes != null)
                     {
-                        ForwardFile(fileName, fileBytes);
+                        var storedModifiedAt = remoteModifiedAt ?? DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+                        ForwardFile(fileName, fileBytes, storedModifiedAt);
                         newOrChanged++;
                         lock (_stateLock)
                         {
@@ -325,7 +338,7 @@ public class FtpWatcher
                             {
                                 Name = fileName,
                                 Size = fileBytes.Length,
-                                ModifiedAt = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+                                ModifiedAt = storedModifiedAt
                             };
                         }
                     }
@@ -479,7 +492,7 @@ public class FtpWatcher
         }
     }
 
-    private void ForwardFile(string filename, byte[] content)
+    private void ForwardFile(string filename, byte[] content, string modifiedAt)
     {
         // Compute SHA-256 hash for integrity verification
         string sha256Hash;
@@ -500,7 +513,7 @@ public class FtpWatcher
             Source = string.IsNullOrEmpty(_serverConfig.Name) ? _serverConfig.FtpHost : _serverConfig.Name,
             SiteId = _siteId,
             TenantId = _tenantId,
-            Timestamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+            ModifiedAt = modifiedAt,
             QueuedAt = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
         };
 
@@ -534,7 +547,7 @@ public class FtpWatcher
             source = entry.Source,
             siteId = entry.SiteId,
             tenantId = entry.TenantId,
-            timestamp = entry.Timestamp
+            modifiedAt = entry.ModifiedAt
         };
     }
 
@@ -570,6 +583,17 @@ public class FtpWatcher
 
         // Plain filename
         return line;
+    }
+
+    /// <summary>
+    /// Parses an MDTM response and returns the raw 14-digit timestamp string
+    /// (YYYYMMDDHHmmss) if the response is valid, or null otherwise.
+    /// </summary>
+    internal static string? ParseMdtmTimestamp(string? response)
+    {
+        if (response == null || !response.StartsWith("213 ")) return null;
+        var timestamp = response[4..].Trim();
+        return timestamp.Length == 14 && timestamp.All(char.IsDigit) ? timestamp : null;
     }
 
     private void OnFtpFileAck(FtpFileAck ack)
