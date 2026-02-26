@@ -32,6 +32,15 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _siteNameSuccess;
 
+    [ObservableProperty]
+    private string _apiKey = "";
+
+    [ObservableProperty]
+    private string _apiKeyMessage = "";
+
+    [ObservableProperty]
+    private bool _apiKeySuccess;
+
     // Tenant dialog
     [ObservableProperty]
     private bool _showTenantDialog;
@@ -203,6 +212,30 @@ public partial class SettingsViewModel : ObservableObject
         {
             SiteNameMessage = "Failed to update site name on server";
             SiteNameSuccess = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task SaveApiKeyAsync()
+    {
+        if (string.IsNullOrWhiteSpace(ApiKey))
+        {
+            ApiKeyMessage = "API key cannot be empty";
+            ApiKeySuccess = false;
+            return;
+        }
+
+        try
+        {
+            await _localService.UpdateConfigAsync(new { apiKey = ApiKey });
+            ApiKey = "";
+            ApiKeyMessage = "API key updated successfully";
+            ApiKeySuccess = true;
+        }
+        catch (Exception)
+        {
+            ApiKeyMessage = "Failed to update API key";
+            ApiKeySuccess = false;
         }
     }
 

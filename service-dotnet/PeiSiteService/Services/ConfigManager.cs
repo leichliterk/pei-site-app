@@ -144,6 +144,8 @@ public class ConfigManager
                             ?? ReadRegistryValue(RegistryView.Registry64, "TenantId");
             string? siteId = ReadRegistryValue(RegistryView.Registry32, "SiteId")
                           ?? ReadRegistryValue(RegistryView.Registry64, "SiteId");
+            string? apiKey = ReadRegistryValue(RegistryView.Registry32, "ApiKey")
+                          ?? ReadRegistryValue(RegistryView.Registry64, "ApiKey");
             string? ftpHost = ReadRegistryValue(RegistryView.Registry32, "FtpHost")
                            ?? ReadRegistryValue(RegistryView.Registry64, "FtpHost");
             string? ftpPath = ReadRegistryValue(RegistryView.Registry32, "FtpPath")
@@ -151,12 +153,12 @@ public class ConfigManager
 
             if (tenantId != null || siteId != null)
             {
-                _logger.Log(ServiceLogLevel.Info, $"[ConfigManager] Found registry values: tenantId={tenantId}, siteId={siteId}, ftpHost={ftpHost}, ftpPath={ftpPath}");
+                _logger.Log(ServiceLogLevel.Info, $"[ConfigManager] Found registry values: tenantId={tenantId}, siteId={siteId}, apiKey={(apiKey != null ? "[set]" : "[not set]")}, ftpHost={ftpHost}, ftpPath={ftpPath}");
 
                 var config = new FullConfig
                 {
                     ApiUrl = DefaultConfig.ApiUrl,
-                    ApiKey = DefaultConfig.ApiKey,
+                    ApiKey = apiKey ?? DefaultConfig.ApiKey,
                     SiteId = siteId != null && int.TryParse(siteId, out var sid) ? sid : DefaultConfig.SiteId,
                     TenantId = tenantId != null && int.TryParse(tenantId, out var tid) ? tid : DefaultConfig.TenantId,
                     FtpEnabled = !string.IsNullOrEmpty(ftpHost),

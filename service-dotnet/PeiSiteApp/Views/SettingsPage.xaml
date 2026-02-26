@@ -91,6 +91,33 @@
                                 <TextBlock Text="{Binding SiteNameMessage}" FontSize="12" />
                             </Border>
 
+                            <!-- API Key -->
+                            <TextBlock Text="API Key" Style="{StaticResource FieldLabel}" />
+                            <DockPanel Margin="0,0,0,8">
+                                <Button DockPanel.Dock="Right" Content="Save" Style="{StaticResource SecondaryButton}"
+                                        Command="{Binding SaveApiKeyCommand}" Margin="8,0,0,0" />
+                                <TextBox Text="{Binding ApiKey, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource InputTextBox}" />
+                            </DockPanel>
+
+                            <!-- API Key Message -->
+                            <Border Margin="0,0,0,16" Padding="10,6" CornerRadius="4"
+                                    Visibility="{Binding ApiKeyMessage, Converter={StaticResource NullToVisConverter}, FallbackValue=Collapsed}">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ApiKeySuccess}" Value="True">
+                                                <Setter Property="Background" Value="#F0FDF4" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding ApiKeySuccess}" Value="False">
+                                                <Setter Property="Background" Value="#FEF2F2" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <TextBlock Text="{Binding ApiKeyMessage}" FontSize="12" />
+                            </Border>
+
                             <!-- Separator -->
                             <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}" Margin="0,8,0,24" />
 
