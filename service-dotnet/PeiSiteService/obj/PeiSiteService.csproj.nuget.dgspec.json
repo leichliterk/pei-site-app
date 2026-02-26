@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\leich\\Documents\\GitHub\\SV\\PEI\\pei-site-app\\service-dotnet\\PeiSiteService\\PeiSiteService.csproj": {}
+    "c:\\Users\\leich\\Documents\\GitHub\\SV\\PEI\\pei-site-app\\service-dotnet\\PeiSiteService\\PeiSiteService.csproj": {}
   },
   "projects": {
-    "C:\\Users\\leich\\Documents\\GitHub\\SV\\PEI\\pei-site-app\\service-dotnet\\PeiSiteService\\PeiSiteService.csproj": {
+    "c:\\Users\\leich\\Documents\\GitHub\\SV\\PEI\\pei-site-app\\service-dotnet\\PeiSiteService\\PeiSiteService.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\leich\\Documents\\GitHub\\SV\\PEI\\pei-site-app\\service-dotnet\\PeiSiteService\\PeiSiteService.csproj",
+        "projectUniqueName": "c:\\Users\\leich\\Documents\\GitHub\\SV\\PEI\\pei-site-app\\service-dotnet\\PeiSiteService\\PeiSiteService.csproj",
         "projectName": "pei-site-service",
-        "projectPath": "C:\\Users\\leich\\Documents\\GitHub\\SV\\PEI\\pei-site-app\\service-dotnet\\PeiSiteService\\PeiSiteService.csproj",
+        "projectPath": "c:\\Users\\leich\\Documents\\GitHub\\SV\\PEI\\pei-site-app\\service-dotnet\\PeiSiteService\\PeiSiteService.csproj",
         "packagesPath": "C:\\Users\\leich\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\leich\\Documents\\GitHub\\SV\\PEI\\pei-site-app\\service-dotnet\\PeiSiteService\\obj\\",
+        "outputPath": "c:\\Users\\leich\\Documents\\GitHub\\SV\\PEI\\pei-site-app\\service-dotnet\\PeiSiteService\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\leich\\AppData\\Roaming\\NuGet\\NuGet.Config"

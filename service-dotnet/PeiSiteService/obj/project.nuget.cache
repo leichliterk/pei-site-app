@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "itWBf3cNd7E=",
+  "dgSpecHash": "6mOZvfYh7dA=",
   "success": true,
-  "projectFilePath": "C:\\Users\\leich\\Documents\\GitHub\\SV\\PEI\\pei-site-app\\service-dotnet\\PeiSiteService\\PeiSiteService.csproj",
+  "projectFilePath": "c:\\Users\\leich\\Documents\\GitHub\\SV\\PEI\\pei-site-app\\service-dotnet\\PeiSiteService\\PeiSiteService.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\leich\\.nuget\\packages\\microsoft.extensions.configuration\\10.0.3\\microsoft.extensions.configuration.10.0.3.nupkg.sha512",
     "C:\\Users\\leich\\.nuget\\packages\\microsoft.extensions.configuration.abstractions\\10.0.3\\microsoft.extensions.configuration.abstractions.10.0.3.nupkg.sha512",
