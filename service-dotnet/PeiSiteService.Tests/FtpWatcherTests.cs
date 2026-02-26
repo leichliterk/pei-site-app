@@ -88,6 +88,26 @@ public class ParseMdtmTimestampTests
         => Assert.Null(FtpWatcher.ParseMdtmTimestamp(input));
 }
 
+// ── MdtmToIso8601 ────────────────────────────────────────────────────────────
+
+public class MdtmToIso8601Tests
+{
+    [Theory]
+    [InlineData("20260115103045", "2026-01-15T10:30:45.000Z")]
+    [InlineData("19991231235959", "1999-12-31T23:59:59.000Z")]
+    [InlineData("20260101000000", "2026-01-01T00:00:00.000Z")]
+    public void ValidMdtm_ReturnsIso8601(string input, string expected)
+        => Assert.Equal(expected, FtpWatcher.MdtmToIso8601(input));
+
+    [Theory]
+    [InlineData("2026-01-15T10:30:45.000Z")]   // already ISO 8601 — pass through
+    [InlineData("not-a-date")]                  // garbage — pass through
+    [InlineData("2026011510304")]               // 13 digits — pass through
+    [InlineData("202601151030456")]             // 15 digits — pass through
+    public void NonMdtm_ReturnsUnchanged(string input)
+        => Assert.Equal(input, FtpWatcher.MdtmToIso8601(input));
+}
+
 // ── CreatePayloadFromEntry ────────────────────────────────────────────────────
 
 public class CreatePayloadFromEntryTests
@@ -124,7 +144,7 @@ public class CreatePayloadFromEntryTests
         Assert.Equal("Plant Floor FTP", root.GetProperty("source").GetString());
         Assert.Equal(1978, root.GetProperty("siteId").GetInt32());
         Assert.Equal(1001, root.GetProperty("tenantId").GetInt32());
-        Assert.Equal("20260222120000", root.GetProperty("modifiedAt").GetString());
+        Assert.Equal("2026-02-22T12:00:00.000Z", root.GetProperty("modifiedAt").GetString());
     }
 
     [Fact]

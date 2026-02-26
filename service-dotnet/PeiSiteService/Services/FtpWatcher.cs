@@ -547,8 +547,23 @@ public class FtpWatcher
             source = entry.Source,
             siteId = entry.SiteId,
             tenantId = entry.TenantId,
-            modifiedAt = entry.ModifiedAt
+            modifiedAt = MdtmToIso8601(entry.ModifiedAt)
         };
+    }
+
+    // Converts MDTM timestamp (YYYYMMDDHHmmss, UTC) to ISO 8601 (yyyy-MM-ddTHH:mm:ss.fffZ).
+    // Falls back to returning the input unchanged if it's not in MDTM format.
+    internal static string MdtmToIso8601(string mdtm)
+    {
+        if (mdtm.Length == 14 && mdtm.All(char.IsDigit) &&
+            DateTime.TryParseExact(mdtm, "yyyyMMddHHmmss",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal,
+                out var dt))
+        {
+            return dt.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+        }
+        return mdtm;
     }
 
     /// <summary>
