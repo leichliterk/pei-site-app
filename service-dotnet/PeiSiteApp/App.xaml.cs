@@ -60,12 +60,11 @@ public partial class App : Application
         // Initialize services
         var settingsManager = new SettingsManager();
         var localService = new LocalServiceClient();
-        var webSocketService = new WebSocketService();
         var siteApiService = new SiteApiService(settingsManager.Settings.ApiUrl);
         var ftpStatusService = new FtpStatusService(localService);
 
         // Create main view model
-        _mainViewModel = new MainViewModel(settingsManager, localService, webSocketService, siteApiService, ftpStatusService);
+        _mainViewModel = new MainViewModel(settingsManager, localService, siteApiService, ftpStatusService);
 
         // Create and show main window
         _mainWindow = new MainWindow

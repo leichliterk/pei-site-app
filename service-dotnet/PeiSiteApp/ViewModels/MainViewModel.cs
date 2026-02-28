@@ -8,7 +8,6 @@ public partial class MainViewModel : ObservableObject
 {
     private readonly SettingsManager _settingsManager;
     private readonly LocalServiceClient _localService;
-    private readonly WebSocketService _webSocketService;
     private readonly SiteApiService _siteApiService;
     private readonly FtpStatusService _ftpStatusService;
 
@@ -32,13 +31,11 @@ public partial class MainViewModel : ObservableObject
     public MainViewModel(
         SettingsManager settingsManager,
         LocalServiceClient localService,
-        WebSocketService webSocketService,
         SiteApiService siteApiService,
         FtpStatusService ftpStatusService)
     {
         _settingsManager = settingsManager;
         _localService = localService;
-        _webSocketService = webSocketService;
         _siteApiService = siteApiService;
         _ftpStatusService = ftpStatusService;
 
@@ -51,15 +48,8 @@ public partial class MainViewModel : ObservableObject
 
     public async Task InitializeAsync()
     {
-        // Check if background service is available
-        var serviceAvailable = await _localService.CheckHealthAsync();
-
-        if (!serviceAvailable)
-        {
-            // Fall back to direct WebSocket
-            var settings = _settingsManager.Settings;
-            _webSocketService.Connect(settings.ApiUrl, settings.ApiKey, settings.SiteNumber, settings.TenantId);
-        }
+        // Check if background service is available (informational — HomeViewModel will poll)
+        await _localService.CheckHealthAsync();
 
         // Start FTP status polling
         _ftpStatusService.StartPolling();
@@ -71,7 +61,7 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void NavigateHome()
     {
-        _homeViewModel ??= new HomeViewModel(_localService, _webSocketService, _siteApiService, _ftpStatusService, _settingsManager);
+        _homeViewModel ??= new HomeViewModel(_localService, _siteApiService, _ftpStatusService, _settingsManager);
         _homeViewModel.Start();
         CurrentPage = _homeViewModel;
     }
@@ -97,9 +87,7 @@ public partial class MainViewModel : ObservableObject
         _homeViewModel?.Stop();
         _ftpStatusService.StopPolling();
         _localService.StopPolling();
-        _webSocketService.Disconnect();
         _localService.Dispose();
-        _webSocketService.Dispose();
         _siteApiService.Dispose();
         _ftpStatusService.Dispose();
     }
