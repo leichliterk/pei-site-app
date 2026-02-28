@@ -268,21 +268,40 @@ public class FtpWatcher
 
             var localIp = GetLocalAddressFor(_serverConfig.FtpHost) ?? IPAddress.Any;
 
-            // NLST uses ASCII mode (text listing)
-            var nlstData = await FtpActiveDataTransferAsync(writer, reader, localIp, "NLST", "NLST");
-            if (nlstData == null)
+            // Try LIST first (returns timestamps + sizes in one call).
+            // Fall back to NLST if the server doesn't support LIST.
+            var listData = await FtpActiveDataTransferAsync(writer, reader, localIp, "LIST", "LIST");
+            bool usedList = listData != null;
+            if (!usedList)
+                listData = await FtpActiveDataTransferAsync(writer, reader, localIp, "NLST", "NLST");
+
+            if (listData == null)
             {
                 _lastResult = "Error: Could not retrieve file listing";
                 return;
             }
 
-            var rawLines = nlstData.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-            var fileNames = rawLines
-                .Select(ParseNlstLine)
-                .Where(f => f != null)
-                .Select(f => f!)
-                .ToArray();
-            _logger.Log(ServiceLogLevel.Debug, $"[FtpWatcher:{Id}] NLST returned {rawLines.Length} lines, {fileNames.Length} files parsed");
+            var rawLines = listData.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            FtpListEntry[] entries;
+            if (usedList)
+            {
+                entries = rawLines
+                    .Select(ParseListEntry)
+                    .Where(e => e != null)
+                    .Select(e => e!)
+                    .ToArray();
+                _logger.Log(ServiceLogLevel.Debug, $"[FtpWatcher:{Id}] LIST returned {rawLines.Length} lines, {entries.Length} files parsed");
+            }
+            else
+            {
+                entries = rawLines
+                    .Select(ParseNlstLine)
+                    .Where(f => f != null)
+                    .Select(f => new FtpListEntry(f!, null, null))
+                    .ToArray();
+                _logger.Log(ServiceLogLevel.Debug, $"[FtpWatcher:{Id}] NLST fallback returned {rawLines.Length} lines, {entries.Length} files parsed");
+            }
+
             int newOrChanged = 0;
 
             // Switch to binary mode for file transfers (forensic byte-for-byte fidelity)
@@ -293,20 +312,17 @@ public class FtpWatcher
                 return;
             }
 
-            foreach (var fileName in fileNames)
+            foreach (var entry in entries)
             {
                 FtpFileState? existing;
-                lock (_stateLock) { _state.Files.TryGetValue(fileName, out existing); }
+                lock (_stateLock) { _state.Files.TryGetValue(entry.Name, out existing); }
 
-                // Use MDTM to get the server's last-modified timestamp for change detection.
-                // Falls back to SIZE if the server doesn't support MDTM.
-                var mdtmResp = await SendFtpCommandAsync(writer, reader, $"MDTM {fileName}", $"MDTM {fileName}");
-                var remoteModifiedAt = ParseMdtmTimestamp(mdtmResp);
-
-                long remoteSize = -1;
-                if (remoteModifiedAt == null)
+                // Determine remote size. If LIST didn't give us size and we have no
+                // timestamp either, fall back to a SIZE command for change detection.
+                long? remoteSize = entry.Size;
+                if (remoteSize == null && entry.ModifiedAt == null)
                 {
-                    var sizeResp = await SendFtpCommandAsync(writer, reader, $"SIZE {fileName}", $"SIZE {fileName}");
+                    var sizeResp = await SendFtpCommandAsync(writer, reader, $"SIZE {entry.Name}", $"SIZE {entry.Name}");
                     if (sizeResp != null && sizeResp.StartsWith("213") &&
                         long.TryParse(sizeResp[4..].Trim(), out var parsedSize))
                         remoteSize = parsedSize;
@@ -314,45 +330,44 @@ public class FtpWatcher
 
                 bool isNew = existing == null;
                 bool isChanged = existing != null && (
-                    remoteModifiedAt != null
-                        ? remoteModifiedAt != existing.ModifiedAt
-                        : remoteSize >= 0 && remoteSize != existing.Size);
+                    entry.ModifiedAt != null
+                        ? entry.ModifiedAt != existing.ModifiedAt
+                        : remoteSize.HasValue && remoteSize.Value != existing.Size);
 
                 if (!isNew && !isChanged) continue;
 
-                var changeDetail = remoteModifiedAt != null
-                    ? $"modified={remoteModifiedAt}, stored={existing?.ModifiedAt ?? "n/a"}"
+                var changeDetail = entry.ModifiedAt != null
+                    ? $"modified={entry.ModifiedAt}, stored={existing?.ModifiedAt ?? "n/a"}"
                     : $"remote={remoteSize} bytes, stored={existing?.Size.ToString() ?? "n/a"}";
-                _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] {(isNew ? "New" : "Updated")} file: {fileName} ({changeDetail})");
+                _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] {(isNew ? "New" : "Updated")} file: {entry.Name} ({changeDetail})");
                 try
                 {
-                    var fileBytes = await FtpActiveDataTransferBytesAsync(writer, reader, localIp, $"RETR {fileName}", $"RETR {fileName}");
+                    var fileBytes = await FtpActiveDataTransferBytesAsync(writer, reader, localIp, $"RETR {entry.Name}", $"RETR {entry.Name}");
                     if (fileBytes != null)
                     {
-                        var storedModifiedAt = remoteModifiedAt ?? DateTime.UtcNow.ToString("yyyyMMddHHmmss");
-                        ForwardFile(fileName, fileBytes, storedModifiedAt);
+                        ForwardFile(entry.Name, fileBytes, entry.ModifiedAt ?? "");
                         newOrChanged++;
                         lock (_stateLock)
                         {
-                            _state.Files[fileName] = new FtpFileState
+                            _state.Files[entry.Name] = new FtpFileState
                             {
-                                Name = fileName,
-                                Size = fileBytes.Length,
-                                ModifiedAt = storedModifiedAt
+                                Name = entry.Name,
+                                Size = remoteSize ?? fileBytes.Length,
+                                ModifiedAt = entry.ModifiedAt ?? ""
                             };
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.Log(ServiceLogLevel.Error, $"[FtpWatcher:{Id}] Error downloading {fileName}: {ex.Message}");
+                    _logger.Log(ServiceLogLevel.Error, $"[FtpWatcher:{Id}] Error downloading {entry.Name}: {ex.Message}");
                 }
             }
 
             lock (_stateLock) { _state.LastPoll = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"); }
             SaveState();
 
-            _lastResult = $"OK - {fileNames.Length} files listed, {newOrChanged} new/updated forwarded";
+            _lastResult = $"OK - {entries.Length} files listed, {newOrChanged} new/updated forwarded";
             _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] Poll complete: {_lastResult}");
 
             await writer.WriteLineAsync("QUIT");
@@ -547,7 +562,7 @@ public class FtpWatcher
             source = entry.Source,
             siteId = entry.SiteId,
             tenantId = entry.TenantId,
-            modifiedAt = MdtmToIso8601(entry.ModifiedAt)
+            modifiedAt = string.IsNullOrEmpty(entry.ModifiedAt) ? (string?)null : MdtmToIso8601(entry.ModifiedAt)
         };
     }
 
@@ -609,6 +624,116 @@ public class FtpWatcher
         if (response == null || !response.StartsWith("213 ")) return null;
         var timestamp = response[4..].Trim();
         return timestamp.Length == 14 && timestamp.All(char.IsDigit) ? timestamp : null;
+    }
+
+    /// <summary>
+    /// Parses a single LIST response line into an FtpListEntry.
+    /// Returns null for directory entries and empty lines.
+    /// Handles Windows CE ("MM-DD-YY  HH:MMAM  size  name"),
+    /// Unix ("-rwx... 1 user grp size Mon DD time name"), and plain filename fallback.
+    /// </summary>
+    internal static FtpListEntry? ParseListEntry(string line)
+    {
+        line = line.Trim();
+        if (string.IsNullOrEmpty(line)) return null;
+
+        // Windows CE / IIS: "MM-DD-YY  HH:MMAM  [<DIR>|size]  name"
+        if (line.Length > 6 && char.IsDigit(line[0]) && line[2] == '-')
+        {
+            if (line.Contains("<DIR>")) return null; // directory
+            var parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 4) return null;
+            var name = string.Join(" ", parts.Skip(3));
+            long? size = long.TryParse(parts[2], out var sz) ? sz : null;
+            var modifiedAt = ParseWindowsCeDateTime(parts[0], parts[1]);
+            return new FtpListEntry(name, size, modifiedAt);
+        }
+
+        // Unix: "drwx..." = directory (skip)
+        if (line[0] == 'd') return null;
+
+        // Unix: "-rwx..." or "lrwx..." = file/symlink
+        if (line[0] == '-' || line[0] == 'l')
+        {
+            var parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 9) return null;
+            var name = string.Join(" ", parts.Skip(8));
+            long? size = long.TryParse(parts[4], out var sz) ? sz : null;
+            var modifiedAt = ParseUnixDateTime(parts[5], parts[6], parts[7]);
+            return new FtpListEntry(name, size, modifiedAt);
+        }
+
+        // Plain filename fallback (bare name, no metadata)
+        return new FtpListEntry(line, null, null);
+    }
+
+    /// <summary>
+    /// Parses Windows CE date and time parts into a 14-digit MDTM-compatible timestamp.
+    /// datePart: "MM-DD-YY", timePart: "HH:MMAM" or "HH:MMPM".
+    /// Returns null if parsing fails.
+    /// </summary>
+    internal static string? ParseWindowsCeDateTime(string datePart, string timePart)
+    {
+        try
+        {
+            var d = datePart.Split('-');
+            if (d.Length != 3) return null;
+            if (!int.TryParse(d[0], out var month)) return null;
+            if (!int.TryParse(d[1], out var day)) return null;
+            if (!int.TryParse(d[2], out var yearShort)) return null;
+            var year = yearShort < 70 ? 2000 + yearShort : 1900 + yearShort;
+
+            bool isPm = timePart.EndsWith("PM", StringComparison.OrdinalIgnoreCase);
+            bool isAm = timePart.EndsWith("AM", StringComparison.OrdinalIgnoreCase);
+            if (!isPm && !isAm) return null;
+
+            var t = timePart[..^2].Split(':');
+            if (t.Length != 2) return null;
+            if (!int.TryParse(t[0], out var hour)) return null;
+            if (!int.TryParse(t[1], out var minute)) return null;
+
+            if (isPm && hour != 12) hour += 12;
+            if (isAm && hour == 12) hour = 0;
+
+            return $"{year:D4}{month:D2}{day:D2}{hour:D2}{minute:D2}00";
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// Parses Unix LIST date fields into a 14-digit MDTM-compatible timestamp.
+    /// month: "Jan", day: "15", yearOrTime: "2024" or "12:30".
+    /// When only a time is available (no year), the current UTC year is assumed.
+    /// Returns null if parsing fails.
+    /// </summary>
+    internal static string? ParseUnixDateTime(string month, string day, string yearOrTime)
+    {
+        try
+        {
+            var months = new[] { "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+            var mi = Array.FindIndex(months, m => m.Equals(month, StringComparison.OrdinalIgnoreCase));
+            if (mi < 0) return null;
+            var monthNum = mi + 1;
+
+            if (!int.TryParse(day.Trim(), out var dayNum)) return null;
+
+            int year, hour = 0, minute = 0;
+            if (yearOrTime.Contains(':'))
+            {
+                year = DateTime.UtcNow.Year;
+                var t = yearOrTime.Split(':');
+                if (!int.TryParse(t[0], out hour)) return null;
+                if (!int.TryParse(t[1], out minute)) return null;
+            }
+            else
+            {
+                if (!int.TryParse(yearOrTime, out year)) return null;
+            }
+
+            return $"{year:D4}{monthNum:D2}{dayNum:D2}{hour:D2}{minute:D2}00";
+        }
+        catch { return null; }
     }
 
     private void OnFtpFileAck(FtpFileAck ack)
@@ -705,3 +830,10 @@ public class FtpWatcher
         }
     }
 }
+
+/// <summary>
+/// Represents a file entry parsed from a LIST or NLST response.
+/// ModifiedAt is a 14-digit MDTM-compatible string (YYYYMMDDHHmmss) or null if unknown.
+/// Size is null when the listing format doesn't include file size.
+/// </summary>
+internal record FtpListEntry(string Name, long? Size, string? ModifiedAt);

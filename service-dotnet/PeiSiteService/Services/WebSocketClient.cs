@@ -58,6 +58,12 @@ public class WebSocketClient : IDisposable
     {
         if (_socket?.Connected == true) return;
 
+        // Dispose any stale disconnected socket before creating a new one so the
+        // server sees a clean connection rather than a lingering session.
+        var stale = _socket;
+        _socket = null;
+        try { stale?.Dispose(); } catch { }
+
         _stopping = false;
         StartHistoryTracking();
         SetStatus(ConnectionStatus.connecting);
@@ -72,7 +78,8 @@ public class WebSocketClient : IDisposable
                 api_key = _config.ApiKey,
                 site_id = _config.SiteId,
                 tenant_id = _config.TenantId,
-                connection_source = "service"
+                connection_source = "service",
+                app_version = AppVersion.Current
             },
             Reconnection = false,
             Transport = TransportProtocol.WebSocket
@@ -95,6 +102,9 @@ public class WebSocketClient : IDisposable
             if (!_stopping)
             {
                 _logger.Log(ServiceLogLevel.Warning, "[WebSocketClient] Unexpected disconnect, will reconnect in 5 seconds...");
+                // Capture a local reference so the retry targets the specific socket
+                // that disconnected, not whatever _socket points to after a race.
+                var disconnectedSocket = _socket;
                 _ = Task.Run(async () =>
                 {
                     await Task.Delay(5000);
@@ -104,12 +114,15 @@ public class WebSocketClient : IDisposable
                         SetStatus(ConnectionStatus.connecting);
                         try
                         {
-                            await _socket.ConnectAsync();
+                            await disconnectedSocket.ConnectAsync();
                             _logger.Log(ServiceLogLevel.Info, "[WebSocketClient] Reconnect succeeded");
                         }
                         catch (Exception ex)
                         {
                             _logger.Log(ServiceLogLevel.Warning, $"[WebSocketClient] Reconnect failed: {ex.Message}, retrying in 10s...");
+                            // Discard the old socket so Connect() starts completely fresh.
+                            lock (_lock) { if (_socket == disconnectedSocket) _socket = null; }
+                            try { disconnectedSocket.Dispose(); } catch { }
                             await Task.Delay(10000);
                             if (!_stopping) Connect();
                         }

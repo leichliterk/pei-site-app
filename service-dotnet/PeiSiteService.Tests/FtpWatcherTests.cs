@@ -193,4 +193,170 @@ public class CreatePayloadFromEntryTests
 
         Assert.Equal("ftp.plantfloor.local", doc.RootElement.GetProperty("source").GetString());
     }
+
+    [Fact]
+    public void EmptyModifiedAt_MapsToNullInPayload()
+    {
+        // When modifiedAt is unknown (e.g. server doesn't support MDTM or LIST timestamps),
+        // the payload should send null rather than an empty string.
+        var entry = new PendingFileEntry
+        {
+            Filename = "unknown.txt",
+            ContentBase64 = "",
+            Sha256 = "",
+            ModifiedAt = "",
+            QueuedAt = "2026-02-22T00:00:00.000Z"
+        };
+
+        var payload = FtpWatcher.CreatePayloadFromEntry(entry);
+        var json = JsonSerializer.Serialize(payload);
+        using var doc = JsonDocument.Parse(json);
+
+        Assert.Equal(JsonValueKind.Null, doc.RootElement.GetProperty("modifiedAt").ValueKind);
+    }
+}
+
+// ── ParseListEntry ────────────────────────────────────────────────────────────
+
+public class ParseListEntryTests
+{
+    // Windows CE / IIS format files
+
+    [Theory]
+    [InlineData("11-15-25  00:00AM       11786 001870_251114_000500.DAE", "001870_251114_000500.DAE", 11786L, "20251115000000")]
+    [InlineData("01-15-26  10:30AM       4096 report.pdf", "report.pdf", 4096L, "20260115103000")]
+    [InlineData("06-15-25  03:30PM       512 data.txt", "data.txt", 512L, "20250615153000")]
+    [InlineData("12-31-25  11:59PM       1024 backup.zip", "backup.zip", 1024L, "20251231235900")]
+    [InlineData("01-01-00  12:00PM       100 test.bin", "test.bin", 100L, "20000101120000")]
+    public void WindowsCE_File_ReturnsEntry(string line, string expectedName, long expectedSize, string expectedModifiedAt)
+    {
+        var entry = FtpWatcher.ParseListEntry(line);
+        Assert.NotNull(entry);
+        Assert.Equal(expectedName, entry!.Name);
+        Assert.Equal(expectedSize, entry.Size);
+        Assert.Equal(expectedModifiedAt, entry.ModifiedAt);
+    }
+
+    [Theory]
+    [InlineData("06-15-25  03:30PM       512 file with spaces.txt", "file with spaces.txt")]
+    public void WindowsCE_FileWithSpaces_ReturnsCorrectName(string line, string expectedName)
+    {
+        var entry = FtpWatcher.ParseListEntry(line);
+        Assert.NotNull(entry);
+        Assert.Equal(expectedName, entry!.Name);
+    }
+
+    [Theory]
+    [InlineData("01-15-26  10:30AM       <DIR>          FolderName")]
+    [InlineData("11-15-25  00:00AM       <DIR>          Archive")]
+    public void WindowsCE_Directory_ReturnsNull(string line)
+        => Assert.Null(FtpWatcher.ParseListEntry(line));
+
+    // Unix format files
+
+    [Theory]
+    [InlineData("-rw-r--r-- 1 user grp 11786 Jan 15 00:00 myfile.txt", "myfile.txt", 11786L)]
+    [InlineData("-rwxr-xr-x 1 root root 1024 Feb  5 12:00 run.sh", "run.sh", 1024L)]
+    [InlineData("-rw-r--r-- 1 user grp 512 Dec 31 23:59 archive.DAE", "archive.DAE", 512L)]
+    public void Unix_File_ReturnsEntry(string line, string expectedName, long expectedSize)
+    {
+        var entry = FtpWatcher.ParseListEntry(line);
+        Assert.NotNull(entry);
+        Assert.Equal(expectedName, entry!.Name);
+        Assert.Equal(expectedSize, entry.Size);
+        Assert.NotNull(entry.ModifiedAt); // timestamp parsed from month/day/time
+    }
+
+    [Theory]
+    [InlineData("-rw-r--r-- 1 user grp 11786 Jan 15 00:00 file with spaces.txt", "file with spaces.txt")]
+    public void Unix_FileWithSpaces_ReturnsCorrectName(string line, string expectedName)
+    {
+        var entry = FtpWatcher.ParseListEntry(line);
+        Assert.NotNull(entry);
+        Assert.Equal(expectedName, entry!.Name);
+    }
+
+    [Theory]
+    [InlineData("drwxr-xr-x  2 user group 4096 Jan 15 10:30 FolderName")]
+    [InlineData("drwxrwxrwx  3 root root 4096 Dec 31 23:59 Archive")]
+    public void Unix_Directory_ReturnsNull(string line)
+        => Assert.Null(FtpWatcher.ParseListEntry(line));
+
+    // Plain filename fallback (no metadata)
+
+    [Theory]
+    [InlineData("myfile.txt", "myfile.txt")]
+    [InlineData("001870_251114_000500.DAE", "001870_251114_000500.DAE")]
+    public void PlainName_ReturnEntryWithNullMetadata(string line, string expectedName)
+    {
+        var entry = FtpWatcher.ParseListEntry(line);
+        Assert.NotNull(entry);
+        Assert.Equal(expectedName, entry!.Name);
+        Assert.Null(entry.Size);
+        Assert.Null(entry.ModifiedAt);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void EmptyOrWhitespace_ReturnsNull(string line)
+        => Assert.Null(FtpWatcher.ParseListEntry(line));
+}
+
+// ── ParseWindowsCeDateTime ────────────────────────────────────────────────────
+
+public class ParseWindowsCeDateTimeTests
+{
+    [Theory]
+    [InlineData("11-15-25", "00:00AM", "20251115000000")]
+    [InlineData("01-15-26", "10:30AM", "20260115103000")]
+    [InlineData("06-15-25", "03:30PM", "20250615153000")]
+    [InlineData("12-31-25", "11:59PM", "20251231235900")]
+    [InlineData("01-01-00", "12:00PM", "20000101120000")]  // year 00 → 2000
+    [InlineData("12-31-69", "12:00AM", "20691231000000")]  // year 69 → 2069 (< 70 threshold)
+    [InlineData("06-15-25", "12:00AM", "20250615000000")]  // 12:00AM = midnight
+    [InlineData("06-15-25", "12:30PM", "20250615123000")]  // 12:30PM = noon
+    public void ValidInput_ReturnsTimestamp(string datePart, string timePart, string expected)
+        => Assert.Equal(expected, FtpWatcher.ParseWindowsCeDateTime(datePart, timePart));
+
+    [Theory]
+    [InlineData("11-15", "00:00AM")]        // bad date (missing year)
+    [InlineData("11-15-25", "00:00")]       // missing AM/PM
+    [InlineData("11-15-25", "")]            // empty time
+    [InlineData("not-a-date", "10:00AM")]   // unparseable date
+    public void InvalidInput_ReturnsNull(string datePart, string timePart)
+        => Assert.Null(FtpWatcher.ParseWindowsCeDateTime(datePart, timePart));
+}
+
+// ── ParseUnixDateTime ─────────────────────────────────────────────────────────
+
+public class ParseUnixDateTimeTests
+{
+    [Theory]
+    [InlineData("Jan", "15", "2024", "20240115000000")]
+    [InlineData("Dec", "31", "2023", "20231231000000")]
+    [InlineData("Feb", " 5", "2025", "20250205000000")]  // space-padded day
+    public void WithYear_ReturnsTimestamp(string month, string day, string year, string expected)
+        => Assert.Equal(expected, FtpWatcher.ParseUnixDateTime(month, day, year));
+
+    [Theory]
+    [InlineData("Jan", "15", "10:30", "103000")]   // partial: HH:MM:00
+    [InlineData("Dec", "31", "23:59", "235900")]
+    [InlineData("Feb", " 5", "00:00", "000000")]
+    public void WithTime_UsesCurrentYearAndParsesTime(string month, string day, string time, string expectedHHMMSS)
+    {
+        var result = FtpWatcher.ParseUnixDateTime(month, day, time);
+        Assert.NotNull(result);
+        // Check year matches current UTC year
+        Assert.StartsWith(DateTime.UtcNow.Year.ToString(), result);
+        // Check the time portion (last 6 digits)
+        Assert.EndsWith(expectedHHMMSS, result);
+    }
+
+    [Theory]
+    [InlineData("Xxx", "15", "2024")]     // invalid month
+    [InlineData("Jan", "XX", "2024")]     // invalid day
+    [InlineData("Jan", "15", "ABCD")]     // invalid year
+    public void InvalidInput_ReturnsNull(string month, string day, string yearOrTime)
+        => Assert.Null(FtpWatcher.ParseUnixDateTime(month, day, yearOrTime));
 }

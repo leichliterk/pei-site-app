@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "677mFFGjdR8=",
+  "dgSpecHash": "izKdPgNHuTU=",
   "success": true,
-  "projectFilePath": "c:\\Users\\leich\\Documents\\GitHub\\SV\\PEI\\pei-site-app\\service-dotnet\\PeiSiteApp\\PeiSiteApp.csproj",
+  "projectFilePath": "C:\\Users\\leich\\Documents\\GitHub\\SV\\PEI\\pei-site-app\\service-dotnet\\PeiSiteApp\\PeiSiteApp.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\leich\\.nuget\\packages\\communitytoolkit.mvvm\\8.4.0\\communitytoolkit.mvvm.8.4.0.nupkg.sha512",
     "C:\\Users\\leich\\.nuget\\packages\\hardcodet.notifyicon.wpf\\1.1.0\\hardcodet.notifyicon.wpf.1.1.0.nupkg.sha512",
