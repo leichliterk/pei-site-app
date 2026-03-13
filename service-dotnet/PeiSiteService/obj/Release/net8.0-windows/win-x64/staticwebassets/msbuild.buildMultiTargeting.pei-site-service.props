@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="..\build\pei-site-service.props" />
-</Project>
