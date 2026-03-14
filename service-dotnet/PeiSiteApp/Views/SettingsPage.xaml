@@ -353,6 +353,79 @@
                             </TextBlock>
                         </StackPanel>
                     </TabItem>
+
+                    <!-- Advanced Tab -->
+                    <TabItem>
+                        <TabItem.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE90F;" FontFamily="Segoe MDL2 Assets" FontSize="14" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                <TextBlock Text="Advanced" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </TabItem.Header>
+                        <StackPanel Margin="24,16" MaxWidth="600">
+                            <TextBlock Text="Service Control" FontSize="16" FontWeight="Medium"
+                                       Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,16" />
+
+                            <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="16">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Status -->
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="PEI Site Service" FontWeight="SemiBold" FontSize="14"
+                                                   Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,4" />
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="●" FontSize="12" Margin="0,0,6,0" VerticalAlignment="Center">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="#6B7280" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsServiceRunning}" Value="True">
+                                                                <Setter Property="Foreground" Value="#22C55E" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                            <TextBlock Text="{Binding ServiceStatusDisplay}"
+                                                       Foreground="{StaticResource TextSecondaryBrush}" FontSize="13" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <!-- Buttons -->
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="Working..." FontSize="12" Margin="0,0,8,0" VerticalAlignment="Center"
+                                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                                   Visibility="{Binding IsServiceBusy, Converter={StaticResource BoolToVis}}" />
+                                        <Button Content="Start Service" Style="{StaticResource PrimaryButton}"
+                                                Command="{Binding StartServiceCommand}"
+                                                Visibility="{Binding IsServiceRunning, Converter={StaticResource InverseBoolToVis}}" />
+                                        <Button Content="Stop Service" Style="{StaticResource DangerButton}"
+                                                Command="{Binding StopServiceCommand}"
+                                                Visibility="{Binding IsServiceRunning, Converter={StaticResource BoolToVis}}" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Error message -->
+                            <Border Margin="0,8,0,0" Padding="10,8" CornerRadius="4" Background="#FEF2F2"
+                                    Visibility="{Binding ServiceMessage, Converter={StaticResource NullToVisConverter}, FallbackValue=Collapsed}">
+                                <TextBlock Text="{Binding ServiceMessage}" Foreground="{StaticResource DangerBrush}"
+                                           FontSize="12" TextWrapping="Wrap" />
+                            </Border>
+
+                            <Border Background="#F0F9FF" BorderBrush="#BAE6FD" BorderThickness="1"
+                                    CornerRadius="4" Padding="12,10" Margin="0,16,0,0">
+                                <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="#0369A1">
+                                    Starting or stopping the service requires administrator privileges.
+                                    If the operation fails, try running the app as administrator.
+                                </TextBlock>
+                            </Border>
+                        </StackPanel>
+                    </TabItem>
                 </TabControl>
             </StackPanel>
         </ScrollViewer>

@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ServiceProcess;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -146,6 +147,23 @@ public partial class SettingsViewModel : ObservableObject
     public ObservableCollection<LogEntry> LogEntries { get; } = new();
     private string? _lastLogTimestamp;
     private DispatcherTimer? _logPollTimer;
+
+    // Advanced tab — service control
+    private const string ServiceName = "PeiSiteService";
+
+    [ObservableProperty]
+    private string _serviceStatusDisplay = "Unknown";
+
+    [ObservableProperty]
+    private bool _isServiceRunning;
+
+    [ObservableProperty]
+    private bool _isServiceBusy;
+
+    [ObservableProperty]
+    private string _serviceMessage = "";
+
+    private DispatcherTimer? _serviceStatusTimer;
 
     public static IReadOnlyList<string> LogLevels { get; } =
         new[] { "debug", "info", "warning", "error", "critical" };
@@ -630,11 +648,110 @@ public partial class SettingsViewModel : ObservableObject
         _lastLogTimestamp = entries[^1].Timestamp;
     }
 
-    // Logging tab index is 1 (Site=0, Logging=1, FTP=2)
+    // --- Advanced tab commands ---
+
+    [RelayCommand(CanExecute = nameof(CanControlService))]
+    private async Task StartServiceAsync()
+    {
+        IsServiceBusy = true;
+        ServiceMessage = "";
+        try
+        {
+            await Task.Run(() =>
+            {
+                using var sc = new ServiceController(ServiceName);
+                sc.Start();
+                sc.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(30));
+            });
+            await RefreshServiceStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            ServiceMessage = $"Failed to start: {ex.Message}";
+        }
+        finally { IsServiceBusy = false; }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanControlService))]
+    private async Task StopServiceAsync()
+    {
+        IsServiceBusy = true;
+        ServiceMessage = "";
+        try
+        {
+            await Task.Run(() =>
+            {
+                using var sc = new ServiceController(ServiceName);
+                sc.Stop();
+                sc.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(30));
+            });
+            await RefreshServiceStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            ServiceMessage = $"Failed to stop: {ex.Message}";
+        }
+        finally { IsServiceBusy = false; }
+    }
+
+    private bool CanControlService() => !IsServiceBusy;
+
+    partial void OnIsServiceBusyChanged(bool value)
+    {
+        StartServiceCommand.NotifyCanExecuteChanged();
+        StopServiceCommand.NotifyCanExecuteChanged();
+    }
+
+    private void StartServiceStatusPolling()
+    {
+        if (_serviceStatusTimer != null) return;
+        _ = RefreshServiceStatusAsync();
+        _serviceStatusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+        _serviceStatusTimer.Tick += async (_, _) => await RefreshServiceStatusAsync();
+        _serviceStatusTimer.Start();
+    }
+
+    private void StopServiceStatusPolling()
+    {
+        _serviceStatusTimer?.Stop();
+        _serviceStatusTimer = null;
+    }
+
+    private async Task RefreshServiceStatusAsync()
+    {
+        try
+        {
+            var status = await Task.Run(() =>
+            {
+                using var sc = new ServiceController(ServiceName);
+                return sc.Status;
+            });
+            IsServiceRunning = status == ServiceControllerStatus.Running;
+            ServiceStatusDisplay = status switch
+            {
+                ServiceControllerStatus.Running => "Running",
+                ServiceControllerStatus.Stopped => "Stopped",
+                ServiceControllerStatus.StartPending => "Starting...",
+                ServiceControllerStatus.StopPending => "Stopping...",
+                ServiceControllerStatus.Paused => "Paused",
+                _ => status.ToString()
+            };
+        }
+        catch
+        {
+            IsServiceRunning = false;
+            ServiceStatusDisplay = "Unknown";
+        }
+    }
+
+    // Tab indices: Site=0, Logging=1, FTP=2, Advanced=3
     partial void OnSelectedTabIndexChanged(int value)
     {
         if (value == 1) StartLogPolling();
         else StopLogPolling();
+
+        if (value == 3) StartServiceStatusPolling();
+        else StopServiceStatusPolling();
     }
 
     partial void OnConfirmationPhraseChanged(string value) => OnPropertyChanged(nameof(IsFormValid));
