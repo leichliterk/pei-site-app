@@ -51,6 +51,21 @@ public class FtpServerResponse
     public string Username { get; set; } = "";
 }
 
+public class LogEntry
+{
+    public string Timestamp { get; set; } = "";
+    public string Level { get; set; } = "";
+    public string Message { get; set; } = "";
+
+    public string ShortTimestamp =>
+        Timestamp.Length >= 23 ? Timestamp[11..23] : Timestamp;
+}
+
+public class LogsResponse
+{
+    public List<LogEntry> Entries { get; set; } = new();
+}
+
 public class FtpBrowseResponse
 {
     public bool Success { get; set; }

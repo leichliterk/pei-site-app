@@ -195,6 +195,74 @@
                                     <Run FontWeight="SemiBold" Text="critical" /> — fatal errors only
                                 </TextBlock>
                             </Border>
+
+                            <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}" Margin="0,16,0,8" />
+
+                            <!-- Live Log header -->
+                            <DockPanel Margin="0,0,0,8">
+                                <Button DockPanel.Dock="Right" Content="Clear" Style="{StaticResource SecondaryButton}"
+                                        Command="{Binding ClearLogsCommand}" />
+                                <TextBlock Text="Live Log" FontWeight="Medium" VerticalAlignment="Center"
+                                           Foreground="{StaticResource TextPrimaryBrush}" />
+                            </DockPanel>
+
+                            <!-- Log viewer -->
+                            <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="4"
+                                    Background="#FAFAFA">
+                                <ScrollViewer x:Name="LogScrollViewer" Height="280"
+                                              VerticalScrollBarVisibility="Auto"
+                                              HorizontalScrollBarVisibility="Auto">
+                                    <ItemsControl ItemsSource="{Binding LogEntries}" Padding="8,6">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock FontFamily="Consolas" FontSize="11"
+                                                           TextWrapping="NoWrap" Margin="0,1">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Level}" Value="debug">
+                                                                    <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Level}" Value="warn">
+                                                                    <Setter Property="Foreground" Value="#D97706" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Level}" Value="error">
+                                                                    <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Level}" Value="crit">
+                                                                    <Setter Property="Foreground" Value="#B91C1C" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                    <Run Text="{Binding ShortTimestamp, Mode=OneWay}" />
+                                                    <Run Text="  " />
+                                                    <Run Text="{Binding Level, Mode=OneWay}" />
+                                                    <Run Text="  " />
+                                                    <Run Text="{Binding Message, Mode=OneWay}" />
+                                                </TextBlock>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Border>
+
+                            <!-- Empty state (shown when no entries) -->
+                            <TextBlock Text="Waiting for log entries..."
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       FontSize="12" FontStyle="Italic" Margin="0,4,0,0">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding LogEntries.Count}" Value="0">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
                         </StackPanel>
                     </TabItem>
 
@@ -403,8 +471,8 @@
                     </DockPanel>
 
                     <!-- Interval -->
-                    <TextBlock Text="Sync Interval (minutes)" Style="{StaticResource FieldLabel}" />
-                    <TextBox Text="{Binding DialogFtpIntervalMinutes, UpdateSourceTrigger=PropertyChanged}"
+                    <TextBlock Text="Sync Interval (seconds)" Style="{StaticResource FieldLabel}" />
+                    <TextBox Text="{Binding DialogFtpIntervalSeconds, UpdateSourceTrigger=PropertyChanged}"
                              Style="{StaticResource InputTextBox}" Margin="0,0,0,16" />
 
                     <!-- Test / Status Message -->

@@ -60,6 +60,10 @@ public static class ApiServer
             return new { success = true };
         });
 
+        // GET /logs — recent in-memory log entries, optionally filtered by ?since= timestamp
+        app.MapGet("/logs", (string? since, FileLogger logger) =>
+            new { entries = logger.GetRecentEntries(since) });
+
         // PUT /log-level
         app.MapPut("/log-level", (LogLevelRequest req, FileLogger logger, ConfigManager cfg) =>
         {

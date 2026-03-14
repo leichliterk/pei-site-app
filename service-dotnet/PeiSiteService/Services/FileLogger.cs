@@ -8,10 +8,13 @@ public class FileLogger
     private readonly object _lock = new();
     private DateTime _lastPruneDate = DateTime.MinValue;
     private const int KeepDays = 30;
+    private const int MaxBufferedEntries = 500;
+    private readonly Queue<LogEntry> _recentEntries = new();
 
     public ServiceLogLevel MinLevel { get; set; } = ServiceLogLevel.Info;
 
     private static readonly string[] LevelLabels = { "DEBUG", "INFO ", "WARN ", "ERROR", "CRIT " };
+    private static readonly string[] LevelNames  = { "debug", "info",  "warn",  "error", "crit"  };
 
     public FileLogger()
     {
@@ -32,6 +35,15 @@ public class FileLogger
         Console.WriteLine(logMessage);
         lock (_lock)
         {
+            _recentEntries.Enqueue(new LogEntry
+            {
+                Timestamp = now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+                Level = LevelNames[(int)level],
+                Message = message
+            });
+            if (_recentEntries.Count > MaxBufferedEntries)
+                _recentEntries.Dequeue();
+
             try
             {
                 var logFile = Path.Combine(_logDir, $"service-{now:yyyy-MM-dd}.log");
@@ -45,6 +57,18 @@ public class FileLogger
                 }
             }
             catch { }
+        }
+    }
+
+    public List<LogEntry> GetRecentEntries(string? since = null)
+    {
+        lock (_lock)
+        {
+            if (since == null)
+                return _recentEntries.ToList();
+            return _recentEntries
+                .Where(e => string.Compare(e.Timestamp, since, StringComparison.Ordinal) > 0)
+                .ToList();
         }
     }
 

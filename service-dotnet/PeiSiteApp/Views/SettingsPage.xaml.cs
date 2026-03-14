@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using PeiSiteApp.Models;
 using PeiSiteApp.ViewModels;
 
@@ -10,6 +11,18 @@ public partial class SettingsPage : UserControl
     public SettingsPage()
     {
         InitializeComponent();
+        DataContextChanged += OnDataContextChanged;
+    }
+
+    private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (e.NewValue is SettingsViewModel vm)
+        {
+            vm.LogEntries.CollectionChanged += (_, _) =>
+                Dispatcher.BeginInvoke(
+                    new Action(() => LogScrollViewer.ScrollToEnd()),
+                    DispatcherPriority.Background);
+        }
     }
 
     private void TreeViewItem_Expanded(object sender, RoutedEventArgs e)

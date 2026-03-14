@@ -128,6 +128,25 @@ public class LocalServiceClient : IDisposable
         catch { return false; }
     }
 
+    // --- Log endpoints ---
+
+    public async Task<List<LogEntry>?> GetLogsAsync(string? since = null)
+    {
+        try
+        {
+            var url = since != null ? $"/logs?since={Uri.EscapeDataString(since)}" : "/logs";
+            var response = await _http.GetAsync(url);
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<LogsResponse>(json, JsonOptions);
+                return result?.Entries;
+            }
+            return null;
+        }
+        catch { return null; }
+    }
+
     // --- FTP endpoints ---
 
     public async Task<FtpOverallStatusResponse?> FtpGetStatusAsync()

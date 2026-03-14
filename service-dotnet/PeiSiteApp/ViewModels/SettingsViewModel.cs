@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PeiSiteApp.Models;
@@ -93,7 +94,7 @@ public partial class SettingsViewModel : ObservableObject
     private string _dialogFtpPath = "/";
 
     [ObservableProperty]
-    private int _dialogFtpIntervalMinutes = 15;
+    private int _dialogFtpIntervalSeconds = 900;
 
     [ObservableProperty]
     private string _dialogUsername = "";
@@ -141,6 +142,10 @@ public partial class SettingsViewModel : ObservableObject
     // Logging tab
     [ObservableProperty]
     private string _selectedLogLevel = "info";
+
+    public ObservableCollection<LogEntry> LogEntries { get; } = new();
+    private string? _lastLogTimestamp;
+    private DispatcherTimer? _logPollTimer;
 
     public static IReadOnlyList<string> LogLevels { get; } =
         new[] { "debug", "info", "warning", "error", "critical" };
@@ -366,7 +371,7 @@ public partial class SettingsViewModel : ObservableObject
         DialogServerName = "";
         DialogFtpHost = "";
         DialogFtpPath = "/";
-        DialogFtpIntervalMinutes = 15;
+        DialogFtpIntervalSeconds = 900;
         DialogUsername = "";
         DialogPassword = "";
         DialogTestMessage = "";
@@ -382,8 +387,8 @@ public partial class SettingsViewModel : ObservableObject
         DialogServerName = server.Name;
         DialogFtpHost = server.Host;
         DialogFtpPath = server.Path;
-        DialogFtpIntervalMinutes = server.PollInterval / 60;
-        if (DialogFtpIntervalMinutes < 1) DialogFtpIntervalMinutes = 1;
+        DialogFtpIntervalSeconds = server.PollInterval;
+        if (DialogFtpIntervalSeconds < 1) DialogFtpIntervalSeconds = 1;
         DialogUsername = server.Username;
         DialogPassword = ""; // passwords are never returned from the service; leave blank to keep existing
         DialogTestMessage = "";
@@ -428,7 +433,7 @@ public partial class SettingsViewModel : ObservableObject
         }
 
         IsDialogSaving = true;
-        var intervalSeconds = DialogFtpIntervalMinutes * 60;
+        var intervalSeconds = DialogFtpIntervalSeconds;
 
         if (string.IsNullOrEmpty(EditingServerId))
         {
@@ -587,6 +592,49 @@ public partial class SettingsViewModel : ObservableObject
     {
         _settingsManager.SaveLogLevel(SelectedLogLevel);
         await _localService.SetLogLevelAsync(SelectedLogLevel);
+    }
+
+    [RelayCommand]
+    private void ClearLogs()
+    {
+        LogEntries.Clear();
+    }
+
+    private void StartLogPolling()
+    {
+        if (_logPollTimer != null) return;
+        _ = PollLogsAsync();
+        _logPollTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+        _logPollTimer.Tick += async (_, _) => await PollLogsAsync();
+        _logPollTimer.Start();
+    }
+
+    private void StopLogPolling()
+    {
+        _logPollTimer?.Stop();
+        _logPollTimer = null;
+    }
+
+    private async Task PollLogsAsync()
+    {
+        var entries = await _localService.GetLogsAsync(_lastLogTimestamp);
+        if (entries == null || entries.Count == 0) return;
+
+        foreach (var entry in entries)
+            LogEntries.Add(entry);
+
+        // Cap at 500 entries to avoid unbounded growth
+        while (LogEntries.Count > 500)
+            LogEntries.RemoveAt(0);
+
+        _lastLogTimestamp = entries[^1].Timestamp;
+    }
+
+    // Logging tab index is 1 (Site=0, Logging=1, FTP=2)
+    partial void OnSelectedTabIndexChanged(int value)
+    {
+        if (value == 1) StartLogPolling();
+        else StopLogPolling();
     }
 
     partial void OnConfirmationPhraseChanged(string value) => OnPropertyChanged(nameof(IsFormValid));
