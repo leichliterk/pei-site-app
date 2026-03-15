@@ -128,6 +128,25 @@ public class LocalServiceClient : IDisposable
         catch { return false; }
     }
 
+    // --- Log endpoints ---
+
+    public async Task<List<LogEntry>?> GetLogsAsync(string? since = null)
+    {
+        try
+        {
+            var url = since != null ? $"/logs?since={Uri.EscapeDataString(since)}" : "/logs";
+            var response = await _http.GetAsync(url);
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<LogsResponse>(json, JsonOptions);
+                return result?.Entries;
+            }
+            return null;
+        }
+        catch { return null; }
+    }
+
     // --- FTP endpoints ---
 
     public async Task<FtpOverallStatusResponse?> FtpGetStatusAsync()
@@ -155,7 +174,7 @@ public class LocalServiceClient : IDisposable
         catch { return false; }
     }
 
-    public async Task<FtpServerResponse?> FtpAddServerAsync(string name, string host, string path, int pollInterval)
+    public async Task<FtpServerResponse?> FtpAddServerAsync(string name, string host, string path, int pollInterval, string username = "", string password = "")
     {
         try
         {
@@ -164,7 +183,9 @@ public class LocalServiceClient : IDisposable
                 name,
                 ftpHost = host,
                 ftpPath = path,
-                ftpPollInterval = pollInterval
+                ftpPollInterval = pollInterval,
+                username,
+                password
             });
             if (response.IsSuccessStatusCode)
             {
@@ -176,7 +197,7 @@ public class LocalServiceClient : IDisposable
         catch { return null; }
     }
 
-    public async Task<bool> FtpUpdateServerAsync(string id, string name, string host, string path, int pollInterval)
+    public async Task<bool> FtpUpdateServerAsync(string id, string name, string host, string path, int pollInterval, string username = "", string password = "")
     {
         try
         {
@@ -185,7 +206,9 @@ public class LocalServiceClient : IDisposable
                 name,
                 ftpHost = host,
                 ftpPath = path,
-                ftpPollInterval = pollInterval
+                ftpPollInterval = pollInterval,
+                username,
+                password
             });
             return response.IsSuccessStatusCode;
         }
@@ -202,12 +225,12 @@ public class LocalServiceClient : IDisposable
         catch { return false; }
     }
 
-    public async Task<FtpTestResult> FtpTestConnectionAsync(string host, string path)
+    public async Task<FtpTestResult> FtpTestConnectionAsync(string host, string path, string username = "", string password = "")
     {
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            var response = await _http.PostAsJsonAsync("/ftp/test", new { host, path }, cts.Token);
+            var response = await _http.PostAsJsonAsync("/ftp/test", new { host, path, username, password }, cts.Token);
             if (response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync(cts.Token);
@@ -225,12 +248,12 @@ public class LocalServiceClient : IDisposable
         }
     }
 
-    public async Task<FtpBrowseResponse> FtpBrowseAsync(string host, string path)
+    public async Task<FtpBrowseResponse> FtpBrowseAsync(string host, string path, string username = "", string password = "")
     {
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            var response = await _http.PostAsJsonAsync("/ftp/browse", new { host, path }, cts.Token);
+            var response = await _http.PostAsJsonAsync("/ftp/browse", new { host, path, username, password }, cts.Token);
             if (response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync(cts.Token);
@@ -247,6 +270,16 @@ public class LocalServiceClient : IDisposable
         {
             return new FtpBrowseResponse { Success = false, Message = ex.Message };
         }
+    }
+
+    public async Task<bool> SetLogLevelAsync(string level)
+    {
+        try
+        {
+            var response = await _http.PutAsJsonAsync("/log-level", new { level });
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
     }
 
     public void Dispose()

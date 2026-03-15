@@ -7,6 +7,8 @@ public class FtpServerConfig
     public string FtpHost { get; set; } = "";
     public string FtpPath { get; set; } = "/";
     public int FtpPollInterval { get; set; } = 60;
+    public string Username { get; set; } = "";
+    public string Password { get; set; } = "";
 }
 
 public class FtpConfig

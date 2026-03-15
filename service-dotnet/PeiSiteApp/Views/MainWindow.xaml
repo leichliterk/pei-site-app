@@ -31,6 +31,8 @@
                         <Run Text="{Binding SiteNumber}" />
                         <Run Text=" - " />
                         <Run Text="{Binding SiteName}" />
+                        <Run Text=" - " />
+                        <Run Text="{Binding Version, Mode=OneWay}" />
                     </TextBlock>
                 </StackPanel>
 

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Win32;
 using PeiSiteService.Models;
 
@@ -20,9 +21,10 @@ public class ConfigManager
     private static readonly FullConfig DefaultConfig = new()
     {
         ApiUrl = "https://pei-web-server-staging.onrender.com/api/data",
-        ApiKey = "_6@L<Q*SC?mSdp$a1E4?L{\"M+8QQ0|Cw",
+        ApiKey = "",
         SiteId = 1000,
         TenantId = 1001,
+        LogLevel = ServiceLogLevel.Info,
         FtpEnabled = false,
         FtpServers = new()
     };
@@ -48,14 +50,21 @@ public class ConfigManager
                 var fileConfig = JsonSerializer.Deserialize<FullConfig>(data, JsonOptions);
                 if (fileConfig != null)
                 {
-                    _logger.Log($"[ConfigManager] Loaded config from file: {_configPath}");
+                    // Decrypt API key if stored as DPAPI-protected blob; migrate plaintext on next save
+                    var raw = JsonSerializer.Deserialize<JsonObject>(data, JsonOptions);
+                    if (raw != null && raw["apiKeyProtected"] is JsonNode protectedNode)
+                    {
+                        fileConfig.ApiKey = CredentialProtection.TryUnprotect(protectedNode.GetValue<string>()) ?? fileConfig.ApiKey;
+                    }
+
+                    _logger.Log(ServiceLogLevel.Debug, $"[ConfigManager] Loaded config from file: {_configPath}");
                     var merged = MergeWithDefaults(fileConfig);
                     return MigrateIfNeeded(merged);
                 }
             }
             catch (Exception ex)
             {
-                _logger.Log($"[ConfigManager] Error reading config file: {ex.Message}");
+                _logger.Log(ServiceLogLevel.Error, $"[ConfigManager] Error reading config file: {ex.Message}");
             }
         }
 
@@ -68,7 +77,7 @@ public class ConfigManager
             return migrated;
         }
 
-        _logger.Log("[ConfigManager] Using default configuration");
+        _logger.Log(ServiceLogLevel.Info, "[ConfigManager] Using default configuration");
         return Clone(DefaultConfig);
     }
 
@@ -82,7 +91,7 @@ public class ConfigManager
         if (!string.IsNullOrEmpty(config.FtpHost) &&
             (config.FtpServers == null || config.FtpServers.Count == 0))
         {
-            _logger.Log("[ConfigManager] Migrating legacy single-FTP config to multi-server format");
+            _logger.Log(ServiceLogLevel.Info, "[ConfigManager] Migrating legacy single-FTP config to multi-server format");
             config.FtpServers = new List<FtpServerConfig>
             {
                 new FtpServerConfig
@@ -109,12 +118,12 @@ public class ConfigManager
                 if (File.Exists(oldState) && !File.Exists(newState))
                 {
                     File.Move(oldState, newState);
-                    _logger.Log("[ConfigManager] Migrated ftp-state.json -> ftp-state-legacy.json");
+                    _logger.Log(ServiceLogLevel.Info, "[ConfigManager] Migrated ftp-state.json -> ftp-state-legacy.json");
                 }
             }
             catch (Exception ex)
             {
-                _logger.Log($"[ConfigManager] Could not migrate state file: {ex.Message}");
+                _logger.Log(ServiceLogLevel.Warning, $"[ConfigManager] Could not migrate state file: {ex.Message}");
             }
 
             SaveConfig(config);
@@ -135,6 +144,8 @@ public class ConfigManager
                             ?? ReadRegistryValue(RegistryView.Registry64, "TenantId");
             string? siteId = ReadRegistryValue(RegistryView.Registry32, "SiteId")
                           ?? ReadRegistryValue(RegistryView.Registry64, "SiteId");
+            string? apiKey = ReadRegistryValue(RegistryView.Registry32, "ApiKey")
+                          ?? ReadRegistryValue(RegistryView.Registry64, "ApiKey");
             string? ftpHost = ReadRegistryValue(RegistryView.Registry32, "FtpHost")
                            ?? ReadRegistryValue(RegistryView.Registry64, "FtpHost");
             string? ftpPath = ReadRegistryValue(RegistryView.Registry32, "FtpPath")
@@ -142,12 +153,12 @@ public class ConfigManager
 
             if (tenantId != null || siteId != null)
             {
-                _logger.Log($"[ConfigManager] Found registry values: tenantId={tenantId}, siteId={siteId}, ftpHost={ftpHost}, ftpPath={ftpPath}");
+                _logger.Log(ServiceLogLevel.Info, $"[ConfigManager] Found registry values: tenantId={tenantId}, siteId={siteId}, apiKey={(apiKey != null ? "[set]" : "[not set]")}, ftpHost={ftpHost}, ftpPath={ftpPath}");
 
                 var config = new FullConfig
                 {
                     ApiUrl = DefaultConfig.ApiUrl,
-                    ApiKey = DefaultConfig.ApiKey,
+                    ApiKey = apiKey ?? DefaultConfig.ApiKey,
                     SiteId = siteId != null && int.TryParse(siteId, out var sid) ? sid : DefaultConfig.SiteId,
                     TenantId = tenantId != null && int.TryParse(tenantId, out var tid) ? tid : DefaultConfig.TenantId,
                     FtpEnabled = !string.IsNullOrEmpty(ftpHost),
@@ -171,7 +182,7 @@ public class ConfigManager
         }
         catch (Exception ex)
         {
-            _logger.Log($"[ConfigManager] Error reading registry: {ex.Message}");
+            _logger.Log(ServiceLogLevel.Error, $"[ConfigManager] Error reading registry: {ex.Message}");
         }
 
         return null;
@@ -227,6 +238,15 @@ public class ConfigManager
         }
     }
 
+    public void SetLogLevel(ServiceLogLevel level)
+    {
+        lock (_lock)
+        {
+            _config.LogLevel = level;
+            SaveConfig(_config);
+        }
+    }
+
     // FTP global toggle
     public void SetFtpEnabled(bool enabled)
     {
@@ -248,11 +268,13 @@ public class ConfigManager
                 Name = req.Name,
                 FtpHost = req.FtpHost,
                 FtpPath = req.FtpPath,
-                FtpPollInterval = req.FtpPollInterval
+                FtpPollInterval = req.FtpPollInterval,
+                Username = req.Username,
+                Password = req.Password
             };
             _config.FtpServers.Add(server);
             SaveConfig(_config);
-            _logger.Log($"[ConfigManager] Added FTP server {server.Id}: {server.FtpHost}");
+            _logger.Log(ServiceLogLevel.Info, $"[ConfigManager] Added FTP server {server.Id}: {server.FtpHost}");
             return server;
         }
     }
@@ -268,9 +290,11 @@ public class ConfigManager
             if (req.FtpHost != null) server.FtpHost = req.FtpHost;
             if (req.FtpPath != null) server.FtpPath = req.FtpPath;
             if (req.FtpPollInterval.HasValue) server.FtpPollInterval = req.FtpPollInterval.Value;
+            if (req.Username != null) server.Username = req.Username;
+            if (req.Password != null) server.Password = req.Password;
 
             SaveConfig(_config);
-            _logger.Log($"[ConfigManager] Updated FTP server {id}: {server.FtpHost}");
+            _logger.Log(ServiceLogLevel.Info, $"[ConfigManager] Updated FTP server {id}: {server.FtpHost}");
             return server;
         }
     }
@@ -283,7 +307,7 @@ public class ConfigManager
             if (removed > 0)
             {
                 SaveConfig(_config);
-                _logger.Log($"[ConfigManager] Removed FTP server {id}");
+                _logger.Log(ServiceLogLevel.Info, $"[ConfigManager] Removed FTP server {id}");
                 return true;
             }
             return false;
@@ -294,13 +318,19 @@ public class ConfigManager
     {
         try
         {
-            var json = JsonSerializer.Serialize(config, JsonOptions);
-            File.WriteAllText(_configPath, json);
-            _logger.Log($"[ConfigManager] Saved config to: {_configPath}");
+            // Serialize the full config, then replace the plaintext apiKey with an encrypted blob
+            var node = JsonNode.Parse(JsonSerializer.Serialize(config, JsonOptions))!.AsObject();
+            if (!string.IsNullOrEmpty(config.ApiKey))
+            {
+                node["apiKeyProtected"] = CredentialProtection.Protect(config.ApiKey);
+            }
+            node.Remove("apiKey"); // never persist plaintext
+            File.WriteAllText(_configPath, node.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+            _logger.Log(ServiceLogLevel.Debug, $"[ConfigManager] Saved config to: {_configPath}");
         }
         catch (Exception ex)
         {
-            _logger.Log($"[ConfigManager] Error saving config: {ex.Message}");
+            _logger.Log(ServiceLogLevel.Error, $"[ConfigManager] Error saving config: {ex.Message}");
         }
     }
 
@@ -312,6 +342,7 @@ public class ConfigManager
             ApiKey = string.IsNullOrEmpty(config.ApiKey) ? DefaultConfig.ApiKey : config.ApiKey,
             SiteId = config.SiteId == 0 ? DefaultConfig.SiteId : config.SiteId,
             TenantId = config.TenantId == 0 ? DefaultConfig.TenantId : config.TenantId,
+            LogLevel = config.LogLevel,
             FtpEnabled = config.FtpEnabled,
             FtpServers = config.FtpServers ?? new(),
             // Keep legacy fields for migration detection
@@ -327,6 +358,7 @@ public class ConfigManager
         ApiKey = c.ApiKey,
         SiteId = c.SiteId,
         TenantId = c.TenantId,
+        LogLevel = c.LogLevel,
         FtpEnabled = c.FtpEnabled,
         FtpServers = c.FtpServers.Select(s => new FtpServerConfig
         {

@@ -9,7 +9,9 @@
       "Bash(npx tailwindcss:*)",
       "Bash(npm uninstall:*)",
       "Bash(node:*)",
-      "Bash(dotnet new:*)"
+      "Bash(dotnet new:*)",
+      "Bash(\"C:\\\\Program Files \\(x86\\)\\\\WiX Toolset v3.14\\\\bin\\\\candle.exe\" -ext WixBalExtension \"Bundle.wxs\" -out \"Bundle.wixobj\")",
+      "Bash(\"C:\\\\Program Files \\(x86\\)\\\\WiX Toolset v3.14\\\\bin\\\\light.exe\" -ext WixBalExtension \"Bundle.wixobj\" -out \"PEI Site App - Staging Setup 1.4.5.exe\")"
     ],
     "deny": [],
     "ask": []

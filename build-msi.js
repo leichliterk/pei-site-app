@@ -155,6 +155,7 @@ function buildMSI() {
            UpgradeCode="57f48daa-3001-40a9-9dab-5a20450fd982">
 
     <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine"
+             InstallPrivileges="elevated"
              Description="${appName} Installer" Comments="Installs ${appName} v${appVersion}" />
 
     <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
@@ -320,7 +321,7 @@ ${appComponentRefs}${serviceComponentRefs}        <ComponentRef Id="ConfigRegist
 
   // Link with light.exe
   console.log('\n--- Linking MSI (light.exe) ---');
-  const msiPath = path.join(outDir, `PEI Site App${envSuffix}.msi`);
+  const msiPath = path.join(outDir, `PEI Site App${envSuffix} ${appVersion}.msi`);
   execSync(`light.exe -nologo -ext WixUIExtension -ext WixUtilExtension -ext WixFirewallExtension -sice:ICE61 -out "${msiPath}" "${wixobjPath}"`, {
     stdio: 'inherit'
   });

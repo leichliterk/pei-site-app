@@ -26,8 +26,16 @@ public class PendingFileQueue
         }
         catch (Exception ex)
         {
-            _logger.Log($"[PendingFileQueue] Could not create pending directory: {ex.Message}");
+            _logger.Log(ServiceLogLevel.Error, $"[PendingFileQueue] Could not create pending directory: {ex.Message}");
         }
+    }
+
+    // For unit testing: inject a custom directory instead of the system ProgramData path
+    internal PendingFileQueue(string pendingDir, FileLogger logger)
+    {
+        _logger = logger;
+        _pendingDir = pendingDir;
+        try { Directory.CreateDirectory(_pendingDir); } catch { }
     }
 
     public void Enqueue(PendingFileEntry entry)
@@ -42,7 +50,7 @@ public class PendingFileQueue
             }
             catch (Exception ex)
             {
-                _logger.Log($"[PendingFileQueue] Error enqueuing {entry.Filename}: {ex.Message}");
+                _logger.Log(ServiceLogLevel.Error, $"[PendingFileQueue] Error enqueuing {entry.Filename}: {ex.Message}");
             }
         }
     }
@@ -67,14 +75,14 @@ public class PendingFileQueue
                     }
                     catch (Exception ex)
                     {
-                        _logger.Log($"[PendingFileQueue] Corrupted pending file {Path.GetFileName(file)}, removing: {ex.Message}");
+                        _logger.Log(ServiceLogLevel.Warning, $"[PendingFileQueue] Corrupted pending file {Path.GetFileName(file)}, removing: {ex.Message}");
                         try { File.Delete(file); } catch { }
                     }
                 }
             }
             catch (Exception ex)
             {
-                _logger.Log($"[PendingFileQueue] Error reading pending directory: {ex.Message}");
+                _logger.Log(ServiceLogLevel.Error, $"[PendingFileQueue] Error reading pending directory: {ex.Message}");
             }
             return entries;
         }
@@ -92,7 +100,7 @@ public class PendingFileQueue
             }
             catch (Exception ex)
             {
-                _logger.Log($"[PendingFileQueue] Error removing {pendingFileId}: {ex.Message}");
+                _logger.Log(ServiceLogLevel.Error, $"[PendingFileQueue] Error removing {pendingFileId}: {ex.Message}");
             }
         }
     }

@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Win32;
 using PeiSiteApp.Models;
 
@@ -49,12 +50,17 @@ public class SettingsManager
                 {
                     if (config.TryGetValue("apiUrl", out var apiUrl) && apiUrl.ValueKind == JsonValueKind.String)
                         settings.ApiUrl = apiUrl.GetString()!;
-                    if (config.TryGetValue("apiKey", out var apiKey) && apiKey.ValueKind == JsonValueKind.String)
+                    // Prefer DPAPI-protected key; fall back to plaintext for migration of existing installs
+                    if (config.TryGetValue("apiKeyProtected", out var apiKeyProtected) && apiKeyProtected.ValueKind == JsonValueKind.String)
+                        settings.ApiKey = CredentialProtection.TryUnprotect(apiKeyProtected.GetString()!) ?? settings.ApiKey;
+                    else if (config.TryGetValue("apiKey", out var apiKey) && apiKey.ValueKind == JsonValueKind.String)
                         settings.ApiKey = apiKey.GetString()!;
                     if (config.TryGetValue("siteId", out var siteId) && siteId.ValueKind == JsonValueKind.Number)
                         settings.SiteNumber = siteId.GetInt32();
                     if (config.TryGetValue("tenantId", out var tenantId) && tenantId.ValueKind == JsonValueKind.Number)
                         settings.TenantId = tenantId.GetInt32();
+                    if (config.TryGetValue("logLevel", out var logLevel) && logLevel.ValueKind == JsonValueKind.String)
+                        settings.LogLevel = logLevel.GetString()!;
                 }
             }
             catch { }
@@ -128,6 +134,12 @@ public class SettingsManager
         SaveServiceConfig();
     }
 
+    public void SaveLogLevel(string level)
+    {
+        _settings.LogLevel = level;
+        SaveServiceConfig();
+    }
+
     private void SaveUserSettings()
     {
         try
@@ -142,14 +154,28 @@ public class SettingsManager
     {
         try
         {
-            var config = new
+            // Read the existing config to preserve fields we don't own (ftpEnabled, ftpServers, etc.)
+            JsonObject node = new();
+            if (File.Exists(_configPath))
             {
-                apiUrl = _settings.ApiUrl,
-                apiKey = _settings.ApiKey,
-                siteId = _settings.SiteNumber,
-                tenantId = _settings.TenantId
-            };
-            File.WriteAllText(_configPath, JsonSerializer.Serialize(config, JsonOptions));
+                try
+                {
+                    var raw = File.ReadAllText(_configPath);
+                    node = JsonNode.Parse(raw)?.AsObject() ?? new();
+                }
+                catch { }
+            }
+
+            // Patch only the fields the app is responsible for; encrypt the API key
+            node["apiUrl"] = _settings.ApiUrl;
+            if (!string.IsNullOrEmpty(_settings.ApiKey))
+                node["apiKeyProtected"] = CredentialProtection.Protect(_settings.ApiKey);
+            node.Remove("apiKey"); // never persist plaintext
+            node["siteId"] = _settings.SiteNumber;
+            node["tenantId"] = _settings.TenantId;
+            node["logLevel"] = _settings.LogLevel;
+
+            File.WriteAllText(_configPath, node.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
         }
         catch { }
     }

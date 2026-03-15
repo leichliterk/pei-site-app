@@ -14,7 +14,6 @@ namespace PeiSiteApp.ViewModels;
 public partial class HomeViewModel : ObservableObject
 {
     private readonly LocalServiceClient _localService;
-    private readonly WebSocketService _webSocketService;
     private readonly SiteApiService _siteApiService;
     private readonly FtpStatusService _ftpStatusService;
     private readonly SettingsManager _settingsManager;
@@ -25,13 +24,10 @@ public partial class HomeViewModel : ObservableObject
     private ConnectionStatus _wsStatus = ConnectionStatus.Disconnected;
 
     [ObservableProperty]
-    private bool _usingLocalService;
-
-    [ObservableProperty]
     private string _currentUptime = "--";
 
     [ObservableProperty]
-    private string _connectionSource = "Application";
+    private string _connectionSource = "Background Service";
 
     [ObservableProperty]
     private string _connectedAtText = "--";
@@ -90,13 +86,11 @@ public partial class HomeViewModel : ObservableObject
 
     public HomeViewModel(
         LocalServiceClient localService,
-        WebSocketService webSocketService,
         SiteApiService siteApiService,
         FtpStatusService ftpStatusService,
         SettingsManager settingsManager)
     {
         _localService = localService;
-        _webSocketService = webSocketService;
         _siteApiService = siteApiService;
         _ftpStatusService = ftpStatusService;
         _settingsManager = settingsManager;
@@ -125,25 +119,14 @@ public partial class HomeViewModel : ObservableObject
         if (_started) return;
         _started = true;
 
-        // Subscribe to service status changes
         _localService.StatusChanged += OnServiceStatusChanged;
-        _webSocketService.StatusChanged += OnWebSocketStatusChanged;
         _ftpStatusService.StatusChanged += HandleFtpStatusChanged;
 
-        // Check initial state
-        UsingLocalService = _localService.IsServiceAvailable;
         IsServiceRunning = _localService.IsServiceAvailable;
-        ConnectionSource = UsingLocalService ? "Background Service" : "Application";
+        _localService.StartPolling();
 
-        if (UsingLocalService)
-        {
-            _localService.StartPolling();
-        }
-
-        // Load uptime data
         _ = LoadUptimeDataAsync();
 
-        // Start 1-second update timer
         _updateTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _updateTimer.Tick += (s, e) =>
         {
@@ -159,7 +142,6 @@ public partial class HomeViewModel : ObservableObject
         _updateTimer?.Stop();
         _updateTimer = null;
         _localService.StatusChanged -= OnServiceStatusChanged;
-        _webSocketService.StatusChanged -= OnWebSocketStatusChanged;
         _ftpStatusService.StatusChanged -= HandleFtpStatusChanged;
     }
 
@@ -169,9 +151,7 @@ public partial class HomeViewModel : ObservableObject
         {
             if (status != null)
             {
-                UsingLocalService = true;
                 IsServiceRunning = true;
-                ConnectionSource = "Background Service";
                 WsStatus = MapServiceStatus(status.Status);
                 ConnectedAtText = status.ConnectedAt != null
                     ? DateTime.Parse(status.ConnectedAt).ToLocalTime().ToString("g")
@@ -180,21 +160,8 @@ public partial class HomeViewModel : ObservableObject
             else
             {
                 IsServiceRunning = false;
-            }
-        });
-    }
-
-    private void OnWebSocketStatusChanged(ConnectionStatus status)
-    {
-        System.Windows.Application.Current?.Dispatcher.Invoke(() =>
-        {
-            if (!UsingLocalService)
-            {
-                WsStatus = status;
-                if (status == ConnectionStatus.Connected && _webSocketService.ConnectedAt.HasValue)
-                    ConnectedAtText = _webSocketService.ConnectedAt.Value.ToLocalTime().ToString("g");
-                else if (status != ConnectionStatus.Connected)
-                    ConnectedAtText = "--";
+                WsStatus = ConnectionStatus.Disconnected;
+                ConnectedAtText = "--";
             }
         });
     }
@@ -228,41 +195,22 @@ public partial class HomeViewModel : ObservableObject
 
     private void UpdateUptime()
     {
-        if (UsingLocalService && _localService.CurrentStatus != null)
+        var svc = _localService.CurrentStatus;
+        if (svc?.Status == "connected" && svc.CurrentUptime > 0)
         {
-            if (_localService.CurrentStatus.Status != "connected" || _localService.CurrentStatus.CurrentUptime <= 0)
-            {
-                CurrentUptime = "--";
-                return;
-            }
-            CurrentUptime = FormatDuration(_localService.CurrentStatus.CurrentUptime);
+            CurrentUptime = FormatDuration(svc.CurrentUptime);
             return;
         }
-
-        if (!UsingLocalService && _webSocketService.Status == ConnectionStatus.Connected && _webSocketService.ConnectedAt.HasValue)
-        {
-            var ms = (DateTime.UtcNow - _webSocketService.ConnectedAt.Value).TotalMilliseconds;
-            CurrentUptime = FormatDuration(ms);
-            return;
-        }
-
         CurrentUptime = "--";
     }
 
     private void UpdateChartData()
     {
-        int[] history;
-        if (UsingLocalService && _localService.CurrentStatus?.ConnectionHistory != null)
-            history = _localService.CurrentStatus.ConnectionHistory;
-        else
-            history = _webSocketService.ConnectionHistory;
-
-        if (history.Length != 300) return;
+        var history = _localService.CurrentStatus?.ConnectionHistory;
+        if (history == null || history.Length != 300) return;
 
         for (int i = 0; i < 300; i++)
-        {
             _chartValues[i].Y = history[i];
-        }
     }
 
     private async Task LoadUptimeDataAsync()
@@ -270,16 +218,7 @@ public partial class HomeViewModel : ObservableObject
         var settings = _settingsManager.Settings;
         var uptimeData = await _siteApiService.GetUptimeAsync(settings.TenantId, settings.SiteNumber, 7);
         if (uptimeData?.Sessions != null && uptimeData.Sessions.Count > 0)
-        {
-            if (UsingLocalService)
-            {
-                await _localService.PrepopulateHistoryAsync(uptimeData.Sessions);
-            }
-            else
-            {
-                _webSocketService.PrepopulateHistory(uptimeData.Sessions);
-            }
-        }
+            await _localService.PrepopulateHistoryAsync(uptimeData.Sessions);
     }
 
     private static string FormatDuration(double ms)

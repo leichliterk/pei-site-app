@@ -60,6 +60,7 @@ public class FtpWatcher
                 Name = _serverConfig.Name,
                 Host = _serverConfig.FtpHost,
                 Path = _serverConfig.FtpPath,
+                Username = _serverConfig.Username,
                 PollInterval = _serverConfig.FtpPollInterval,
                 LastPoll = _state.LastPoll,
                 LastResult = _lastResult,
@@ -78,20 +79,20 @@ public class FtpWatcher
     {
         if (string.IsNullOrEmpty(_serverConfig.FtpHost))
         {
-            _logger.Log($"[FtpWatcher:{Id}] Not starting - no host configured");
+            _logger.Log(ServiceLogLevel.Warning, $"[FtpWatcher:{Id}] Not starting - no host configured");
             return;
         }
 
         if (_pollTimer != null)
         {
-            _logger.Log($"[FtpWatcher:{Id}] Already running");
+            _logger.Log(ServiceLogLevel.Debug, $"[FtpWatcher:{Id}] Already running");
             return;
         }
 
         _wsClient.FtpFileAckReceived += OnFtpFileAck;
         _wsClient.StatusChanged += OnWsStatusChanged;
 
-        _logger.Log($"[FtpWatcher:{Id}] Starting - host: {_serverConfig.FtpHost}, path: {_serverConfig.FtpPath}, interval: {_serverConfig.FtpPollInterval}s");
+        _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] Starting - host: {_serverConfig.FtpHost}, path: {_serverConfig.FtpPath}, interval: {_serverConfig.FtpPollInterval}s");
 
         _ = PollAsync();
         _pollTimer = new Timer(_ => _ = PollAsync(), null,
@@ -107,7 +108,7 @@ public class FtpWatcher
             _pollTimer = null;
             _wsClient.FtpFileAckReceived -= OnFtpFileAck;
             _wsClient.StatusChanged -= OnWsStatusChanged;
-            _logger.Log($"[FtpWatcher:{Id}] Stopped");
+            _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] Stopped");
         }
     }
 
@@ -133,7 +134,7 @@ public class FtpWatcher
     {
         await writer.WriteLineAsync(command);
         var resp = await reader.ReadLineAsync();
-        _logger.Log($"[RawFTP:{Id}] {label}: {resp}");
+        _logger.Log(ServiceLogLevel.Debug, $"[RawFTP:{Id}] {label}: {resp}");
         return resp;
     }
 
@@ -169,7 +170,7 @@ public class FtpWatcher
             var completed = await Task.WhenAny(acceptTask, Task.Delay(30000));
             if (completed != acceptTask)
             {
-                _logger.Log($"[RawFTP:{Id}] Timeout waiting for data connection ({label})");
+                _logger.Log(ServiceLogLevel.Warning, $"[RawFTP:{Id}] Timeout waiting for data connection ({label})");
                 return null;
             }
 
@@ -181,7 +182,7 @@ public class FtpWatcher
             await dataStream.CopyToAsync(ms);
 
             resp = await reader.ReadLineAsync();
-            _logger.Log($"[RawFTP:{Id}] {label} transfer: {resp}");
+            _logger.Log(ServiceLogLevel.Debug, $"[RawFTP:{Id}] {label} transfer: {resp}");
 
             return ms.ToArray();
         }
@@ -209,8 +210,10 @@ public class FtpWatcher
 
             await reader.ReadLineAsync(); // banner
 
-            await SendFtpCommandAsync(writer, reader, "USER anonymous", "USER");
-            var resp = await SendFtpCommandAsync(writer, reader, "PASS anonymous@", "PASS");
+            var username = string.IsNullOrEmpty(_serverConfig.Username) ? "anonymous" : _serverConfig.Username;
+            var password = string.IsNullOrEmpty(_serverConfig.Password) ? "anonymous@" : _serverConfig.Password;
+            await SendFtpCommandAsync(writer, reader, $"USER {username}", "USER");
+            var resp = await SendFtpCommandAsync(writer, reader, $"PASS {password}", "PASS");
             if (resp == null || !resp.StartsWith("230"))
             {
                 control.Dispose();
@@ -244,14 +247,14 @@ public class FtpWatcher
     {
         if (Interlocked.CompareExchange(ref _isPolling, 1, 0) != 0)
         {
-            _logger.Log($"[FtpWatcher:{Id}] Poll already in progress, skipping");
+            _logger.Log(ServiceLogLevel.Debug, $"[FtpWatcher:{Id}] Poll already in progress, skipping");
             return;
         }
 
         TcpClient? control = null;
         try
         {
-            _logger.Log($"[FtpWatcher:{Id}] Connecting to {_serverConfig.FtpHost}...");
+            _logger.Log(ServiceLogLevel.Debug, $"[FtpWatcher:{Id}] Connecting to {_serverConfig.FtpHost}...");
             var conn = await ConnectAndLoginAsync(_serverConfig.FtpHost, _serverConfig.FtpPath);
             if (conn == null)
             {
@@ -265,21 +268,40 @@ public class FtpWatcher
 
             var localIp = GetLocalAddressFor(_serverConfig.FtpHost) ?? IPAddress.Any;
 
-            // NLST uses ASCII mode (text listing)
-            var nlstData = await FtpActiveDataTransferAsync(writer, reader, localIp, "NLST", "NLST");
-            if (nlstData == null)
+            // Try LIST first (returns timestamps + sizes in one call).
+            // Fall back to NLST if the server doesn't support LIST.
+            var listData = await FtpActiveDataTransferAsync(writer, reader, localIp, "LIST", "LIST");
+            bool usedList = listData != null;
+            if (!usedList)
+                listData = await FtpActiveDataTransferAsync(writer, reader, localIp, "NLST", "NLST");
+
+            if (listData == null)
             {
                 _lastResult = "Error: Could not retrieve file listing";
                 return;
             }
 
-            var rawLines = nlstData.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-            var fileNames = rawLines
-                .Select(ParseNlstLine)
-                .Where(f => f != null)
-                .Select(f => f!)
-                .ToArray();
-            _logger.Log($"[FtpWatcher:{Id}] NLST returned {rawLines.Length} lines, {fileNames.Length} files parsed");
+            var rawLines = listData.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            FtpListEntry[] entries;
+            if (usedList)
+            {
+                entries = rawLines
+                    .Select(ParseListEntry)
+                    .Where(e => e != null)
+                    .Select(e => e!)
+                    .ToArray();
+                _logger.Log(ServiceLogLevel.Debug, $"[FtpWatcher:{Id}] LIST returned {rawLines.Length} lines, {entries.Length} files parsed");
+            }
+            else
+            {
+                entries = rawLines
+                    .Select(ParseNlstLine)
+                    .Where(f => f != null)
+                    .Select(f => new FtpListEntry(f!, null, null))
+                    .ToArray();
+                _logger.Log(ServiceLogLevel.Debug, $"[FtpWatcher:{Id}] NLST fallback returned {rawLines.Length} lines, {entries.Length} files parsed");
+            }
+
             int newOrChanged = 0;
 
             // Switch to binary mode for file transfers (forensic byte-for-byte fidelity)
@@ -290,61 +312,38 @@ public class FtpWatcher
                 return;
             }
 
-            foreach (var fileName in fileNames)
+            foreach (var entry in entries)
             {
-                FtpFileState? existing;
-                lock (_stateLock) { _state.Files.TryGetValue(fileName, out existing); }
+                if (!IsModifiedToday(entry.ModifiedAt)) continue;
 
-                // Use SIZE to detect new files and updates to existing files
-                var sizeResp = await SendFtpCommandAsync(writer, reader, $"SIZE {fileName}", $"SIZE {fileName}");
-                long remoteSize = -1;
-                if (sizeResp != null && sizeResp.StartsWith("213") &&
-                    long.TryParse(sizeResp[4..].Trim(), out var parsedSize))
-                    remoteSize = parsedSize;
-
-                bool isNew = existing == null;
-                bool isChanged = existing != null && remoteSize >= 0 && remoteSize != existing.Size;
-
-                if (!isNew && !isChanged) continue;
-
-                _logger.Log($"[FtpWatcher:{Id}] {(isNew ? "New" : "Updated")} file: {fileName} " +
-                            $"(remote={remoteSize} bytes, stored={existing?.Size.ToString() ?? "n/a"})");
+                _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] Sending today's file: {entry.Name} (modified={entry.ModifiedAt})");
                 try
                 {
-                    var fileBytes = await FtpActiveDataTransferBytesAsync(writer, reader, localIp, $"RETR {fileName}", $"RETR {fileName}");
+                    var fileBytes = await FtpActiveDataTransferBytesAsync(writer, reader, localIp, $"RETR {entry.Name}", $"RETR {entry.Name}");
                     if (fileBytes != null)
                     {
-                        ForwardFile(fileName, fileBytes);
+                        ForwardFile(entry.Name, fileBytes, entry.ModifiedAt ?? "");
                         newOrChanged++;
-                        lock (_stateLock)
-                        {
-                            _state.Files[fileName] = new FtpFileState
-                            {
-                                Name = fileName,
-                                Size = fileBytes.Length,
-                                ModifiedAt = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
-                            };
-                        }
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.Log($"[FtpWatcher:{Id}] Error downloading {fileName}: {ex.Message}");
+                    _logger.Log(ServiceLogLevel.Error, $"[FtpWatcher:{Id}] Error downloading {entry.Name}: {ex.Message}");
                 }
             }
 
             lock (_stateLock) { _state.LastPoll = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"); }
             SaveState();
 
-            _lastResult = $"OK - {fileNames.Length} files listed, {newOrChanged} new/updated forwarded";
-            _logger.Log($"[FtpWatcher:{Id}] Poll complete: {_lastResult}");
+            _lastResult = $"OK - {entries.Length} files listed, {newOrChanged} forwarded (today)";
+            _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] Poll complete: {_lastResult}");
 
             await writer.WriteLineAsync("QUIT");
         }
         catch (Exception ex)
         {
             _lastResult = $"Error: {ex.Message}";
-            _logger.Log($"[FtpWatcher:{Id}] Poll failed: {_lastResult}");
+            _logger.Log(ServiceLogLevel.Error, $"[FtpWatcher:{Id}] Poll failed: {_lastResult}");
         }
         finally
         {
@@ -355,7 +354,7 @@ public class FtpWatcher
 
     public async Task<FtpTestResult> TestConnectionAsync(string host, string remotePath)
     {
-        _logger.Log($"[FtpWatcher] Testing connection (raw TCP) to {host}{remotePath}...");
+        _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher] Testing connection (raw TCP) to {host}{remotePath}...");
 
         TcpClient? control = null;
         try
@@ -374,7 +373,7 @@ public class FtpWatcher
                 return new FtpTestResult { Success = false, Message = "Could not retrieve file listing (data connection failed)" };
 
             var fileNames = nlstData.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-            _logger.Log($"[RawFTP] Parsed {fileNames.Length} file names");
+            _logger.Log(ServiceLogLevel.Debug, $"[RawFTP] Parsed {fileNames.Length} file names");
 
             await writer.WriteLineAsync("QUIT");
 
@@ -387,7 +386,7 @@ public class FtpWatcher
         }
         catch (Exception ex)
         {
-            _logger.Log($"[RawFTP] Test failed: {ex.Message}");
+            _logger.Log(ServiceLogLevel.Error, $"[RawFTP] Test failed: {ex.Message}");
             return new FtpTestResult { Success = false, Message = ex.Message };
         }
         finally
@@ -402,7 +401,7 @@ public class FtpWatcher
     /// </summary>
     public async Task<FtpBrowseResult> ListDirectoriesAsync(string host, string path)
     {
-        _logger.Log($"[FtpWatcher] Browsing directories at {host}{path}...");
+        _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher] Browsing directories at {host}{path}...");
 
         TcpClient? control = null;
         try
@@ -457,7 +456,7 @@ public class FtpWatcher
 
             await writer.WriteLineAsync("QUIT");
 
-            _logger.Log($"[FtpWatcher] Found {dirs.Count} directories at {path}");
+            _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher] Found {dirs.Count} directories at {path}");
             return new FtpBrowseResult
             {
                 Success = true,
@@ -467,7 +466,7 @@ public class FtpWatcher
         }
         catch (Exception ex)
         {
-            _logger.Log($"[FtpWatcher] Browse failed: {ex.Message}");
+            _logger.Log(ServiceLogLevel.Error, $"[FtpWatcher] Browse failed: {ex.Message}");
             return new FtpBrowseResult { Success = false, Message = ex.Message };
         }
         finally
@@ -476,7 +475,7 @@ public class FtpWatcher
         }
     }
 
-    private void ForwardFile(string filename, byte[] content)
+    private void ForwardFile(string filename, byte[] content, string modifiedAt)
     {
         // Compute SHA-256 hash for integrity verification
         string sha256Hash;
@@ -497,23 +496,23 @@ public class FtpWatcher
             Source = string.IsNullOrEmpty(_serverConfig.Name) ? _serverConfig.FtpHost : _serverConfig.Name,
             SiteId = _siteId,
             TenantId = _tenantId,
-            Timestamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+            ModifiedAt = modifiedAt,
             QueuedAt = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
         };
 
         // Save to pending queue FIRST (guarantees no data loss)
         _pendingQueue.Enqueue(entry);
-        _logger.Log($"[FtpWatcher:{Id}] Queued: {filename} ({content.Length} bytes, SHA256: {sha256Hash[..12]}...)");
+        _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] Queued: {filename} ({content.Length} bytes, SHA256: {sha256Hash[..12]}...)");
 
         // Attempt immediate send if WebSocket is connected; removal happens on ack
         if (_wsClient.Status == ConnectionStatus.connected)
         {
             _wsClient.EmitToServer("ftp:file", CreatePayloadFromEntry(entry));
-            _logger.Log($"[FtpWatcher:{Id}] Sent, awaiting ack: {filename}");
+            _logger.Log(ServiceLogLevel.Debug, $"[FtpWatcher:{Id}] Sent, awaiting ack: {filename}");
         }
         else
         {
-            _logger.Log($"[FtpWatcher:{Id}] WebSocket disconnected, file queued for later: {filename}");
+            _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] WebSocket disconnected, file queued for later: {filename}");
         }
 
         Interlocked.Increment(ref _filesForwarded);
@@ -531,8 +530,30 @@ public class FtpWatcher
             source = entry.Source,
             siteId = entry.SiteId,
             tenantId = entry.TenantId,
-            timestamp = entry.Timestamp
+            modifiedAt = string.IsNullOrEmpty(entry.ModifiedAt) ? (string?)null : MdtmToIso8601(entry.ModifiedAt)
         };
+    }
+
+    // Returns true if the 14-digit MDTM timestamp (YYYYMMDDHHmmss, UTC) falls on today's UTC date.
+    private static bool IsModifiedToday(string? modifiedAt)
+    {
+        if (string.IsNullOrEmpty(modifiedAt) || modifiedAt.Length < 8) return false;
+        return modifiedAt.StartsWith(DateTime.UtcNow.ToString("yyyyMMdd"));
+    }
+
+    // Converts MDTM timestamp (YYYYMMDDHHmmss, UTC) to ISO 8601 (yyyy-MM-ddTHH:mm:ss.fffZ).
+    // Falls back to returning the input unchanged if it's not in MDTM format.
+    internal static string MdtmToIso8601(string mdtm)
+    {
+        if (mdtm.Length == 14 && mdtm.All(char.IsDigit) &&
+            DateTime.TryParseExact(mdtm, "yyyyMMddHHmmss",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal,
+                out var dt))
+        {
+            return dt.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+        }
+        return mdtm;
     }
 
     /// <summary>
@@ -543,7 +564,7 @@ public class FtpWatcher
     ///   - Unix full listing:             "-rw-r--r-- 1 user grp 11786 Jan 15 00:00 001870_251114_000500.DAE"
     /// Returns null for directory entries (skipped during polling).
     /// </summary>
-    private static string? ParseNlstLine(string line)
+    internal static string? ParseNlstLine(string line)
     {
         line = line.Trim();
         if (string.IsNullOrEmpty(line)) return null;
@@ -569,6 +590,127 @@ public class FtpWatcher
         return line;
     }
 
+    /// <summary>
+    /// Parses an MDTM response and returns the raw 14-digit timestamp string
+    /// (YYYYMMDDHHmmss) if the response is valid, or null otherwise.
+    /// </summary>
+    internal static string? ParseMdtmTimestamp(string? response)
+    {
+        if (response == null || !response.StartsWith("213 ")) return null;
+        var timestamp = response[4..].Trim();
+        return timestamp.Length == 14 && timestamp.All(char.IsDigit) ? timestamp : null;
+    }
+
+    /// <summary>
+    /// Parses a single LIST response line into an FtpListEntry.
+    /// Returns null for directory entries and empty lines.
+    /// Handles Windows CE ("MM-DD-YY  HH:MMAM  size  name"),
+    /// Unix ("-rwx... 1 user grp size Mon DD time name"), and plain filename fallback.
+    /// </summary>
+    internal static FtpListEntry? ParseListEntry(string line)
+    {
+        line = line.Trim();
+        if (string.IsNullOrEmpty(line)) return null;
+
+        // Windows CE / IIS: "MM-DD-YY  HH:MMAM  [<DIR>|size]  name"
+        if (line.Length > 6 && char.IsDigit(line[0]) && line[2] == '-')
+        {
+            if (line.Contains("<DIR>")) return null; // directory
+            var parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 4) return null;
+            var name = string.Join(" ", parts.Skip(3));
+            long? size = long.TryParse(parts[2], out var sz) ? sz : null;
+            var modifiedAt = ParseWindowsCeDateTime(parts[0], parts[1]);
+            return new FtpListEntry(name, size, modifiedAt);
+        }
+
+        // Unix: "drwx..." = directory (skip)
+        if (line[0] == 'd') return null;
+
+        // Unix: "-rwx..." or "lrwx..." = file/symlink
+        if (line[0] == '-' || line[0] == 'l')
+        {
+            var parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 9) return null;
+            var name = string.Join(" ", parts.Skip(8));
+            long? size = long.TryParse(parts[4], out var sz) ? sz : null;
+            var modifiedAt = ParseUnixDateTime(parts[5], parts[6], parts[7]);
+            return new FtpListEntry(name, size, modifiedAt);
+        }
+
+        // Plain filename fallback (bare name, no metadata)
+        return new FtpListEntry(line, null, null);
+    }
+
+    /// <summary>
+    /// Parses Windows CE date and time parts into a 14-digit MDTM-compatible timestamp.
+    /// datePart: "MM-DD-YY", timePart: "HH:MMAM" or "HH:MMPM".
+    /// Returns null if parsing fails.
+    /// </summary>
+    internal static string? ParseWindowsCeDateTime(string datePart, string timePart)
+    {
+        try
+        {
+            var d = datePart.Split('-');
+            if (d.Length != 3) return null;
+            if (!int.TryParse(d[0], out var month)) return null;
+            if (!int.TryParse(d[1], out var day)) return null;
+            if (!int.TryParse(d[2], out var yearShort)) return null;
+            var year = yearShort < 70 ? 2000 + yearShort : 1900 + yearShort;
+
+            bool isPm = timePart.EndsWith("PM", StringComparison.OrdinalIgnoreCase);
+            bool isAm = timePart.EndsWith("AM", StringComparison.OrdinalIgnoreCase);
+            if (!isPm && !isAm) return null;
+
+            var t = timePart[..^2].Split(':');
+            if (t.Length != 2) return null;
+            if (!int.TryParse(t[0], out var hour)) return null;
+            if (!int.TryParse(t[1], out var minute)) return null;
+
+            if (isPm && hour != 12) hour += 12;
+            if (isAm && hour == 12) hour = 0;
+
+            return $"{year:D4}{month:D2}{day:D2}{hour:D2}{minute:D2}00";
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// Parses Unix LIST date fields into a 14-digit MDTM-compatible timestamp.
+    /// month: "Jan", day: "15", yearOrTime: "2024" or "12:30".
+    /// When only a time is available (no year), the current UTC year is assumed.
+    /// Returns null if parsing fails.
+    /// </summary>
+    internal static string? ParseUnixDateTime(string month, string day, string yearOrTime)
+    {
+        try
+        {
+            var months = new[] { "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+            var mi = Array.FindIndex(months, m => m.Equals(month, StringComparison.OrdinalIgnoreCase));
+            if (mi < 0) return null;
+            var monthNum = mi + 1;
+
+            if (!int.TryParse(day.Trim(), out var dayNum)) return null;
+
+            int year, hour = 0, minute = 0;
+            if (yearOrTime.Contains(':'))
+            {
+                year = DateTime.UtcNow.Year;
+                var t = yearOrTime.Split(':');
+                if (!int.TryParse(t[0], out hour)) return null;
+                if (!int.TryParse(t[1], out minute)) return null;
+            }
+            else
+            {
+                if (!int.TryParse(yearOrTime, out year)) return null;
+            }
+
+            return $"{year:D4}{monthNum:D2}{dayNum:D2}{hour:D2}{minute:D2}00";
+        }
+        catch { return null; }
+    }
+
     private void OnFtpFileAck(FtpFileAck ack)
     {
         // Only handle acks for files belonging to this watcher
@@ -578,11 +720,11 @@ public class FtpWatcher
         if (ack.Success)
         {
             _pendingQueue.Remove(match.PendingFileId);
-            _logger.Log($"[FtpWatcher:{Id}] ACK success: {ack.Filename} (server file_id={ack.FileId})");
+            _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] ACK success: {ack.Filename} (server file_id={ack.FileId})");
         }
         else
         {
-            _logger.Log($"[FtpWatcher:{Id}] ACK failure: {ack.Filename} - {ack.Error}. Clearing for re-poll.");
+            _logger.Log(ServiceLogLevel.Warning, $"[FtpWatcher:{Id}] ACK failure: {ack.Filename} - {ack.Error}. Clearing for re-poll.");
             // Remove from pending queue so we don't retry the stale queued data
             _pendingQueue.Remove(match.PendingFileId);
             // Remove from FTP state so the next poll cycle re-downloads and re-transmits fresh
@@ -592,29 +734,39 @@ public class FtpWatcher
             }
             SaveState();
         }
+
+        // After handling this ACK (success or failure), send the next queued file if any.
+        // Run on the thread pool to avoid re-entrancy on the socket event thread.
+        _ = Task.Run(FlushNextPending);
     }
 
     private void OnWsStatusChanged(ConnectionStatus status)
     {
         if (status == ConnectionStatus.connected)
         {
-            _logger.Log($"[FtpWatcher:{Id}] WebSocket reconnected, flushing own pending queue");
-            FlushOwnPending();
+            _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] WebSocket reconnected, starting sequential flush");
+            _ = Task.Run(FlushNextPending);
         }
     }
 
-    private void FlushOwnPending()
+    /// <summary>
+    /// Sends the single oldest pending file for this watcher and returns.
+    /// The next file is sent after its ACK is received, keeping the pipeline
+    /// sequential and avoiding server-side burst pressure.
+    /// </summary>
+    private void FlushNextPending()
     {
-        var entries = _pendingQueue.GetAll().Where(e => e.ServerId == Id).ToList();
-        if (entries.Count == 0) return;
+        if (_wsClient.Status != ConnectionStatus.connected) return;
 
-        _logger.Log($"[FtpWatcher:{Id}] Flushing {entries.Count} pending file(s)");
-        foreach (var entry in entries)
-        {
-            if (_wsClient.Status != ConnectionStatus.connected) break;
-            _wsClient.EmitToServer("ftp:file", CreatePayloadFromEntry(entry));
-            _logger.Log($"[FtpWatcher:{Id}] Re-sent, awaiting ack: {entry.Filename}");
-        }
+        var next = _pendingQueue.GetAll()
+            .Where(e => e.ServerId == Id)
+            .OrderBy(e => e.QueuedAt)
+            .FirstOrDefault();
+
+        if (next == null) return;
+
+        _wsClient.EmitToServer("ftp:file", CreatePayloadFromEntry(next));
+        _logger.Log(ServiceLogLevel.Debug, $"[FtpWatcher:{Id}] Flush: sent {next.Filename}, awaiting ack");
     }
 
     private void LoadState()
@@ -628,13 +780,13 @@ public class FtpWatcher
                 if (state != null)
                 {
                     _state = state;
-                    _logger.Log($"[FtpWatcher:{Id}] Loaded state: {_state.Files.Count} tracked files");
+                    _logger.Log(ServiceLogLevel.Debug, $"[FtpWatcher:{Id}] Loaded state: {_state.Files.Count} tracked files");
                 }
             }
         }
         catch (Exception ex)
         {
-            _logger.Log($"[FtpWatcher:{Id}] Could not load state: {ex.Message}");
+            _logger.Log(ServiceLogLevel.Error, $"[FtpWatcher:{Id}] Could not load state: {ex.Message}");
             _state = new FtpState();
         }
     }
@@ -649,7 +801,14 @@ public class FtpWatcher
         }
         catch (Exception ex)
         {
-            _logger.Log($"[FtpWatcher:{Id}] Could not save state: {ex.Message}");
+            _logger.Log(ServiceLogLevel.Error, $"[FtpWatcher:{Id}] Could not save state: {ex.Message}");
         }
     }
 }
+
+/// <summary>
+/// Represents a file entry parsed from a LIST or NLST response.
+/// ModifiedAt is a 14-digit MDTM-compatible string (YYYYMMDDHHmmss) or null if unknown.
+/// Size is null when the listing format doesn't include file size.
+/// </summary>
+internal record FtpListEntry(string Name, long? Size, string? ModifiedAt);

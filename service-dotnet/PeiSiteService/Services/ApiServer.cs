@@ -60,6 +60,24 @@ public static class ApiServer
             return new { success = true };
         });
 
+        // GET /logs — recent in-memory log entries, optionally filtered by ?since= timestamp
+        app.MapGet("/logs", (string? since, FileLogger logger) =>
+            new { entries = logger.GetRecentEntries(since) });
+
+        // PUT /log-level
+        app.MapPut("/log-level", (LogLevelRequest req, FileLogger logger, ConfigManager cfg) =>
+        {
+            logger.MinLevel = req.Level;
+            cfg.SetLogLevel(req.Level);
+            return new { success = true, level = req.Level.ToString().ToLowerInvariant() };
+        });
+
+        // GET /log-level
+        app.MapGet("/log-level", (FileLogger logger) => new
+        {
+            level = logger.MinLevel.ToString().ToLowerInvariant()
+        });
+
         // POST /prepopulate-history
         app.MapPost("/prepopulate-history", (PrepopulateRequest req, WebSocketClient ws) =>
         {
@@ -114,7 +132,7 @@ public static class ApiServer
         {
             if (string.IsNullOrEmpty(req.Host))
                 return Results.BadRequest(new { success = false, message = "host is required" });
-            var result = await mgr.TestConnectionAsync(req.Host, req.Path ?? "/");
+            var result = await mgr.TestConnectionAsync(req.Host, req.Path ?? "/", req.Username, req.Password);
             return Results.Ok(result);
         });
 
@@ -123,7 +141,7 @@ public static class ApiServer
         {
             if (string.IsNullOrEmpty(req.Host))
                 return Results.BadRequest(new { success = false, message = "host is required" });
-            var result = await mgr.BrowseDirectoryAsync(req.Host, req.Path);
+            var result = await mgr.BrowseDirectoryAsync(req.Host, req.Path, req.Username, req.Password);
             return Results.Ok(result);
         });
     }

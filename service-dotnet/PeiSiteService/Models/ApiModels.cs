@@ -27,6 +27,8 @@ public class FtpServerCreateRequest
     public string FtpHost { get; set; } = "";
     public string FtpPath { get; set; } = "/";
     public int FtpPollInterval { get; set; } = 900;
+    public string Username { get; set; } = "";
+    public string Password { get; set; } = "";
 }
 
 public class FtpServerUpdateRequest
@@ -35,6 +37,8 @@ public class FtpServerUpdateRequest
     public string? FtpHost { get; set; }
     public string? FtpPath { get; set; }
     public int? FtpPollInterval { get; set; }
+    public string? Username { get; set; }
+    public string? Password { get; set; }
 }
 
 public class FtpEnabledRequest
@@ -42,10 +46,17 @@ public class FtpEnabledRequest
     public bool Enabled { get; set; }
 }
 
+public class LogLevelRequest
+{
+    public ServiceLogLevel Level { get; set; } = ServiceLogLevel.Info;
+}
+
 public class FtpTestRequest
 {
     public string Host { get; set; } = "";
     public string? Path { get; set; }
+    public string Username { get; set; } = "";
+    public string Password { get; set; } = "";
 }
 
 public class FtpTestResult
@@ -59,6 +70,8 @@ public class FtpBrowseRequest
 {
     public string Host { get; set; } = "";
     public string Path { get; set; } = "/";
+    public string Username { get; set; } = "";
+    public string Password { get; set; } = "";
 }
 
 public class FtpBrowseResult
@@ -74,6 +87,15 @@ public class FtpDirectoryEntry
     public string FullPath { get; set; } = "";
 }
 
+// Log entries
+
+public class LogEntry
+{
+    public string Timestamp { get; set; } = "";
+    public string Level { get; set; } = "";
+    public string Message { get; set; } = "";
+}
+
 // FTP status responses
 
 public class FtpWatcherStatus
@@ -82,6 +104,7 @@ public class FtpWatcherStatus
     public string Name { get; set; } = "";
     public string Host { get; set; } = "";
     public string Path { get; set; } = "";
+    public string Username { get; set; } = "";
     public int PollInterval { get; set; }
     public string? LastPoll { get; set; }
     public string LastResult { get; set; } = "";

@@ -58,12 +58,18 @@ public class WebSocketClient : IDisposable
     {
         if (_socket?.Connected == true) return;
 
+        // Dispose any stale disconnected socket before creating a new one so the
+        // server sees a clean connection rather than a lingering session.
+        var stale = _socket;
+        _socket = null;
+        try { stale?.Dispose(); } catch { }
+
         _stopping = false;
         StartHistoryTracking();
         SetStatus(ConnectionStatus.connecting);
 
         var url = $"{_config.ApiUrl}/desktop";
-        _logger.Log($"[WebSocketClient] Connecting to: {url}");
+        _logger.Log(ServiceLogLevel.Info, $"[WebSocketClient] Connecting to: {url}");
 
         _socket = new SocketIOClient.SocketIO(new Uri(url), new SocketIOClient.SocketIOOptions
         {
@@ -72,7 +78,8 @@ public class WebSocketClient : IDisposable
                 api_key = _config.ApiKey,
                 site_id = _config.SiteId,
                 tenant_id = _config.TenantId,
-                connection_source = "service"
+                connection_source = "service",
+                app_version = AppVersion.Current
             },
             Reconnection = false,
             Transport = TransportProtocol.WebSocket
@@ -80,36 +87,42 @@ public class WebSocketClient : IDisposable
 
         _socket.OnConnected += (s, e) =>
         {
-            _logger.Log("[WebSocketClient] Connected");
+            _logger.Log(ServiceLogLevel.Info, "[WebSocketClient] Connected");
             lock (_lock) { _connectedAt = DateTime.UtcNow; }
             SetStatus(ConnectionStatus.connected);
         };
 
         _socket.OnDisconnected += (s, reason) =>
         {
-            _logger.Log($"[WebSocketClient] Disconnected: {reason}");
+            _logger.Log(ServiceLogLevel.Info, $"[WebSocketClient] Disconnected: {reason}");
             lock (_lock) { _connectedAt = null; }
             SetStatus(ConnectionStatus.disconnected);
 
             // Auto-reconnect on unexpected disconnects (not during intentional shutdown)
             if (!_stopping)
             {
-                _logger.Log("[WebSocketClient] Unexpected disconnect, will reconnect in 5 seconds...");
+                _logger.Log(ServiceLogLevel.Warning, "[WebSocketClient] Unexpected disconnect, will reconnect in 5 seconds...");
+                // Capture a local reference so the retry targets the specific socket
+                // that disconnected, not whatever _socket points to after a race.
+                var disconnectedSocket = _socket;
                 _ = Task.Run(async () =>
                 {
                     await Task.Delay(5000);
                     if (!_stopping)
                     {
-                        _logger.Log("[WebSocketClient] Attempting reconnect...");
+                        _logger.Log(ServiceLogLevel.Info, "[WebSocketClient] Attempting reconnect...");
                         SetStatus(ConnectionStatus.connecting);
                         try
                         {
-                            await _socket.ConnectAsync();
-                            _logger.Log("[WebSocketClient] Reconnect succeeded");
+                            await disconnectedSocket.ConnectAsync();
+                            _logger.Log(ServiceLogLevel.Info, "[WebSocketClient] Reconnect succeeded");
                         }
                         catch (Exception ex)
                         {
-                            _logger.Log($"[WebSocketClient] Reconnect failed: {ex.Message}, retrying in 10s...");
+                            _logger.Log(ServiceLogLevel.Warning, $"[WebSocketClient] Reconnect failed: {ex.Message}, retrying in 10s...");
+                            // Discard the old socket so Connect() starts completely fresh.
+                            lock (_lock) { if (_socket == disconnectedSocket) _socket = null; }
+                            try { disconnectedSocket.Dispose(); } catch { }
                             await Task.Delay(10000);
                             if (!_stopping) Connect();
                         }
@@ -120,13 +133,13 @@ public class WebSocketClient : IDisposable
 
         _socket.OnError += (s, error) =>
         {
-            _logger.Log($"[WebSocketClient] Connection error: {error}");
+            _logger.Log(ServiceLogLevel.Error, $"[WebSocketClient] Connection error: {error}");
             SetStatus(ConnectionStatus.error);
         };
 
         _socket.OnAny(async (name, ctx) =>
         {
-            _logger.Log($"[WebSocketClient] Event: {name}");
+            _logger.Log(ServiceLogLevel.Debug, $"[WebSocketClient] Event: {name}");
             await Task.CompletedTask;
         });
 
@@ -139,7 +152,7 @@ public class WebSocketClient : IDisposable
             }
             catch (Exception ex)
             {
-                _logger.Log($"[WebSocketClient] Error parsing ftp:file_ack: {ex.Message}");
+                _logger.Log(ServiceLogLevel.Error, $"[WebSocketClient] Error parsing ftp:file_ack: {ex.Message}");
             }
         });
 
@@ -152,14 +165,14 @@ public class WebSocketClient : IDisposable
                 try
                 {
                     await _socket.ConnectAsync();
-                    _logger.Log("[WebSocketClient] ConnectAsync completed");
+                    _logger.Log(ServiceLogLevel.Info, "[WebSocketClient] ConnectAsync completed");
                     break; // Connected successfully
                 }
                 catch (Exception ex)
                 {
-                    _logger.Log($"[WebSocketClient] ConnectAsync exception: {ex.Message}");
+                    _logger.Log(ServiceLogLevel.Warning, $"[WebSocketClient] ConnectAsync exception: {ex.Message}");
                     SetStatus(ConnectionStatus.error);
-                    _logger.Log("[WebSocketClient] Will retry connection in 10 seconds...");
+                    _logger.Log(ServiceLogLevel.Warning, "[WebSocketClient] Will retry connection in 10 seconds...");
                     await Task.Delay(10000);
                     SetStatus(ConnectionStatus.connecting);
                 }
@@ -228,7 +241,7 @@ public class WebSocketClient : IDisposable
 
         if (needsReconnect)
         {
-            _logger.Log("[WebSocketClient] Config changed, reconnecting...");
+            _logger.Log(ServiceLogLevel.Info, "[WebSocketClient] Config changed, reconnecting...");
             Disconnect();
             Connect();
         }
@@ -265,7 +278,7 @@ public class WebSocketClient : IDisposable
             }
         }
 
-        _logger.Log($"[WebSocketClient] History prepopulated from {sessions.Count} sessions");
+        _logger.Log(ServiceLogLevel.Debug, $"[WebSocketClient] History prepopulated from {sessions.Count} sessions");
     }
 
     private void SetStatus(ConnectionStatus status)

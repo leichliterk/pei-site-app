@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.ServiceProcess;
+using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PeiSiteApp.Models;
@@ -31,6 +33,15 @@ public partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _siteNameSuccess;
+
+    [ObservableProperty]
+    private string _apiKey = "";
+
+    [ObservableProperty]
+    private string _apiKeyMessage = "";
+
+    [ObservableProperty]
+    private bool _apiKeySuccess;
 
     // Tenant dialog
     [ObservableProperty]
@@ -84,7 +95,13 @@ public partial class SettingsViewModel : ObservableObject
     private string _dialogFtpPath = "/";
 
     [ObservableProperty]
-    private int _dialogFtpIntervalMinutes = 15;
+    private int _dialogFtpIntervalSeconds = 900;
+
+    [ObservableProperty]
+    private string _dialogUsername = "";
+
+    [ObservableProperty]
+    private string _dialogPassword = "";
 
     [ObservableProperty]
     private string _dialogTestMessage = "";
@@ -123,6 +140,37 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _deletingServerHost = "";
 
+    // Logging tab
+    [ObservableProperty]
+    private string _selectedLogLevel = "info";
+
+    public ObservableCollection<LogEntry> LogEntries { get; } = new();
+    private string? _lastLogTimestamp;
+    private DispatcherTimer? _logPollTimer;
+
+    // Advanced tab — service control
+    private const string ServiceName = "PeiSiteService";
+
+    [ObservableProperty]
+    private string _serviceStatusDisplay = "Unknown";
+
+    [ObservableProperty]
+    private bool _isServiceRunning;
+
+    [ObservableProperty]
+    private bool _isServiceBusy;
+
+    [ObservableProperty]
+    private string _serviceMessage = "";
+
+    private DispatcherTimer? _serviceStatusTimer;
+
+    public static IReadOnlyList<string> LogLevels { get; } =
+        new[] { "debug", "info", "warning", "error", "critical" };
+
+    public bool IsFtpDialogSaveEnabled =>
+        !string.IsNullOrWhiteSpace(DialogServerName) && !string.IsNullOrWhiteSpace(DialogFtpHost);
+
     public bool IsFormValid
     {
         get
@@ -156,6 +204,7 @@ public partial class SettingsViewModel : ObservableObject
         SiteName = settings.SiteName;
         TenantId = settings.TenantId.ToString();
         SiteNumber = settings.SiteNumber;
+        SelectedLogLevel = settings.LogLevel;
 
         _ = LoadFtpServersAsync();
     }
@@ -186,6 +235,30 @@ public partial class SettingsViewModel : ObservableObject
         {
             SiteNameMessage = "Failed to update site name on server";
             SiteNameSuccess = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task SaveApiKeyAsync()
+    {
+        if (string.IsNullOrWhiteSpace(ApiKey))
+        {
+            ApiKeyMessage = "API key cannot be empty";
+            ApiKeySuccess = false;
+            return;
+        }
+
+        try
+        {
+            await _localService.UpdateConfigAsync(new { apiKey = ApiKey });
+            ApiKey = "";
+            ApiKeyMessage = "API key updated successfully";
+            ApiKeySuccess = true;
+        }
+        catch (Exception)
+        {
+            ApiKeyMessage = "Failed to update API key";
+            ApiKeySuccess = false;
         }
     }
 
@@ -316,7 +389,9 @@ public partial class SettingsViewModel : ObservableObject
         DialogServerName = "";
         DialogFtpHost = "";
         DialogFtpPath = "/";
-        DialogFtpIntervalMinutes = 15;
+        DialogFtpIntervalSeconds = 900;
+        DialogUsername = "";
+        DialogPassword = "";
         DialogTestMessage = "";
         DialogTestSuccess = null;
         ShowFtpServerDialog = true;
@@ -330,8 +405,10 @@ public partial class SettingsViewModel : ObservableObject
         DialogServerName = server.Name;
         DialogFtpHost = server.Host;
         DialogFtpPath = server.Path;
-        DialogFtpIntervalMinutes = server.PollInterval / 60;
-        if (DialogFtpIntervalMinutes < 1) DialogFtpIntervalMinutes = 1;
+        DialogFtpIntervalSeconds = server.PollInterval;
+        if (DialogFtpIntervalSeconds < 1) DialogFtpIntervalSeconds = 1;
+        DialogUsername = server.Username;
+        DialogPassword = ""; // passwords are never returned from the service; leave blank to keep existing
         DialogTestMessage = "";
         DialogTestSuccess = null;
         ShowFtpServerDialog = true;
@@ -357,7 +434,7 @@ public partial class SettingsViewModel : ObservableObject
         DialogTestMessage = "Testing connection...";
         DialogTestSuccess = null;
 
-        var result = await _localService.FtpTestConnectionAsync(DialogFtpHost, DialogFtpPath);
+        var result = await _localService.FtpTestConnectionAsync(DialogFtpHost, DialogFtpPath, DialogUsername, DialogPassword);
         DialogTestMessage = result.Message;
         DialogTestSuccess = result.Success;
         IsDialogTesting = false;
@@ -374,11 +451,11 @@ public partial class SettingsViewModel : ObservableObject
         }
 
         IsDialogSaving = true;
-        var intervalSeconds = DialogFtpIntervalMinutes * 60;
+        var intervalSeconds = DialogFtpIntervalSeconds;
 
         if (string.IsNullOrEmpty(EditingServerId))
         {
-            var result = await _localService.FtpAddServerAsync(DialogServerName, DialogFtpHost, DialogFtpPath, intervalSeconds);
+            var result = await _localService.FtpAddServerAsync(DialogServerName, DialogFtpHost, DialogFtpPath, intervalSeconds, DialogUsername, DialogPassword);
             if (result != null)
             {
                 ShowFtpServerDialog = false;
@@ -392,7 +469,7 @@ public partial class SettingsViewModel : ObservableObject
         }
         else
         {
-            var success = await _localService.FtpUpdateServerAsync(EditingServerId, DialogServerName, DialogFtpHost, DialogFtpPath, intervalSeconds);
+            var success = await _localService.FtpUpdateServerAsync(EditingServerId, DialogServerName, DialogFtpHost, DialogFtpPath, intervalSeconds, DialogUsername, DialogPassword);
             if (success)
             {
                 ShowFtpServerDialog = false;
@@ -450,7 +527,7 @@ public partial class SettingsViewModel : ObservableObject
         if (node.HasLoadedChildren) return;
 
         node.IsLoading = true;
-        var result = await _localService.FtpBrowseAsync(DialogFtpHost, node.FullPath);
+        var result = await _localService.FtpBrowseAsync(DialogFtpHost, node.FullPath, DialogUsername, DialogPassword);
         node.IsLoading = false;
 
         if (result.Success)
@@ -474,7 +551,7 @@ public partial class SettingsViewModel : ObservableObject
         IsBrowseLoading = true;
         BrowseErrorMessage = "";
 
-        var result = await _localService.FtpBrowseAsync(DialogFtpHost, path);
+        var result = await _localService.FtpBrowseAsync(DialogFtpHost, path, DialogUsername, DialogPassword);
         IsBrowseLoading = false;
 
         if (result.Success)
@@ -526,8 +603,161 @@ public partial class SettingsViewModel : ObservableObject
             await LoadFtpServersAsync();
     }
 
+    // --- Logging tab commands ---
+
+    [RelayCommand]
+    private async Task SaveLogLevelAsync()
+    {
+        _settingsManager.SaveLogLevel(SelectedLogLevel);
+        await _localService.SetLogLevelAsync(SelectedLogLevel);
+    }
+
+    [RelayCommand]
+    private void ClearLogs()
+    {
+        LogEntries.Clear();
+    }
+
+    private void StartLogPolling()
+    {
+        if (_logPollTimer != null) return;
+        _ = PollLogsAsync();
+        _logPollTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+        _logPollTimer.Tick += async (_, _) => await PollLogsAsync();
+        _logPollTimer.Start();
+    }
+
+    private void StopLogPolling()
+    {
+        _logPollTimer?.Stop();
+        _logPollTimer = null;
+    }
+
+    private async Task PollLogsAsync()
+    {
+        var entries = await _localService.GetLogsAsync(_lastLogTimestamp);
+        if (entries == null || entries.Count == 0) return;
+
+        foreach (var entry in entries)
+            LogEntries.Add(entry);
+
+        // Cap at 500 entries to avoid unbounded growth
+        while (LogEntries.Count > 500)
+            LogEntries.RemoveAt(0);
+
+        _lastLogTimestamp = entries[^1].Timestamp;
+    }
+
+    // --- Advanced tab commands ---
+
+    [RelayCommand(CanExecute = nameof(CanControlService))]
+    private async Task StartServiceAsync()
+    {
+        IsServiceBusy = true;
+        ServiceMessage = "";
+        try
+        {
+            await Task.Run(() =>
+            {
+                using var sc = new ServiceController(ServiceName);
+                sc.Start();
+                sc.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(30));
+            });
+            await RefreshServiceStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            ServiceMessage = $"Failed to start: {ex.Message}";
+        }
+        finally { IsServiceBusy = false; }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanControlService))]
+    private async Task StopServiceAsync()
+    {
+        IsServiceBusy = true;
+        ServiceMessage = "";
+        try
+        {
+            await Task.Run(() =>
+            {
+                using var sc = new ServiceController(ServiceName);
+                sc.Stop();
+                sc.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(30));
+            });
+            await RefreshServiceStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            ServiceMessage = $"Failed to stop: {ex.Message}";
+        }
+        finally { IsServiceBusy = false; }
+    }
+
+    private bool CanControlService() => !IsServiceBusy;
+
+    partial void OnIsServiceBusyChanged(bool value)
+    {
+        StartServiceCommand.NotifyCanExecuteChanged();
+        StopServiceCommand.NotifyCanExecuteChanged();
+    }
+
+    private void StartServiceStatusPolling()
+    {
+        if (_serviceStatusTimer != null) return;
+        _ = RefreshServiceStatusAsync();
+        _serviceStatusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+        _serviceStatusTimer.Tick += async (_, _) => await RefreshServiceStatusAsync();
+        _serviceStatusTimer.Start();
+    }
+
+    private void StopServiceStatusPolling()
+    {
+        _serviceStatusTimer?.Stop();
+        _serviceStatusTimer = null;
+    }
+
+    private async Task RefreshServiceStatusAsync()
+    {
+        try
+        {
+            var status = await Task.Run(() =>
+            {
+                using var sc = new ServiceController(ServiceName);
+                return sc.Status;
+            });
+            IsServiceRunning = status == ServiceControllerStatus.Running;
+            ServiceStatusDisplay = status switch
+            {
+                ServiceControllerStatus.Running => "Running",
+                ServiceControllerStatus.Stopped => "Stopped",
+                ServiceControllerStatus.StartPending => "Starting...",
+                ServiceControllerStatus.StopPending => "Stopping...",
+                ServiceControllerStatus.Paused => "Paused",
+                _ => status.ToString()
+            };
+        }
+        catch
+        {
+            IsServiceRunning = false;
+            ServiceStatusDisplay = "Unknown";
+        }
+    }
+
+    // Tab indices: Site=0, Logging=1, FTP=2, Advanced=3
+    partial void OnSelectedTabIndexChanged(int value)
+    {
+        if (value == 1) StartLogPolling();
+        else StopLogPolling();
+
+        if (value == 3) StartServiceStatusPolling();
+        else StopServiceStatusPolling();
+    }
+
     partial void OnConfirmationPhraseChanged(string value) => OnPropertyChanged(nameof(IsFormValid));
     partial void OnNewSiteNumberInputChanged(string value) => OnPropertyChanged(nameof(IsFormValid));
     partial void OnTenantConfirmationPhraseChanged(string value) => OnPropertyChanged(nameof(IsTenantFormValid));
     partial void OnNewTenantIdInputChanged(string value) => OnPropertyChanged(nameof(IsTenantFormValid));
+    partial void OnDialogServerNameChanged(string value) => OnPropertyChanged(nameof(IsFtpDialogSaveEnabled));
+    partial void OnDialogFtpHostChanged(string value) => OnPropertyChanged(nameof(IsFtpDialogSaveEnabled));
 }

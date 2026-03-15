@@ -42,7 +42,9 @@ var configManager = new ConfigManager(logger);
 var config = configManager.GetConfig();
 var ftpConfig = configManager.GetFtpConfig();
 
-logger.Log($"[PEI Site Service] Configuration loaded: apiUrl={config.ApiUrl}, siteId={config.SiteId}, tenantId={config.TenantId}");
+logger.MinLevel = config.LogLevel;
+
+logger.Log($"[PEI Site Service] Configuration loaded: apiUrl={config.ApiUrl}, siteId={config.SiteId}, tenantId={config.TenantId}, logLevel={config.LogLevel}");
 logger.Log($"[PEI Site Service] FTP config: enabled={ftpConfig.FtpEnabled}, servers={ftpConfig.Servers.Count}");
 
 var wsClient = new WebSocketClient(config.ToServiceConfig(), logger);
