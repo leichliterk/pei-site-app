@@ -30,4 +30,8 @@
     <Resource Include="Resources\icon.ico" />
   </ItemGroup>
 
+  <PropertyGroup Condition="'$(BuildEnvironment)' == 'Production'">
+    <DefineConstants>$(DefineConstants);PRODUCTION</DefineConstants>
+  </PropertyGroup>
+
 </Project>

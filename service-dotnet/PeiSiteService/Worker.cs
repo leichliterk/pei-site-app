@@ -78,7 +78,11 @@ public class Worker : BackgroundService
         var apiUrl = _configManager.GetConfig().ApiUrl;
         string host;
         try { host = new Uri(apiUrl).Host; }
+#if PRODUCTION
         catch { host = "pei-web-server.onrender.com"; }
+#else
+        catch { host = "pei-web-server-staging.onrender.com"; }
+#endif
 
         for (int attempt = 1; attempt <= maxAttempts; attempt++)
         {

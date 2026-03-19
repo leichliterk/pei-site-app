@@ -20,7 +20,11 @@ public class ConfigManager
 
     private static readonly FullConfig DefaultConfig = new()
     {
+#if PRODUCTION
+        ApiUrl = "https://pei-web-server.onrender.com/api/data",
+#else
         ApiUrl = "https://pei-web-server-staging.onrender.com/api/data",
+#endif
         ApiKey = "",
         SiteId = 1000,
         TenantId = 1001,

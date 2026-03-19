@@ -20,4 +20,8 @@
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.3" />
   </ItemGroup>
 
+  <PropertyGroup Condition="'$(BuildEnvironment)' == 'Production'">
+    <DefineConstants>$(DefineConstants);PRODUCTION</DefineConstants>
+  </PropertyGroup>
+
 </Project>
