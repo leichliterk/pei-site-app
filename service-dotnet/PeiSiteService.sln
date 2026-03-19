@@ -1,0 +1,34 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PeiSiteService", "PeiSiteService\PeiSiteService.csproj", "{FB8103DD-7219-4F3C-94BB-6D471628C94A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PeiSiteApp", "PeiSiteApp\PeiSiteApp.csproj", "{AECD5E48-C246-4C0C-8A32-C3B2A5A742DB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PeiSiteService.Tests", "PeiSiteService.Tests\PeiSiteService.Tests.csproj", "{D3E4F5A6-B7C8-49D0-E1F2-A3B4C5D6E7F8}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{FB8103DD-7219-4F3C-94BB-6D471628C94A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FB8103DD-7219-4F3C-94BB-6D471628C94A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FB8103DD-7219-4F3C-94BB-6D471628C94A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FB8103DD-7219-4F3C-94BB-6D471628C94A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AECD5E48-C246-4C0C-8A32-C3B2A5A742DB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AECD5E48-C246-4C0C-8A32-C3B2A5A742DB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AECD5E48-C246-4C0C-8A32-C3B2A5A742DB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AECD5E48-C246-4C0C-8A32-C3B2A5A742DB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D3E4F5A6-B7C8-49D0-E1F2-A3B4C5D6E7F8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D3E4F5A6-B7C8-49D0-E1F2-A3B4C5D6E7F8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D3E4F5A6-B7C8-49D0-E1F2-A3B4C5D6E7F8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D3E4F5A6-B7C8-49D0-E1F2-A3B4C5D6E7F8}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
