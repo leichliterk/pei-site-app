@@ -3,8 +3,12 @@
 **/obj/
 **/publish/
 
-# MSI build output
-/release/
+# MSI build output (binaries excluded, WXS/RTF source files tracked)
+/release/**/*.msi
+/release/**/*.exe
+/release/**/*.wixobj
+/release/**/*.wixpdb
+/release/**/*.cab
 
 # IDEs and editors
 .idea/
