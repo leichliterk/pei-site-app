@@ -43,12 +43,26 @@
           <Directory Id="INSTALLFOLDER" Name="PEI Site App" />
         </Directory>
       </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="PeiStartMenuDir" Name="PEI Data Systems" />
+      </Directory>
+      <Directory Id="DesktopFolder" Name="Desktop" />
     </Directory>
+
+    <!-- Launch tray app after install (runs as the logged-in user, no wait) -->
+    <CustomAction Id="LaunchApp"
+                  FileKey="PeiSiteApp_exe"
+                  ExeCommand=""
+                  Return="asyncNoWait"
+                  Impersonate="yes" />
+    <InstallExecuteSequence>
+      <Custom Action="LaunchApp" After="InstallFinalize">NOT Installed</Custom>
+    </InstallExecuteSequence>
 
     <Feature Id="ProductFeature" Title="PEI Site App" Level="1">
       <ComponentRef Id="AppExe" />
       <ComponentRef Id="ServiceExe" />
-      <ComponentRef Id="ServiceInstallComp" />
+      <ComponentRef Id="AppShortcuts" />
       <ComponentRef Id="RegistryConfig" />
       <ComponentRef Id="AutoStart" />
     </Feature>
@@ -67,7 +81,7 @@
                                 Program="[INSTALLFOLDER]pei-site-app.exe" />
       </Component>
 
-      <!-- Windows Service executable + SCM registration -->
+      <!-- Windows Service executable + SCM registration (must be same component as exe) -->
       <Component Id="ServiceExe" Guid="*" Win64="yes">
         <File Id="PeiSiteService_exe"
               Name="pei-site-service.exe"
@@ -78,10 +92,6 @@
                                 Scope="localSubnet"
                                 Protocol="tcp"
                                 Program="[INSTALLFOLDER]pei-site-service.exe" />
-      </Component>
-
-      <Component Id="ServiceInstallComp" Guid="*" Win64="yes">
-        <CreateFolder />
         <ServiceInstall Id="PeiSiteServiceInstall"
                         Name="PeiSiteService"
                         DisplayName="PEI Site Service"
@@ -96,15 +106,33 @@
                         Start="install"
                         Stop="both"
                         Remove="uninstall"
-                        Wait="yes" />
+                        Wait="no" />
         <util:ServiceConfig ServiceName="PeiSiteService"
                             FirstFailureActionType="restart"
                             SecondFailureActionType="restart"
                             ThirdFailureActionType="restart"
                             RestartServiceDelayInSeconds="10" />
-        <RegistryValue Root="HKLM"
-                       Key="Software\PEI Data Systems\PEI Site App\ServiceInstall"
-                       Name="Installed"
+      </Component>
+    </DirectoryRef>
+
+    <!-- Shortcuts -->
+    <DirectoryRef Id="PeiStartMenuDir">
+      <Component Id="AppShortcuts" Guid="*" Win64="yes">
+        <Shortcut Id="StartMenuShortcut"
+                  Name="PEI Site App"
+                  Description="PEI Site App"
+                  Target="[INSTALLFOLDER]pei-site-app.exe"
+                  WorkingDirectory="INSTALLFOLDER" />
+        <Shortcut Id="DesktopShortcut"
+                  Name="PEI Site App"
+                  Description="PEI Site App"
+                  Target="[INSTALLFOLDER]pei-site-app.exe"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Directory="DesktopFolder" />
+        <RemoveFolder Id="RemovePeiStartMenuDir" Directory="PeiStartMenuDir" On="uninstall" />
+        <RegistryValue Root="HKCU"
+                       Key="Software\PEI Data Systems\PEI Site App"
+                       Name="Shortcuts"
                        Type="integer"
                        Value="1"
                        KeyPath="yes" />
@@ -123,9 +151,9 @@
         </RegistryKey>
       </Component>
 
-      <!-- Auto-start WPF tray app on user login -->
-      <Component Id="AutoStart" Guid="*">
-        <RegistryValue Root="HKCU"
+      <!-- Auto-start WPF tray app on user login (HKLM so it applies to all users under perMachine install) -->
+      <Component Id="AutoStart" Guid="*" Win64="yes">
+        <RegistryValue Root="HKLM"
                        Key="Software\Microsoft\Windows\CurrentVersion\Run"
                        Name="PEI Site App"
                        Type="string"
