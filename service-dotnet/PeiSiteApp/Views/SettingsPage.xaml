@@ -546,7 +546,12 @@
                     <!-- Interval -->
                     <TextBlock Text="Sync Interval (seconds)" Style="{StaticResource FieldLabel}" />
                     <TextBox Text="{Binding DialogFtpIntervalSeconds, UpdateSourceTrigger=PropertyChanged}"
-                             Style="{StaticResource InputTextBox}" Margin="0,0,0,16" />
+                             Style="{StaticResource InputTextBox}" Margin="0,0,0,12" />
+
+                    <!-- Full upload -->
+                    <CheckBox IsChecked="{Binding DialogForceFullUpload}"
+                              Content="Full upload on next poll (upload all files, regardless of date)"
+                              Margin="0,0,0,16" />
 
                     <!-- Test / Status Message -->
                     <Border Padding="10,8" CornerRadius="4" Margin="0,0,0,12"

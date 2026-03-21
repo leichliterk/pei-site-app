@@ -17,6 +17,8 @@ public class FtpWatcher
     private readonly FileLogger _logger;
     private readonly string _statePath;
 
+    private readonly Action<string>? _onForceUploadComplete;
+
     private Timer? _pollTimer;
     private FtpState _state = new();
     private string _lastResult = "never polled";
@@ -34,7 +36,7 @@ public class FtpWatcher
     public string Host => _serverConfig.FtpHost;
     public bool IsCurrentlyPolling => _isPolling == 1;
 
-    public FtpWatcher(FtpServerConfig serverConfig, WebSocketClient wsClient, PendingFileQueue pendingQueue, int siteId, int tenantId, FileLogger logger)
+    public FtpWatcher(FtpServerConfig serverConfig, WebSocketClient wsClient, PendingFileQueue pendingQueue, int siteId, int tenantId, FileLogger logger, Action<string>? onForceUploadComplete = null)
     {
         _serverConfig = serverConfig;
         _wsClient = wsClient;
@@ -42,6 +44,7 @@ public class FtpWatcher
         _siteId = siteId;
         _tenantId = tenantId;
         _logger = logger;
+        _onForceUploadComplete = onForceUploadComplete;
 
         var programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
         var stateDir = Path.Combine(programData, "PEI Site Service");
@@ -65,7 +68,8 @@ public class FtpWatcher
                 LastPoll = _state.LastPoll,
                 LastResult = _lastResult,
                 FilesForwarded = _filesForwarded,
-                IsPolling = _isPolling == 1
+                IsPolling = _isPolling == 1,
+                ForceFullUploadOnNextPoll = _serverConfig.ForceFullUploadOnNextPoll
             };
         }
     }
@@ -303,6 +307,7 @@ public class FtpWatcher
             }
 
             int newOrChanged = 0;
+            bool isFullUpload = _serverConfig.ForceFullUploadOnNextPoll;
 
             // Switch to binary mode for file transfers (forensic byte-for-byte fidelity)
             var typeResp = await SendFtpCommandAsync(writer, reader, "TYPE I", "TYPE I");
@@ -312,11 +317,15 @@ public class FtpWatcher
                 return;
             }
 
+            if (isFullUpload)
+                _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] Full upload requested — uploading all {entries.Length} files");
+
             foreach (var entry in entries)
             {
-                if (!IsModifiedToday(entry.ModifiedAt)) continue;
+                if (!isFullUpload && !IsModifiedToday(entry.ModifiedAt)) continue;
 
-                _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] Sending today's file: {entry.Name} (modified={entry.ModifiedAt})");
+                var reason = isFullUpload ? "full upload" : "modified today";
+                _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] Sending file ({reason}): {entry.Name} (modified={entry.ModifiedAt})");
                 try
                 {
                     var fileBytes = await FtpActiveDataTransferBytesAsync(writer, reader, localIp, $"RETR {entry.Name}", $"RETR {entry.Name}");
@@ -332,10 +341,17 @@ public class FtpWatcher
                 }
             }
 
+            if (isFullUpload)
+            {
+                _serverConfig.ForceFullUploadOnNextPoll = false;
+                _onForceUploadComplete?.Invoke(Id);
+            }
+
             lock (_stateLock) { _state.LastPoll = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"); }
             SaveState();
 
-            _lastResult = $"OK - {entries.Length} files listed, {newOrChanged} forwarded (today)";
+            var mode = isFullUpload ? "full upload" : "today";
+            _lastResult = $"OK - {entries.Length} files listed, {newOrChanged} forwarded ({mode})";
             _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] Poll complete: {_lastResult}");
 
             await writer.WriteLineAsync("QUIT");

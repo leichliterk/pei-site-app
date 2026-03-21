@@ -104,6 +104,9 @@ public partial class SettingsViewModel : ObservableObject
     private string _dialogPassword = "";
 
     [ObservableProperty]
+    private bool _dialogForceFullUpload;
+
+    [ObservableProperty]
     private string _dialogTestMessage = "";
 
     [ObservableProperty]
@@ -392,6 +395,7 @@ public partial class SettingsViewModel : ObservableObject
         DialogFtpIntervalSeconds = 900;
         DialogUsername = "";
         DialogPassword = "";
+        DialogForceFullUpload = false;
         DialogTestMessage = "";
         DialogTestSuccess = null;
         ShowFtpServerDialog = true;
@@ -409,6 +413,7 @@ public partial class SettingsViewModel : ObservableObject
         if (DialogFtpIntervalSeconds < 1) DialogFtpIntervalSeconds = 1;
         DialogUsername = server.Username;
         DialogPassword = ""; // passwords are never returned from the service; leave blank to keep existing
+        DialogForceFullUpload = server.ForceFullUploadOnNextPoll;
         DialogTestMessage = "";
         DialogTestSuccess = null;
         ShowFtpServerDialog = true;
@@ -469,7 +474,7 @@ public partial class SettingsViewModel : ObservableObject
         }
         else
         {
-            var success = await _localService.FtpUpdateServerAsync(EditingServerId, DialogServerName, DialogFtpHost, DialogFtpPath, intervalSeconds, DialogUsername, DialogPassword);
+            var success = await _localService.FtpUpdateServerAsync(EditingServerId, DialogServerName, DialogFtpHost, DialogFtpPath, intervalSeconds, DialogUsername, DialogPassword, DialogForceFullUpload);
             if (success)
             {
                 ShowFtpServerDialog = false;

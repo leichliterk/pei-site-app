@@ -39,6 +39,7 @@ public class FtpServerUpdateRequest
     public int? FtpPollInterval { get; set; }
     public string? Username { get; set; }
     public string? Password { get; set; }
+    public bool? ForceFullUploadOnNextPoll { get; set; }
 }
 
 public class FtpEnabledRequest
@@ -110,6 +111,7 @@ public class FtpWatcherStatus
     public string LastResult { get; set; } = "";
     public int FilesForwarded { get; set; }
     public bool IsPolling { get; set; }
+    public bool ForceFullUploadOnNextPoll { get; set; }
 }
 
 public class FtpOverallStatus
