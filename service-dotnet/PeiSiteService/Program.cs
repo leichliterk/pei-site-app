@@ -49,7 +49,7 @@ logger.Log($"[PEI Site Service] FTP config: enabled={ftpConfig.FtpEnabled}, serv
 
 var wsClient = new WebSocketClient(config.ToServiceConfig(), logger);
 var pendingQueue = new PendingFileQueue(logger);
-var ftpManager = new FtpWatcherManager(wsClient, pendingQueue, logger);
+var ftpManager = new FtpWatcherManager(wsClient, pendingQueue, logger, configManager);
 ftpManager.Initialize(ftpConfig, config.SiteId, config.TenantId);
 
 builder.Services.AddSingleton(logger);

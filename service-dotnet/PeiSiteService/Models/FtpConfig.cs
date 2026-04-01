@@ -9,6 +9,7 @@ public class FtpServerConfig
     public int FtpPollInterval { get; set; } = 60;
     public string Username { get; set; } = "";
     public string Password { get; set; } = "";
+    public bool ForceFullUploadOnNextPoll { get; set; }
 }
 
 public class FtpConfig

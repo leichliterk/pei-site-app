@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
+     xmlns:fire="http://schemas.microsoft.com/wix/FirewallExtension"
+     xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+
+  <Product Id="*"
+           Name="PEI Site App"
+           Language="1033"
+           Version="1.0.0"
+           Manufacturer="PEI Data Systems"
+           UpgradeCode="57f48daa-3001-40a9-9dab-5a20450fd982">
+
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine"
+             Platform="x64"
+             Description="PEI Site App Installer"
+             Comments="Installs PEI Site App v1.0.0" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- Kill WPF tray app before install/upgrade so files can be replaced -->
+    <util:CloseApplication Id="ClosePeiSiteApp"
+                           Target="pei-site-app.exe"
+                           CloseMessage="no"
+                           RebootPrompt="no" />
+
+    <!-- Configuration properties (collected in setup dialog) -->
+    <Property Id="TENANT_ID" Value="1001" />
+    <Property Id="SITE_ID" Value="1000" />
+    <Property Id="SITE_NAME" Value=" " />
+    <Property Id="API_KEY" Value=" " />
+
+    <!-- Default install folder -->
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+
+    <UIRef Id="WixUI_PeiConfig" />
+    <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
+
+    <!-- Directory layout -->
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="PeiDataDir" Name="PEI Data Systems">
+          <Directory Id="INSTALLFOLDER" Name="PEI Site App" />
+        </Directory>
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="PeiStartMenuDir" Name="PEI Data Systems" />
+      </Directory>
+      <Directory Id="DesktopFolder" Name="Desktop" />
+    </Directory>
+
+    <!-- Launch tray app after install (runs as the logged-in user, no wait) -->
+    <CustomAction Id="LaunchApp"
+                  FileKey="PeiSiteApp_exe"
+                  ExeCommand=""
+                  Return="asyncNoWait"
+                  Impersonate="yes" />
+    <InstallExecuteSequence>
+      <Custom Action="LaunchApp" After="InstallFinalize">NOT Installed</Custom>
+    </InstallExecuteSequence>
+
+    <Feature Id="ProductFeature" Title="PEI Site App" Level="1">
+      <ComponentRef Id="AppExe" />
+      <ComponentRef Id="ServiceExe" />
+      <ComponentRef Id="AppShortcuts" />
+      <ComponentRef Id="RegistryConfig" />
+      <ComponentRef Id="AutoStart" />
+    </Feature>
+
+    <!-- WPF Tray App executable -->
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="AppExe" Guid="*" Win64="yes">
+        <File Id="PeiSiteApp_exe"
+              Name="pei-site-app.exe"
+              Source="..\..\service-dotnet\PeiSiteApp\bin\Release\net8.0-windows\win-x64\publish\pei-site-app.exe"
+              KeyPath="yes" />
+        <fire:FirewallException Id="AppFirewall"
+                                Name="PEI Site App"
+                                Scope="localSubnet"
+                                Protocol="tcp"
+                                Program="[INSTALLFOLDER]pei-site-app.exe" />
+      </Component>
+
+      <!-- Windows Service executable + SCM registration (must be same component as exe) -->
+      <Component Id="ServiceExe" Guid="*" Win64="yes">
+        <File Id="PeiSiteService_exe"
+              Name="pei-site-service.exe"
+              Source="..\..\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\publish\pei-site-service.exe"
+              KeyPath="yes" />
+        <fire:FirewallException Id="ServiceFirewall"
+                                Name="PEI Site Service"
+                                Scope="localSubnet"
+                                Protocol="tcp"
+                                Program="[INSTALLFOLDER]pei-site-service.exe" />
+        <ServiceInstall Id="PeiSiteServiceInstall"
+                        Name="PeiSiteService"
+                        DisplayName="PEI Site Service"
+                        Description="Monitors FTP servers and syncs site data to the PEI platform."
+                        Type="ownProcess"
+                        Start="auto"
+                        ErrorControl="normal"
+                        Account="LocalSystem"
+                        Vital="yes" />
+        <ServiceControl Id="PeiSiteServiceControl"
+                        Name="PeiSiteService"
+                        Start="install"
+                        Stop="both"
+                        Remove="uninstall"
+                        Wait="no" />
+        <util:ServiceConfig ServiceName="PeiSiteService"
+                            FirstFailureActionType="restart"
+                            SecondFailureActionType="restart"
+                            ThirdFailureActionType="restart"
+                            RestartServiceDelayInSeconds="10" />
+      </Component>
+    </DirectoryRef>
+
+    <!-- Shortcuts -->
+    <DirectoryRef Id="PeiStartMenuDir">
+      <Component Id="AppShortcuts" Guid="*" Win64="yes">
+        <Shortcut Id="StartMenuShortcut"
+                  Name="PEI Site App"
+                  Description="PEI Site App"
+                  Target="[INSTALLFOLDER]pei-site-app.exe"
+                  WorkingDirectory="INSTALLFOLDER" />
+        <Shortcut Id="DesktopShortcut"
+                  Name="PEI Site App"
+                  Description="PEI Site App"
+                  Target="[INSTALLFOLDER]pei-site-app.exe"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Directory="DesktopFolder" />
+        <RemoveFolder Id="RemovePeiStartMenuDir" Directory="PeiStartMenuDir" On="uninstall" />
+        <RegistryValue Root="HKCU"
+                       Key="Software\PEI Data Systems\PEI Site App"
+                       Name="Shortcuts"
+                       Type="integer"
+                       Value="1"
+                       KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <!-- Registry: bootstrap config for service on first run -->
+    <DirectoryRef Id="TARGETDIR">
+      <Component Id="RegistryConfig" Guid="*">
+        <RegistryKey Root="HKLM" Key="Software\PEI Data Systems\PEI Site App">
+          <RegistryValue Name="TenantId" Type="string" Value="[TENANT_ID]" />
+          <RegistryValue Name="SiteId" Type="string" Value="[SITE_ID]" />
+          <RegistryValue Name="SiteName" Type="string" Value="[SITE_NAME]" />
+          <RegistryValue Name="ApiKey" Type="string" Value="[API_KEY]" />
+          <RegistryValue Name="InstallPath" Type="string" Value="[INSTALLFOLDER]" KeyPath="yes" />
+        </RegistryKey>
+      </Component>
+
+      <!-- Auto-start WPF tray app on user login (HKLM so it applies to all users under perMachine install) -->
+      <Component Id="AutoStart" Guid="*" Win64="yes">
+        <RegistryValue Root="HKLM"
+                       Key="Software\Microsoft\Windows\CurrentVersion\Run"
+                       Name="PEI Site App"
+                       Type="string"
+                       Value="[INSTALLFOLDER]pei-site-app.exe"
+                       KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+  </Product>
+
+  <!-- Custom UI: WelcomeDlg → ConfigurationDlg → InstallDirDlg → VerifyReadyDlg -->
+  <Fragment>
+    <UI Id="WixUI_PeiConfig">
+      <TextStyle Id="WixUI_Font_Normal" FaceName="Tahoma" Size="8" />
+      <TextStyle Id="WixUI_Font_Bigger" FaceName="Tahoma" Size="12" />
+      <TextStyle Id="WixUI_Font_Title"  FaceName="Tahoma" Size="9" Bold="yes" />
+
+      <Property Id="DefaultUIFont" Value="WixUI_Font_Normal" />
+      <Property Id="WixUI_Mode"    Value="InstallDir" />
+
+      <DialogRef Id="BrowseDlg" />
+      <DialogRef Id="DiskCostDlg" />
+      <DialogRef Id="ErrorDlg" />
+      <DialogRef Id="FatalError" />
+      <DialogRef Id="FilesInUse" />
+      <DialogRef Id="MsiRMFilesInUse" />
+      <DialogRef Id="PrepareDlg" />
+      <DialogRef Id="ProgressDlg" />
+      <DialogRef Id="ResumeDlg" />
+      <DialogRef Id="UserExit" />
+      <DialogRef Id="WelcomeDlg" />
+      <DialogRef Id="InstallDirDlg" />
+      <DialogRef Id="VerifyReadyDlg" />
+      <DialogRef Id="MaintenanceWelcomeDlg" />
+      <DialogRef Id="MaintenanceTypeDlg" />
+
+      <!-- Navigation -->
+      <Publish Dialog="WelcomeDlg"        Control="Next"         Event="NewDialog" Value="ConfigurationDlg">NOT Installed</Publish>
+      <Publish Dialog="WelcomeDlg"        Control="Next"         Event="NewDialog" Value="VerifyReadyDlg">Installed AND PATCH</Publish>
+
+      <Publish Dialog="ConfigurationDlg"  Control="Back"         Event="NewDialog" Value="WelcomeDlg">1</Publish>
+      <Publish Dialog="ConfigurationDlg"  Control="Next"         Event="NewDialog" Value="InstallDirDlg">1</Publish>
+
+      <Publish Dialog="InstallDirDlg"     Control="Back"         Event="NewDialog" Value="ConfigurationDlg">1</Publish>
+      <Publish Dialog="InstallDirDlg"     Control="Next"         Event="SetTargetPath" Value="[WIXUI_INSTALLDIR]" Order="1">1</Publish>
+      <Publish Dialog="InstallDirDlg"     Control="Next"         Event="DoAction"      Value="WixUIValidatePath" Order="2">NOT WIXUI_DONTVALIDATEPATH</Publish>
+      <Publish Dialog="InstallDirDlg"     Control="Next"         Event="SpawnDialog"   Value="InvalidDirDlg"     Order="3"><![CDATA[NOT WIXUI_DONTVALIDATEPATH AND WIXUI_PATHEXISTS = 1]]></Publish>
+      <Publish Dialog="InstallDirDlg"     Control="Next"         Event="NewDialog"     Value="VerifyReadyDlg"   Order="4">WIXUI_DONTVALIDATEPATH OR NOT WIXUI_PATHEXISTS</Publish>
+      <Publish Dialog="InstallDirDlg"     Control="ChangeFolder" Property="_BrowseProperty" Value="[WIXUI_INSTALLDIR]" Order="1">1</Publish>
+      <Publish Dialog="InstallDirDlg"     Control="ChangeFolder" Event="SpawnDialog"   Value="BrowseDlg"        Order="2">1</Publish>
+
+      <Publish Dialog="VerifyReadyDlg"    Control="Back"         Event="NewDialog" Value="InstallDirDlg"        Order="1">NOT Installed</Publish>
+      <Publish Dialog="VerifyReadyDlg"    Control="Back"         Event="NewDialog" Value="MaintenanceTypeDlg"   Order="2">Installed AND NOT PATCH</Publish>
+      <Publish Dialog="VerifyReadyDlg"    Control="Back"         Event="NewDialog" Value="WelcomeDlg"           Order="2">Installed AND PATCH</Publish>
+
+      <Publish Dialog="ExitDialog"        Control="Finish"       Event="EndDialog" Value="Return" Order="999">1</Publish>
+
+      <Publish Dialog="BrowseDlg"         Control="OK"           Event="DoAction"    Value="WixUIValidatePath" Order="3">1</Publish>
+      <Publish Dialog="BrowseDlg"         Control="OK"           Event="SpawnDialog" Value="InvalidDirDlg"      Order="4"><![CDATA[NOT WIXUI_DONTVALIDATEPATH AND WIXUI_PATHEXISTS = 1]]></Publish>
+
+      <Publish Dialog="MaintenanceWelcomeDlg" Control="Next"     Event="NewDialog" Value="MaintenanceTypeDlg">1</Publish>
+      <Publish Dialog="MaintenanceTypeDlg"    Control="Back"     Event="NewDialog" Value="MaintenanceWelcomeDlg">1</Publish>
+      <Publish Dialog="MaintenanceTypeDlg"    Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg">1</Publish>
+      <Publish Dialog="MaintenanceTypeDlg"    Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg">1</Publish>
+
+      <Property Id="ARPNOMODIFY" Value="1" />
+
+      <!-- Configuration Dialog -->
+      <Dialog Id="ConfigurationDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="BannerBitmap" Type="Bitmap"     X="0"   Y="0"   Width="370" Height="44"  TabSkip="no" Text="!(loc.InstallDirDlgBannerBitmap)" />
+        <Control Id="BannerLine"   Type="Line"       X="0"   Y="44"  Width="370" Height="0" />
+        <Control Id="BottomLine"   Type="Line"       X="0"   Y="234" Width="370" Height="0" />
+
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="300" Height="15" Transparent="yes" NoPrefix="yes">
+          <Text>{\WixUI_Font_Title}Site Configuration</Text>
+        </Control>
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="320" Height="15" Transparent="yes" NoPrefix="yes">
+          <Text>Enter the connection details provided by PEI Data Systems.</Text>
+        </Control>
+
+        <Control Id="TenantIdLabel"  Type="Text" X="20"  Y="62"  Width="100" Height="12" NoPrefix="yes"><Text>Tenant ID:</Text></Control>
+        <Control Id="TenantIdEdit"   Type="Edit" X="130" Y="60"  Width="210" Height="17" Property="TENANT_ID"  Text="{20}" />
+
+        <Control Id="SiteIdLabel"    Type="Text" X="20"  Y="87"  Width="100" Height="12" NoPrefix="yes"><Text>Site ID:</Text></Control>
+        <Control Id="SiteIdEdit"     Type="Edit" X="130" Y="85"  Width="210" Height="17" Property="SITE_ID"    Text="{20}" />
+
+        <Control Id="SiteNameLabel"  Type="Text" X="20"  Y="112" Width="100" Height="12" NoPrefix="yes"><Text>Site Name:</Text></Control>
+        <Control Id="SiteNameEdit"   Type="Edit" X="130" Y="110" Width="210" Height="17" Property="SITE_NAME"  Text="{100}" />
+
+        <Control Id="ApiKeyLabel"    Type="Text" X="20"  Y="137" Width="100" Height="12" NoPrefix="yes"><Text>API Key:</Text></Control>
+        <Control Id="ApiKeyEdit"     Type="Edit" X="130" Y="135" Width="210" Height="17" Property="API_KEY"    Text="{256}" />
+
+        <Control Id="Back"   Type="PushButton" X="180" Y="243" Width="56" Height="17"              Text="!(loc.WixUIBack)" />
+        <Control Id="Next"   Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)" />
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes"  Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg">1</Publish>
+        </Control>
+      </Dialog>
+
+    </UI>
+    <UIRef Id="WixUI_Common" />
+  </Fragment>
+
+</Wix>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
+     xmlns:bal="http://schemas.microsoft.com/wix/BalExtension">
+
+  <Bundle Name="PEI Site App - Staging"
+          Version="1.4.7.0"
+          Manufacturer="PEI Data Systems"
+          UpgradeCode="c4b2a019-8e6f-4d3a-b715-92c3de8f1a4e"
+          IconSourceFile="..\..\service-dotnet\PeiSiteApp\Resources\icon.ico">
+
+    <BootstrapperApplicationRef Id="WixStandardBootstrapperApplication.RtfLicense">
+      <bal:WixStandardBootstrapperApplication
+        LicenseFile="License.rtf"
+        SuppressOptionsUI="yes" />
+    </BootstrapperApplicationRef>
+
+    <Chain>
+      <MsiPackage Id="PeiSiteApp"
+                  SourceFile="$(var.MsiFile)"
+                  DisplayInternalUI="yes" />
+    </Chain>
+
+  </Bundle>
+</Wix>

@@ -39,6 +39,7 @@ public class FtpServerStatusResponse
     public string LastResult { get; set; } = "";
     public int FilesForwarded { get; set; }
     public bool IsPolling { get; set; }
+    public bool ForceFullUploadOnNextPoll { get; set; }
 }
 
 public class FtpServerResponse
