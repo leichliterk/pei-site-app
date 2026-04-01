@@ -17,7 +17,10 @@ public class FtpWatcher
     private readonly FileLogger _logger;
     private readonly string _statePath;
 
+    private readonly Action<string>? _onForceUploadComplete;
+
     private Timer? _pollTimer;
+    private Timer? _dailyTimer;
     private FtpState _state = new();
     private string _lastResult = "never polled";
     private int _filesForwarded;
@@ -34,7 +37,7 @@ public class FtpWatcher
     public string Host => _serverConfig.FtpHost;
     public bool IsCurrentlyPolling => _isPolling == 1;
 
-    public FtpWatcher(FtpServerConfig serverConfig, WebSocketClient wsClient, PendingFileQueue pendingQueue, int siteId, int tenantId, FileLogger logger)
+    public FtpWatcher(FtpServerConfig serverConfig, WebSocketClient wsClient, PendingFileQueue pendingQueue, int siteId, int tenantId, FileLogger logger, Action<string>? onForceUploadComplete = null)
     {
         _serverConfig = serverConfig;
         _wsClient = wsClient;
@@ -42,6 +45,7 @@ public class FtpWatcher
         _siteId = siteId;
         _tenantId = tenantId;
         _logger = logger;
+        _onForceUploadComplete = onForceUploadComplete;
 
         var programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
         var stateDir = Path.Combine(programData, "PEI Site Service");
@@ -65,7 +69,8 @@ public class FtpWatcher
                 LastPoll = _state.LastPoll,
                 LastResult = _lastResult,
                 FilesForwarded = _filesForwarded,
-                IsPolling = _isPolling == 1
+                IsPolling = _isPolling == 1,
+                ForceFullUploadOnNextPoll = _serverConfig.ForceFullUploadOnNextPoll
             };
         }
     }
@@ -98,6 +103,43 @@ public class FtpWatcher
         _pollTimer = new Timer(_ => _ = PollAsync(), null,
             TimeSpan.FromSeconds(_serverConfig.FtpPollInterval),
             TimeSpan.FromSeconds(_serverConfig.FtpPollInterval));
+
+        ScheduleDailyTimer();
+    }
+
+    private void ScheduleDailyTimer()
+    {
+        _dailyTimer?.Dispose();
+
+        // Calculate delay to next 2:00 AM UTC
+        var now = DateTime.UtcNow;
+        var next2Am = now.Date.AddHours(2);
+        if (next2Am <= now)
+            next2Am = next2Am.AddDays(1);
+        var delay = next2Am - now;
+
+        _logger.Log(ServiceLogLevel.Debug, $"[FtpWatcher:{Id}] Daily yesterday-upload scheduled in {delay.TotalHours:F1}h (at {next2Am:HH:mm} UTC)");
+
+        _dailyTimer = new Timer(_ => _ = PollYesterdayAsync(), null, delay, Timeout.InfiniteTimeSpan);
+    }
+
+    private async Task PollYesterdayAsync()
+    {
+        var yesterday = DateTime.UtcNow.Date.AddDays(-1);
+        _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] Daily 2AM upload — waiting for any active poll to finish...");
+
+        // Wait for any in-progress poll to finish before starting
+        while (Interlocked.CompareExchange(ref _isPolling, 1, 0) != 0)
+            await Task.Delay(5000);
+
+        // _isPolling is now 1 (held by us) — release and let PollAsync own it normally
+        Interlocked.Exchange(ref _isPolling, 0);
+
+        _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] Daily 2AM upload starting for {yesterday:yyyy-MM-dd}");
+        await PollAsync(dateFilter: yesterday);
+
+        // Reschedule for tomorrow's 2 AM
+        ScheduleDailyTimer();
     }
 
     public void Stop()
@@ -106,6 +148,8 @@ public class FtpWatcher
         {
             _pollTimer.Dispose();
             _pollTimer = null;
+            _dailyTimer?.Dispose();
+            _dailyTimer = null;
             _wsClient.FtpFileAckReceived -= OnFtpFileAck;
             _wsClient.StatusChanged -= OnWsStatusChanged;
             _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] Stopped");
@@ -243,7 +287,7 @@ public class FtpWatcher
 
     // --- Public operations ---
 
-    public async Task PollAsync()
+    public async Task PollAsync(DateTime? dateFilter = null)
     {
         if (Interlocked.CompareExchange(ref _isPolling, 1, 0) != 0)
         {
@@ -303,6 +347,8 @@ public class FtpWatcher
             }
 
             int newOrChanged = 0;
+            bool isFullUpload = _serverConfig.ForceFullUploadOnNextPoll;
+            var effectiveDate = dateFilter ?? DateTime.UtcNow.Date;
 
             // Switch to binary mode for file transfers (forensic byte-for-byte fidelity)
             var typeResp = await SendFtpCommandAsync(writer, reader, "TYPE I", "TYPE I");
@@ -312,11 +358,15 @@ public class FtpWatcher
                 return;
             }
 
+            if (isFullUpload)
+                _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] Full upload requested — uploading all {entries.Length} files");
+
             foreach (var entry in entries)
             {
-                if (!IsModifiedToday(entry.ModifiedAt)) continue;
+                if (!isFullUpload && !IsModifiedOnDate(entry.ModifiedAt, effectiveDate)) continue;
 
-                _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] Sending today's file: {entry.Name} (modified={entry.ModifiedAt})");
+                var reason = isFullUpload ? "full upload" : $"modified {effectiveDate:yyyy-MM-dd}";
+                _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] Sending file ({reason}): {entry.Name} (modified={entry.ModifiedAt})");
                 try
                 {
                     var fileBytes = await FtpActiveDataTransferBytesAsync(writer, reader, localIp, $"RETR {entry.Name}", $"RETR {entry.Name}");
@@ -332,10 +382,17 @@ public class FtpWatcher
                 }
             }
 
+            if (isFullUpload)
+            {
+                _serverConfig.ForceFullUploadOnNextPoll = false;
+                _onForceUploadComplete?.Invoke(Id);
+            }
+
             lock (_stateLock) { _state.LastPoll = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"); }
             SaveState();
 
-            _lastResult = $"OK - {entries.Length} files listed, {newOrChanged} forwarded (today)";
+            var mode = isFullUpload ? "full upload" : effectiveDate.ToString("yyyy-MM-dd");
+            _lastResult = $"OK - {entries.Length} files listed, {newOrChanged} forwarded ({mode})";
             _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] Poll complete: {_lastResult}");
 
             await writer.WriteLineAsync("QUIT");
@@ -534,11 +591,11 @@ public class FtpWatcher
         };
     }
 
-    // Returns true if the 14-digit MDTM timestamp (YYYYMMDDHHmmss, UTC) falls on today's UTC date.
-    private static bool IsModifiedToday(string? modifiedAt)
+    // Returns true if the 14-digit MDTM timestamp (YYYYMMDDHHmmss, UTC) falls on the given UTC date.
+    private static bool IsModifiedOnDate(string? modifiedAt, DateTime date)
     {
         if (string.IsNullOrEmpty(modifiedAt) || modifiedAt.Length < 8) return false;
-        return modifiedAt.StartsWith(DateTime.UtcNow.ToString("yyyyMMdd"));
+        return modifiedAt.StartsWith(date.ToString("yyyyMMdd"));
     }
 
     // Converts MDTM timestamp (YYYYMMDDHHmmss, UTC) to ISO 8601 (yyyy-MM-ddTHH:mm:ss.fffZ).

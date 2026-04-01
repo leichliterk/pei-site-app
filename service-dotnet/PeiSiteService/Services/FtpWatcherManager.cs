@@ -8,17 +8,18 @@ public class FtpWatcherManager
     private readonly WebSocketClient _wsClient;
     private readonly PendingFileQueue _pendingQueue;
     private readonly FileLogger _logger;
+    private readonly ConfigManager _configManager;
     private readonly object _lock = new();
     private int _siteId;
     private int _tenantId;
     private bool _enabled;
 
-    public FtpWatcherManager(WebSocketClient wsClient, PendingFileQueue pendingQueue, FileLogger logger)
+    public FtpWatcherManager(WebSocketClient wsClient, PendingFileQueue pendingQueue, FileLogger logger, ConfigManager configManager)
     {
         _wsClient = wsClient;
         _pendingQueue = pendingQueue;
         _logger = logger;
-
+        _configManager = configManager;
     }
 
     public void Initialize(FtpConfig ftpConfig, int siteId, int tenantId)
@@ -31,7 +32,7 @@ public class FtpWatcherManager
         {
             foreach (var server in ftpConfig.Servers)
             {
-                var watcher = new FtpWatcher(server, _wsClient, _pendingQueue, _siteId, _tenantId, _logger);
+                var watcher = new FtpWatcher(server, _wsClient, _pendingQueue, _siteId, _tenantId, _logger, _configManager.ClearForceFullUpload);
                 _watchers[server.Id] = watcher;
             }
         }
@@ -76,7 +77,7 @@ public class FtpWatcherManager
     {
         lock (_lock)
         {
-            var watcher = new FtpWatcher(server, _wsClient, _pendingQueue, _siteId, _tenantId, _logger);
+            var watcher = new FtpWatcher(server, _wsClient, _pendingQueue, _siteId, _tenantId, _logger, _configManager.ClearForceFullUpload);
             _watchers[server.Id] = watcher;
             if (_enabled) watcher.Start();
             _logger.Log(ServiceLogLevel.Info, $"[FtpWatcherManager] Added server {server.Id}: {server.FtpHost}");

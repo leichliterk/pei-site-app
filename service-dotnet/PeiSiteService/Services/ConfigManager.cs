@@ -296,10 +296,23 @@ public class ConfigManager
             if (req.FtpPollInterval.HasValue) server.FtpPollInterval = req.FtpPollInterval.Value;
             if (req.Username != null) server.Username = req.Username;
             if (req.Password != null) server.Password = req.Password;
+            if (req.ForceFullUploadOnNextPoll.HasValue) server.ForceFullUploadOnNextPoll = req.ForceFullUploadOnNextPoll.Value;
 
             SaveConfig(_config);
             _logger.Log(ServiceLogLevel.Info, $"[ConfigManager] Updated FTP server {id}: {server.FtpHost}");
             return server;
+        }
+    }
+
+    public void ClearForceFullUpload(string id)
+    {
+        lock (_lock)
+        {
+            var server = _config.FtpServers.FirstOrDefault(s => s.Id == id);
+            if (server == null || !server.ForceFullUploadOnNextPoll) return;
+            server.ForceFullUploadOnNextPoll = false;
+            SaveConfig(_config);
+            _logger.Log(ServiceLogLevel.Info, $"[ConfigManager] Cleared ForceFullUploadOnNextPoll for server {id}");
         }
     }
 

@@ -11,7 +11,8 @@
       "Bash(node:*)",
       "Bash(dotnet new:*)",
       "Bash(\"C:\\\\Program Files \\(x86\\)\\\\WiX Toolset v3.14\\\\bin\\\\candle.exe\" -ext WixBalExtension \"Bundle.wxs\" -out \"Bundle.wixobj\")",
-      "Bash(\"C:\\\\Program Files \\(x86\\)\\\\WiX Toolset v3.14\\\\bin\\\\light.exe\" -ext WixBalExtension \"Bundle.wixobj\" -out \"PEI Site App - Staging Setup 1.4.5.exe\")"
+      "Bash(\"C:\\\\Program Files \\(x86\\)\\\\WiX Toolset v3.14\\\\bin\\\\light.exe\" -ext WixBalExtension \"Bundle.wixobj\" -out \"PEI Site App - Staging Setup 1.4.5.exe\")",
+      "Bash(powershell -ExecutionPolicy Bypass -File build.ps1 -Environment Production -Version 1.0.0)"
     ],
     "deny": [],
     "ask": []

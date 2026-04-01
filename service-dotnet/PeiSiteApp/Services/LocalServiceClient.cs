@@ -197,7 +197,7 @@ public class LocalServiceClient : IDisposable
         catch { return null; }
     }
 
-    public async Task<bool> FtpUpdateServerAsync(string id, string name, string host, string path, int pollInterval, string username = "", string password = "")
+    public async Task<bool> FtpUpdateServerAsync(string id, string name, string host, string path, int pollInterval, string username = "", string password = "", bool forceFullUploadOnNextPoll = false)
     {
         try
         {
@@ -208,7 +208,8 @@ public class LocalServiceClient : IDisposable
                 ftpPath = path,
                 ftpPollInterval = pollInterval,
                 username,
-                password
+                password,
+                forceFullUploadOnNextPoll
             });
             return response.IsSuccessStatusCode;
         }
