@@ -150,6 +150,7 @@ public partial class SettingsViewModel : ObservableObject
     public ObservableCollection<LogEntry> LogEntries { get; } = new();
     private string? _lastLogTimestamp;
     private DispatcherTimer? _logPollTimer;
+    private DispatcherTimer? _ftpStatusTimer;
 
     // Advanced tab — service control
     private const string ServiceName = "PeiSiteService";
@@ -623,6 +624,20 @@ public partial class SettingsViewModel : ObservableObject
         LogEntries.Clear();
     }
 
+    private void StartFtpStatusPolling()
+    {
+        if (_ftpStatusTimer != null) return;
+        _ftpStatusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        _ftpStatusTimer.Tick += async (_, _) => await LoadFtpServersAsync();
+        _ftpStatusTimer.Start();
+    }
+
+    private void StopFtpStatusPolling()
+    {
+        _ftpStatusTimer?.Stop();
+        _ftpStatusTimer = null;
+    }
+
     private void StartLogPolling()
     {
         if (_logPollTimer != null) return;
@@ -754,6 +769,9 @@ public partial class SettingsViewModel : ObservableObject
     {
         if (value == 1) StartLogPolling();
         else StopLogPolling();
+
+        if (value == 2) StartFtpStatusPolling();
+        else StopFtpStatusPolling();
 
         if (value == 3) StartServiceStatusPolling();
         else StopServiceStatusPolling();
