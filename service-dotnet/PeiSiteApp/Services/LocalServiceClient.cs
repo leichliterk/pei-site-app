@@ -283,6 +283,28 @@ public class LocalServiceClient : IDisposable
         catch { return false; }
     }
 
+    // --- OTA endpoints ---
+
+    public async Task<bool> OtaRespondAsync(string releaseId, bool accepted)
+    {
+        try
+        {
+            var response = await _http.PostAsJsonAsync("/ota/respond", new { releaseId, accepted });
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    public async Task<bool> OtaInstalledAsync(string releaseId, string version)
+    {
+        try
+        {
+            var response = await _http.PostAsJsonAsync("/ota/installed", new { releaseId, version });
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
     // --- Notification endpoints ---
 
     public async Task<NotificationsResponse?> GetNotificationsAsync()

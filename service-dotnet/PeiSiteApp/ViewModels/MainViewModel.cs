@@ -106,7 +106,7 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void NavigateNotifications()
     {
-        _notificationsViewModel ??= new NotificationsViewModel(_localService, this);
+        _notificationsViewModel ??= new NotificationsViewModel(_localService, this, _settingsManager.Settings.ApiUrl);
         CurrentPage = _notificationsViewModel;
         _ = _notificationsViewModel.LoadAsync();
     }

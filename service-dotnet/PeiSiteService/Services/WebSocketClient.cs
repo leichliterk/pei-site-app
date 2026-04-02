@@ -22,6 +22,8 @@ public class WebSocketClient : IDisposable
     public event Action<FtpFileAck>? FtpFileAckReceived;
     public event Action<ServiceNotification>? NotificationReceived;
 
+    private TaskCompletionSource<bool>? _otaAckSource;
+
     public ConnectionStatus Status
     {
         get { lock (_lock) { return _status; } }
@@ -157,6 +159,19 @@ public class WebSocketClient : IDisposable
             }
         });
 
+        _socket.On("ota:response_ack", response =>
+        {
+            try
+            {
+                var ack = response.GetValue<OtaResponseAck>();
+                _otaAckSource?.TrySetResult(ack.Success);
+            }
+            catch
+            {
+                _otaAckSource?.TrySetResult(false);
+            }
+        });
+
         _socket.On("notification", response =>
         {
             try
@@ -237,6 +252,19 @@ public class WebSocketClient : IDisposable
             using var doc = JsonDocument.Parse(json);
             _ = _socket.EmitAsync(eventName, doc.RootElement);
         }
+    }
+
+    public async Task<bool> EmitOtaResponseAsync(string releaseId, bool accepted)
+    {
+        _otaAckSource = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        EmitToServer("ota:response", new { release_id = releaseId, accepted });
+        var completed = await Task.WhenAny(_otaAckSource.Task, Task.Delay(TimeSpan.FromSeconds(30)));
+        return completed == _otaAckSource.Task && await _otaAckSource.Task;
+    }
+
+    public void EmitOtaInstalled(string releaseId, string version)
+    {
+        EmitToServer("ota:installed", new { release_id = releaseId, version });
     }
 
     public void UpdateConfig(ConfigUpdateRequest updates)

@@ -87,6 +87,22 @@ public static class ApiServer
             return Results.Ok(new { success = true });
         });
 
+        // --- OTA endpoints ---
+
+        // POST /ota/respond — emit ota:response and wait for ota:response_ack
+        app.MapPost("/ota/respond", async (OtaRespondRequest req, WebSocketClient ws) =>
+        {
+            var success = await ws.EmitOtaResponseAsync(req.ReleaseId, req.Accepted);
+            return new { success };
+        });
+
+        // POST /ota/installed — emit ota:installed (no ack)
+        app.MapPost("/ota/installed", (OtaInstalledRequest req, WebSocketClient ws) =>
+        {
+            ws.EmitOtaInstalled(req.ReleaseId, req.Version);
+            return new { success = true };
+        });
+
         // --- Notification endpoints ---
 
         // GET /notifications

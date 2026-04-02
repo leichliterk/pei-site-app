@@ -72,6 +72,8 @@ public class NotificationResponse
     public NotificationDataResponse? Data { get; set; }
     public bool Read { get; set; }
     public string ReceivedAt { get; set; } = "";
+
+    public bool IsOta => Data?.Ota == true;
 }
 
 public class NotificationsResponse
