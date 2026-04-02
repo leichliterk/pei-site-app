@@ -87,6 +87,26 @@ public static class ApiServer
             return Results.Ok(new { success = true });
         });
 
+        // --- Notification endpoints ---
+
+        // GET /notifications
+        app.MapGet("/notifications", (NotificationManager nm) => new
+        {
+            notifications = nm.GetAll(),
+            unreadCount = nm.UnreadCount
+        });
+
+        // POST /notifications/{id}/read
+        app.MapPost("/notifications/{id}/read", (string id, NotificationManager nm) =>
+            nm.MarkRead(id) ? Results.Ok(new { success = true }) : Results.NotFound());
+
+        // POST /notifications/read-all
+        app.MapPost("/notifications/read-all", (NotificationManager nm) =>
+        {
+            nm.MarkAllRead();
+            return new { success = true };
+        });
+
         // --- FTP endpoints ---
 
         // GET /ftp/status — overall status (enabled + all server statuses)

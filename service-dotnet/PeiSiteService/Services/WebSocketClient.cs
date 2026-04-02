@@ -20,6 +20,7 @@ public class WebSocketClient : IDisposable
 
     public event Action<ConnectionStatus>? StatusChanged;
     public event Action<FtpFileAck>? FtpFileAckReceived;
+    public event Action<ServiceNotification>? NotificationReceived;
 
     public ConnectionStatus Status
     {
@@ -153,6 +154,21 @@ public class WebSocketClient : IDisposable
             catch (Exception ex)
             {
                 _logger.Log(ServiceLogLevel.Error, $"[WebSocketClient] Error parsing ftp:file_ack: {ex.Message}");
+            }
+        });
+
+        _socket.On("notification", response =>
+        {
+            try
+            {
+                var notification = response.GetValue<ServiceNotification>();
+                notification.ReceivedAt = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+                _logger.Log(ServiceLogLevel.Info, $"[WebSocketClient] Notification received: {notification.Id} — {notification.Title}");
+                NotificationReceived?.Invoke(notification);
+            }
+            catch (Exception ex)
+            {
+                _logger.Log(ServiceLogLevel.Error, $"[WebSocketClient] Error parsing notification: {ex.Message}");
             }
         });
 

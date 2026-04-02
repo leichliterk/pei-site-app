@@ -283,6 +283,43 @@ public class LocalServiceClient : IDisposable
         catch { return false; }
     }
 
+    // --- Notification endpoints ---
+
+    public async Task<NotificationsResponse?> GetNotificationsAsync()
+    {
+        try
+        {
+            var response = await _http.GetAsync("/notifications");
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<NotificationsResponse>(json, JsonOptions);
+            }
+            return null;
+        }
+        catch { return null; }
+    }
+
+    public async Task<bool> MarkNotificationReadAsync(string id)
+    {
+        try
+        {
+            var response = await _http.PostAsync($"/notifications/{id}/read", null);
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    public async Task<bool> MarkAllNotificationsReadAsync()
+    {
+        try
+        {
+            var response = await _http.PostAsync("/notifications/read-all", null);
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
     public void Dispose()
     {
         StopPolling();

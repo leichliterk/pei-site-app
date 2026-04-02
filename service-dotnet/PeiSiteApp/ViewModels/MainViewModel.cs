@@ -1,3 +1,4 @@
+using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PeiSiteApp.Services;
@@ -23,10 +24,24 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string _windowTitle = "PEI Site App";
 
+    [ObservableProperty]
+    private int _unreadNotificationCount;
+
+    public bool HasUnreadNotifications => UnreadNotificationCount > 0;
+    public string UnreadNotificationDisplay => UnreadNotificationCount > 99 ? "99+" : UnreadNotificationCount.ToString();
+
+    partial void OnUnreadNotificationCountChanged(int value)
+    {
+        OnPropertyChanged(nameof(HasUnreadNotifications));
+        OnPropertyChanged(nameof(UnreadNotificationDisplay));
+    }
+
     public string Version { get; }
 
     private HomeViewModel? _homeViewModel;
     private SettingsViewModel? _settingsViewModel;
+    private NotificationsViewModel? _notificationsViewModel;
+    private DispatcherTimer? _notificationPollTimer;
 
     public MainViewModel(
         SettingsManager settingsManager,
@@ -54,8 +69,21 @@ public partial class MainViewModel : ObservableObject
         // Start FTP status polling
         _ftpStatusService.StartPolling();
 
+        // Start notification badge polling (every 10 seconds)
+        _ = PollNotificationCountAsync();
+        _notificationPollTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(10) };
+        _notificationPollTimer.Tick += async (_, _) => await PollNotificationCountAsync();
+        _notificationPollTimer.Start();
+
         // Navigate to home
         NavigateHome();
+    }
+
+    private async Task PollNotificationCountAsync()
+    {
+        var result = await _localService.GetNotificationsAsync();
+        if (result != null)
+            UnreadNotificationCount = result.UnreadCount;
     }
 
     [RelayCommand]
@@ -75,6 +103,19 @@ public partial class MainViewModel : ObservableObject
         CurrentPage = _settingsViewModel;
     }
 
+    [RelayCommand]
+    private void NavigateNotifications()
+    {
+        _notificationsViewModel ??= new NotificationsViewModel(_localService, this);
+        CurrentPage = _notificationsViewModel;
+        _ = _notificationsViewModel.LoadAsync();
+    }
+
+    public void RefreshNotificationCount()
+    {
+        _ = PollNotificationCountAsync();
+    }
+
     public void UpdateSiteInfo()
     {
         var settings = _settingsManager.Settings;
@@ -84,6 +125,8 @@ public partial class MainViewModel : ObservableObject
 
     public void Shutdown()
     {
+        _notificationPollTimer?.Stop();
+        _notificationPollTimer = null;
         _homeViewModel?.Stop();
         _ftpStatusService.StopPolling();
         _localService.StopPolling();
