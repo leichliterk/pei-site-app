@@ -6,7 +6,8 @@
       "mcp__coordinator__blackboard_set",
       "mcp__coordinator__task_list",
       "mcp__coordinator__contract_list",
-      "mcp__coordinator__event_poll"
+      "mcp__coordinator__event_poll",
+      "Bash(powershell -ExecutionPolicy Bypass -File build.ps1 -Environment Staging -Version 1.2.0)"
     ]
   }
 }

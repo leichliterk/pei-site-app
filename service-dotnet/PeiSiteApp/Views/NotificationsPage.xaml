@@ -75,7 +75,7 @@
                     <!-- Size -->
                     <TextBlock FontSize="12" Foreground="#94A3B8" Margin="0,0,0,20">
                         <Run Text="Download size: " />
-                        <Run Text="{Binding OtaSizeDisplay}" />
+                        <Run Text="{Binding OtaSizeDisplay, Mode=OneWay}" />
                     </TextBlock>
 
                     <!-- Confirm state: Install / Later buttons -->
@@ -132,7 +132,7 @@
                                 </Style.Triggers>
                             </Style>
                         </StackPanel.Style>
-                        <TextBlock Text="{Binding OtaStatusMessage}" FontSize="13" Foreground="#475569"
+                        <TextBlock Text="{Binding OtaStatusMessage, Mode=OneWay}" FontSize="13" Foreground="#475569"
                                    Margin="0,0,0,10" />
                         <ProgressBar Value="{Binding OtaDownloadProgress}" Maximum="100"
                                      Height="8" Background="#E2E8F0" Foreground="#3B82F6" />
@@ -151,7 +151,7 @@
                             </Style>
                         </TextBlock.Style>
                         <Run Text="&#xE73E;  " FontFamily="Segoe MDL2 Assets" />
-                        <Run Text="{Binding OtaStatusMessage}" />
+                        <Run Text="{Binding OtaStatusMessage, Mode=OneWay}" />
                     </TextBlock>
 
                     <!-- Error state -->
@@ -166,7 +166,7 @@
                                 </Style.Triggers>
                             </Style>
                         </StackPanel.Style>
-                        <TextBlock Text="{Binding OtaStatusMessage}" Foreground="#EF4444"
+                        <TextBlock Text="{Binding OtaStatusMessage, Mode=OneWay}" Foreground="#EF4444"
                                    FontSize="13" TextWrapping="Wrap" Margin="0,0,0,12" />
                         <Button Command="{Binding OtaDeclineCommand}"
                                 Background="Transparent" BorderBrush="#E2E8F0" BorderThickness="1"
