@@ -9,13 +9,15 @@ public class Worker : BackgroundService
     private readonly WebSocketClient _wsClient;
     private readonly FtpWatcherManager _ftpManager;
     private readonly ConfigManager _configManager;
+    private readonly NotificationManager _notificationManager;
 
-    public Worker(FileLogger logger, WebSocketClient wsClient, FtpWatcherManager ftpManager, ConfigManager configManager)
+    public Worker(FileLogger logger, WebSocketClient wsClient, FtpWatcherManager ftpManager, ConfigManager configManager, NotificationManager notificationManager)
     {
         _logger = logger;
         _wsClient = wsClient;
         _ftpManager = ftpManager;
         _configManager = configManager;
+        _notificationManager = notificationManager;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -28,6 +30,8 @@ public class Worker : BackgroundService
         {
             _logger.Log($"[PEI Site Service] Connection status: {status}");
         };
+
+        _wsClient.NotificationReceived += _notificationManager.Add;
 
         try
         {

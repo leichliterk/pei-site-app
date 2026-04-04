@@ -51,12 +51,14 @@ var wsClient = new WebSocketClient(config.ToServiceConfig(), logger);
 var pendingQueue = new PendingFileQueue(logger);
 var ftpManager = new FtpWatcherManager(wsClient, pendingQueue, logger, configManager);
 ftpManager.Initialize(ftpConfig, config.SiteId, config.TenantId);
+var notificationManager = new NotificationManager();
 
 builder.Services.AddSingleton(logger);
 builder.Services.AddSingleton(configManager);
 builder.Services.AddSingleton(wsClient);
 builder.Services.AddSingleton(pendingQueue);
 builder.Services.AddSingleton(ftpManager);
+builder.Services.AddSingleton(notificationManager);
 builder.Services.AddHostedService<Worker>();
 
 var app = builder.Build();

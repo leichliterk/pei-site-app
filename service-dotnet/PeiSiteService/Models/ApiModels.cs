@@ -19,6 +19,26 @@ public class SessionInfo
     public string? DisconnectedAt { get; set; }
 }
 
+// OTA
+
+public class OtaRespondRequest
+{
+    public string ReleaseId { get; set; } = "";
+    public bool Accepted { get; set; }
+}
+
+public class OtaInstalledRequest
+{
+    public string ReleaseId { get; set; } = "";
+    public string Version { get; set; } = "";
+}
+
+public class OtaResponseAck
+{
+    public bool Success { get; set; }
+    public string? Error { get; set; }
+}
+
 // FTP server CRUD
 
 public class FtpServerCreateRequest

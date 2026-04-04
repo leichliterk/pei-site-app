@@ -6,14 +6,14 @@
   <Product Id="*"
            Name="PEI Site App"
            Language="1033"
-           Version="1.0.0"
+           Version="1.2.0"
            Manufacturer="PEI Data Systems"
            UpgradeCode="57f48daa-3001-40a9-9dab-5a20450fd982">
 
     <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine"
              Platform="x64"
              Description="PEI Site App Installer"
-             Comments="Installs PEI Site App v1.0.0" />
+             Comments="Installs PEI Site App v1.2.0" />
 
     <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
     <MediaTemplate EmbedCab="yes" />
