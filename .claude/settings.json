@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet build:*)",
+      "mcp__coordinator__event_publish",
+      "mcp__coordinator__blackboard_set",
+      "mcp__coordinator__task_list",
+      "mcp__coordinator__contract_list",
+      "mcp__coordinator__event_poll"
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "coordinator": {
+      "type": "sse",
+      "url": "http://localhost:3100/sse",
+      "headers": {
+        "x-agent-name": "csharp"
+      }
+    }
+  }
+}
