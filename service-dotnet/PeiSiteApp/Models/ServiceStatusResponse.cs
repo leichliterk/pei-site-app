@@ -55,11 +55,13 @@ public class FtpServerResponse
 public class NotificationDataResponse
 {
     public bool Ota { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("release_id")]
     public string? ReleaseId { get; set; }
     public string? Version { get; set; }
     public string? Notes { get; set; }
     public long? Size { get; set; }
     public string? Sha256 { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("download_token")]
     public string? DownloadToken { get; set; }
 }
 

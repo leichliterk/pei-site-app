@@ -280,9 +280,11 @@
 
                             <!-- Enable Toggle -->
                             <DockPanel Margin="0,0,0,16">
-                                <CheckBox DockPanel.Dock="Right" IsChecked="{Binding FtpEnabled}"
-                                          VerticalAlignment="Center"
-                                          Command="{Binding ToggleFtpEnabledCommand}" />
+                                <ToggleButton DockPanel.Dock="Right"
+                                              Style="{StaticResource ToggleSwitch}"
+                                              IsChecked="{Binding FtpEnabled}"
+                                              VerticalAlignment="Center"
+                                              Command="{Binding ToggleFtpEnabledCommand}" />
                                 <StackPanel>
                                     <TextBlock Text="Enable FTP Auto-Sync" FontWeight="Medium" />
                                     <TextBlock Text="Automatically sync files from FTP servers on schedule"
