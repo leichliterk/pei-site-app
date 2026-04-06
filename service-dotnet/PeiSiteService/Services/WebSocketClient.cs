@@ -20,6 +20,9 @@ public class WebSocketClient : IDisposable
 
     public event Action<ConnectionStatus>? StatusChanged;
     public event Action<FtpFileAck>? FtpFileAckReceived;
+    public event Action<ServiceNotification>? NotificationReceived;
+
+    private TaskCompletionSource<bool>? _otaAckSource;
 
     public ConnectionStatus Status
     {
@@ -156,6 +159,34 @@ public class WebSocketClient : IDisposable
             }
         });
 
+        _socket.On("ota:response_ack", response =>
+        {
+            try
+            {
+                var ack = response.GetValue<OtaResponseAck>();
+                _otaAckSource?.TrySetResult(ack.Success);
+            }
+            catch
+            {
+                _otaAckSource?.TrySetResult(false);
+            }
+        });
+
+        _socket.On("notification", response =>
+        {
+            try
+            {
+                var notification = response.GetValue<ServiceNotification>();
+                notification.ReceivedAt = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+                _logger.Log(ServiceLogLevel.Info, $"[WebSocketClient] Notification received: {notification.Id} — {notification.Title}");
+                NotificationReceived?.Invoke(notification);
+            }
+            catch (Exception ex)
+            {
+                _logger.Log(ServiceLogLevel.Error, $"[WebSocketClient] Error parsing notification: {ex.Message}");
+            }
+        });
+
         // We handle reconnection ourselves in OnDisconnected, so Reconnection = false.
         // Outer retry loop handles initial connection failures.
         _ = Task.Run(async () =>
@@ -221,6 +252,19 @@ public class WebSocketClient : IDisposable
             using var doc = JsonDocument.Parse(json);
             _ = _socket.EmitAsync(eventName, doc.RootElement);
         }
+    }
+
+    public async Task<bool> EmitOtaResponseAsync(string releaseId, bool accepted)
+    {
+        _otaAckSource = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        EmitToServer("ota:response", new { release_id = releaseId, accepted });
+        var completed = await Task.WhenAny(_otaAckSource.Task, Task.Delay(TimeSpan.FromSeconds(30)));
+        return completed == _otaAckSource.Task && await _otaAckSource.Task;
+    }
+
+    public void EmitOtaInstalled(string releaseId, string version)
+    {
+        EmitToServer("ota:installed", new { release_id = releaseId, version });
     }
 
     public void UpdateConfig(ConfigUpdateRequest updates)

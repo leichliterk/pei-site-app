@@ -52,6 +52,38 @@ public class FtpServerResponse
     public string Username { get; set; } = "";
 }
 
+public class NotificationDataResponse
+{
+    public bool Ota { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("release_id")]
+    public string? ReleaseId { get; set; }
+    public string? Version { get; set; }
+    public string? Notes { get; set; }
+    public long? Size { get; set; }
+    public string? Sha256 { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("download_token")]
+    public string? DownloadToken { get; set; }
+}
+
+public class NotificationResponse
+{
+    public string Id { get; set; } = "";
+    public string Title { get; set; } = "";
+    public string Body { get; set; } = "";
+    public string Type { get; set; } = "info";
+    public NotificationDataResponse? Data { get; set; }
+    public bool Read { get; set; }
+    public string ReceivedAt { get; set; } = "";
+
+    public bool IsOta => Data?.Ota == true;
+}
+
+public class NotificationsResponse
+{
+    public List<NotificationResponse> Notifications { get; set; } = new();
+    public int UnreadCount { get; set; }
+}
+
 public class LogEntry
 {
     public string Timestamp { get; set; } = "";

@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet build:*)",
+      "mcp__coordinator__event_publish",
+      "mcp__coordinator__blackboard_set",
+      "mcp__coordinator__task_list",
+      "mcp__coordinator__contract_list",
+      "mcp__coordinator__event_poll",
+      "Bash(powershell -ExecutionPolicy Bypass -File build.ps1 -Environment Staging -Version 1.2.0)",
+      "Bash(powershell -Command \"\\(Get-Content ''C:/Users/leich/Documents/GitHub/SV/PEI/pei-site-app/service-dotnet/PeiSiteService/AppVersion.cs''\\) -replace ''1\\\\.2\\\\.1'', ''1.2.2'' | Set-Content ''C:/Users/leich/Documents/GitHub/SV/PEI/pei-site-app/service-dotnet/PeiSiteService/AppVersion.cs''\")",
+      "Bash(powershell -Command \"\\(Get-Content ''C:/Users/leich/Documents/GitHub/SV/PEI/pei-site-app/service-dotnet/PeiSiteApp/Models/AppSettings.cs''\\) -replace ''1\\\\.2\\\\.1'', ''1.2.2'' | Set-Content ''C:/Users/leich/Documents/GitHub/SV/PEI/pei-site-app/service-dotnet/PeiSiteApp/Models/AppSettings.cs''\")",
+      "Bash(powershell -ExecutionPolicy Bypass -File build.ps1 -Environment Staging -Version 1.2.2)"
+    ]
+  }
+}
