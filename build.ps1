@@ -17,19 +17,26 @@ Write-Host "  Version     : $Version"
 Write-Host ""
 
 # ---------------------------------------------------------------------------
-# 1. Publish both projects
+# 1. Wipe bin+obj and publish both projects (guarantees a full recompile)
 # ---------------------------------------------------------------------------
+$appDir     = Join-Path $root "service-dotnet\PeiSiteApp"
+$serviceDir = Join-Path $root "service-dotnet\PeiSiteService"
+
+Write-Host "--- Cleaning PeiSiteApp ---" -ForegroundColor Yellow
+Remove-Item -Recurse -Force (Join-Path $appDir "bin") -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force (Join-Path $appDir "obj") -ErrorAction SilentlyContinue
+
 Write-Host "--- Publishing PeiSiteApp ---" -ForegroundColor Yellow
-& dotnet publish "$root/service-dotnet/PeiSiteApp" `
-    -c Release -r win-x64 --self-contained true `
-    -p:BuildEnvironment=$Environment
+& dotnet publish $appDir -c Release -r win-x64 --self-contained true -p:BuildEnvironment=$Environment
 if ($LASTEXITCODE -ne 0) { throw "PeiSiteApp publish failed" }
 
 Write-Host ""
+Write-Host "--- Cleaning PeiSiteService ---" -ForegroundColor Yellow
+Remove-Item -Recurse -Force (Join-Path $serviceDir "bin") -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force (Join-Path $serviceDir "obj") -ErrorAction SilentlyContinue
+
 Write-Host "--- Publishing PeiSiteService ---" -ForegroundColor Yellow
-& dotnet publish "$root/service-dotnet/PeiSiteService" `
-    -c Release -r win-x64 --self-contained true `
-    -p:BuildEnvironment=$Environment
+& dotnet publish $serviceDir -c Release -r win-x64 --self-contained true -p:BuildEnvironment=$Environment
 if ($LASTEXITCODE -ne 0) { throw "PeiSiteService publish failed" }
 
 # ---------------------------------------------------------------------------

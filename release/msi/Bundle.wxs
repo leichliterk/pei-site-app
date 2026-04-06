@@ -3,7 +3,7 @@
      xmlns:bal="http://schemas.microsoft.com/wix/BalExtension">
 
   <Bundle Name="PEI Site App"
-          Version="1.2.2"
+          Version="1.2.4"
           Manufacturer="PEI Data Systems"
           UpgradeCode="a7f31d82-5c4e-4b19-8f62-1d0e9c3a74b5"
           IconSourceFile="..\..\service-dotnet\PeiSiteApp\Resources\icon.ico">
