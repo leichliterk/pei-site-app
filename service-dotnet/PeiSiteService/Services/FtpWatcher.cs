@@ -25,6 +25,7 @@ public class FtpWatcher
     private string _lastResult = "never polled";
     private int _filesForwarded;
     private int _isPolling;
+    private int _isFlushing;
     private readonly object _stateLock = new();
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -560,19 +561,11 @@ public class FtpWatcher
         // Save to pending queue FIRST (guarantees no data loss)
         _pendingQueue.Enqueue(entry);
         _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] Queued: {filename} ({content.Length} bytes, SHA256: {sha256Hash[..12]}...)");
-
-        // Attempt immediate send if WebSocket is connected; removal happens on ack
-        if (_wsClient.Status == ConnectionStatus.connected)
-        {
-            _wsClient.EmitToServer("ftp:file", CreatePayloadFromEntry(entry));
-            _logger.Log(ServiceLogLevel.Debug, $"[FtpWatcher:{Id}] Sent, awaiting ack: {filename}");
-        }
-        else
-        {
-            _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] WebSocket disconnected, file queued for later: {filename}");
-        }
-
         Interlocked.Increment(ref _filesForwarded);
+
+        // Always send through the queue — never emit directly.
+        // Direct emit + queue flush = double send; this keeps the pipeline strictly sequential.
+        _ = Task.Run(FlushNextPending);
     }
 
     internal static object CreatePayloadFromEntry(PendingFileEntry entry)
@@ -810,20 +803,29 @@ public class FtpWatcher
     /// Sends the single oldest pending file for this watcher and returns.
     /// The next file is sent after its ACK is received, keeping the pipeline
     /// sequential and avoiding server-side burst pressure.
+    /// A CAS flag prevents concurrent invocations from double-sending the same file.
     /// </summary>
     private void FlushNextPending()
     {
-        if (_wsClient.Status != ConnectionStatus.connected) return;
+        if (Interlocked.CompareExchange(ref _isFlushing, 1, 0) != 0) return;
+        try
+        {
+            if (_wsClient.Status != ConnectionStatus.connected) return;
 
-        var next = _pendingQueue.GetAll()
-            .Where(e => e.ServerId == Id)
-            .OrderBy(e => e.QueuedAt)
-            .FirstOrDefault();
+            var next = _pendingQueue.GetAll()
+                .Where(e => e.ServerId == Id)
+                .OrderBy(e => e.QueuedAt)
+                .FirstOrDefault();
 
-        if (next == null) return;
+            if (next == null) return;
 
-        _wsClient.EmitToServer("ftp:file", CreatePayloadFromEntry(next));
-        _logger.Log(ServiceLogLevel.Debug, $"[FtpWatcher:{Id}] Flush: sent {next.Filename}, awaiting ack");
+            _wsClient.EmitToServer("ftp:file", CreatePayloadFromEntry(next));
+            _logger.Log(ServiceLogLevel.Debug, $"[FtpWatcher:{Id}] Flush: sent {next.Filename}, awaiting ack");
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _isFlushing, 0);
+        }
     }
 
     private void LoadState()
