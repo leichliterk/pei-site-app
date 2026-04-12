@@ -15,4 +15,7 @@ public class FtpFileAck
 
     [JsonPropertyName("error")]
     public string? Error { get; set; }
+
+    [JsonPropertyName("records_inserted")]
+    public int? RecordsInserted { get; set; }
 }
