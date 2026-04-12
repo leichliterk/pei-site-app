@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using PeiSiteService.Models;
 using SocketIOClient;
 using SocketIOClient.Transport;
@@ -10,6 +11,8 @@ public class WebSocketClient : IDisposable
     private SocketIOClient.SocketIO? _socket;
     private ServiceConfig _config;
     private readonly FileLogger _logger;
+    private readonly FtpWatcherManager _ftpManager;
+    private readonly FileQueue _fileQueue;
     private readonly object _lock = new();
 
     private ConnectionStatus _status = ConnectionStatus.disconnected;
@@ -51,10 +54,15 @@ public class WebSocketClient : IDisposable
         }
     }
 
-    public WebSocketClient(ServiceConfig config, FileLogger logger)
+    public WebSocketClient(ServiceConfig config, FileLogger logger, FtpWatcherManager ftpManager, FileQueue fileQueue)
     {
         _config = config;
         _logger = logger;
+        _ftpManager = ftpManager;
+        _fileQueue = fileQueue;
+
+        // Emit ftp:status whenever queue depth changes (enqueue or terminal transition)
+        _fileQueue.QueueDepthChanged += () => EmitFtpStatus();
     }
 
     public void Connect()
@@ -93,6 +101,8 @@ public class WebSocketClient : IDisposable
             _logger.Log(ServiceLogLevel.Info, "[WebSocketClient] Connected");
             lock (_lock) { _connectedAt = DateTime.UtcNow; }
             SetStatus(ConnectionStatus.connected);
+            EmitServiceStatus();
+            EmitFtpStatus();
         };
 
         _socket.OnDisconnected += (s, reason) =>
@@ -184,6 +194,57 @@ public class WebSocketClient : IDisposable
             catch (Exception ex)
             {
                 _logger.Log(ServiceLogLevel.Error, $"[WebSocketClient] Error parsing notification: {ex.Message}");
+            }
+        });
+
+        _socket.On("service:command", response =>
+        {
+            try
+            {
+                var cmd = response.GetValue<ServiceCommand>();
+                _logger.Log(ServiceLogLevel.Info, $"[WebSocketClient] service:command received: {cmd.Action}");
+                EmitToServer("service:command_ack", new { action = cmd.Action, success = true });
+
+                if (cmd.Action == "stop" || cmd.Action == "restart")
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        await Task.Delay(300); // let ack flush
+                        Environment.Exit(0);
+                    });
+                }
+                // "start" is a no-op — we are already running
+            }
+            catch (Exception ex)
+            {
+                _logger.Log(ServiceLogLevel.Error, $"[WebSocketClient] Error handling service:command: {ex.Message}");
+                try { EmitToServer("service:command_ack", new { action = "unknown", success = false, error = ex.Message }); } catch { }
+            }
+        });
+
+        _socket.On("ftp:command", response =>
+        {
+            try
+            {
+                var cmd = response.GetValue<FtpCommand>();
+                _logger.Log(ServiceLogLevel.Info, $"[WebSocketClient] ftp:command received: {cmd.Action}");
+
+                switch (cmd.Action)
+                {
+                    case "pause":       _ftpManager.PauseAll(); break;
+                    case "resume":      _ftpManager.ResumeAll(); break;
+                    case "full-upload": _ftpManager.TriggerFullUploadAll(); break;
+                    default:
+                        throw new InvalidOperationException($"Unknown ftp:command action: {cmd.Action}");
+                }
+
+                EmitToServer("ftp:command_ack", new { action = cmd.Action, success = true });
+                EmitFtpStatus();
+            }
+            catch (Exception ex)
+            {
+                _logger.Log(ServiceLogLevel.Error, $"[WebSocketClient] Error handling ftp:command: {ex.Message}");
+                try { EmitToServer("ftp:command_ack", new { action = "unknown", success = false, error = ex.Message }); } catch { }
             }
         });
 
@@ -323,6 +384,16 @@ public class WebSocketClient : IDisposable
         }
 
         _logger.Log(ServiceLogLevel.Debug, $"[WebSocketClient] History prepopulated from {sessions.Count} sessions");
+    }
+
+    private void EmitServiceStatus()
+    {
+        EmitToServer("service:status", new { state = "running" });
+    }
+
+    private void EmitFtpStatus()
+    {
+        EmitToServer("ftp:status", new { paused = _ftpManager.IsPaused, queueDepth = _fileQueue.PendingCount });
     }
 
     private void SetStatus(ConnectionStatus status)

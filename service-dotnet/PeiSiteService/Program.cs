@@ -47,11 +47,11 @@ logger.MinLevel = config.LogLevel;
 logger.Log($"[PEI Site Service] Configuration loaded: apiUrl={config.ApiUrl}, siteId={config.SiteId}, tenantId={config.TenantId}, logLevel={config.LogLevel}");
 logger.Log($"[PEI Site Service] FTP config: enabled={ftpConfig.FtpEnabled}, servers={ftpConfig.Servers.Count}");
 
-var wsClient = new WebSocketClient(config.ToServiceConfig(), logger);
 var fileQueue = new FileQueue(logger);
-var fileBroker = new FileBroker(fileQueue, wsClient, logger);
 var ftpManager = new FtpWatcherManager(fileQueue, logger, configManager);
 ftpManager.Initialize(ftpConfig, config.SiteId, config.TenantId);
+var wsClient = new WebSocketClient(config.ToServiceConfig(), logger, ftpManager, fileQueue);
+var fileBroker = new FileBroker(fileQueue, wsClient, logger);
 var notificationManager = new NotificationManager();
 
 builder.Services.AddSingleton(logger);
