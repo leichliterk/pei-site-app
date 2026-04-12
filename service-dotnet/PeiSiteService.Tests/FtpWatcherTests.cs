@@ -108,37 +108,42 @@ public class MdtmToIso8601Tests
         => Assert.Equal(input, FtpWatcher.MdtmToIso8601(input));
 }
 
-// ── CreatePayloadFromEntry ────────────────────────────────────────────────────
+// ── BuildPayload (FileBroker) ─────────────────────────────────────────────────
 
-public class CreatePayloadFromEntryTests
+public class BuildPayloadTests
 {
+    private static QueueEntry MakeEntry(string filename, string fileDate, string source = "Plant Floor FTP",
+        string content = "", string sha256 = "", int siteId = 1978, int tenantId = 1001) => new()
+    {
+        Id = "test-id",
+        ServerId = "srv1",
+        Filename = filename,
+        FileDate = fileDate,
+        Sha256 = sha256,
+        SizeBytes = content.Length,
+        Source = source,
+        SiteId = siteId,
+        TenantId = tenantId,
+        ContentBase64 = content,
+        QueuedAt = "2026-02-22T00:00:00.000Z"
+    };
+
     [Fact]
     public void AllFields_MappedToPayload()
     {
-        var entry = new PendingFileEntry
-        {
-            PendingFileId = "srv1_20260222_abc",
-            ServerId = "srv1",
-            Filename = "report.DAE",
-            ContentBase64 = Convert.ToBase64String(new byte[] { 1, 2, 3 }),
-            Sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-            Encoding = "base64",
-            Size = 3,
-            Source = "Plant Floor FTP",
-            SiteId = 1978,
-            TenantId = 1001,
-            ModifiedAt = "20260222120000",
-            QueuedAt = "2026-02-22T00:00:00.000Z"
-        };
+        var content = Convert.ToBase64String(new byte[] { 1, 2, 3 });
+        var sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+        var entry = MakeEntry("report.DAE", "20260222120000", content: content, sha256: sha256);
+        entry.SizeBytes = 3;
 
-        var payload = FtpWatcher.CreatePayloadFromEntry(entry);
+        var payload = FileBroker.BuildPayload(entry);
         var json = JsonSerializer.Serialize(payload);
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
 
         Assert.Equal("report.DAE", root.GetProperty("filename").GetString());
-        Assert.Equal(entry.ContentBase64, root.GetProperty("content").GetString());
-        Assert.Equal(entry.Sha256, root.GetProperty("sha256").GetString());
+        Assert.Equal(content, root.GetProperty("content").GetString());
+        Assert.Equal(sha256, root.GetProperty("sha256").GetString());
         Assert.Equal("base64", root.GetProperty("encoding").GetString());
         Assert.Equal(3L, root.GetProperty("size").GetInt64());
         Assert.Equal("Plant Floor FTP", root.GetProperty("source").GetString());
@@ -148,46 +153,26 @@ public class CreatePayloadFromEntryTests
     }
 
     [Fact]
-    public void NoPassword_OrInternalIds_InPayload()
+    public void NoInternalIds_InPayload()
     {
-        var entry = new PendingFileEntry
-        {
-            PendingFileId = "should-not-appear",
-            ServerId = "also-not-appear",
-            Filename = "test.txt",
-            ContentBase64 = "",
-            Sha256 = "",
-            ModifiedAt = "20260222120000",
-            QueuedAt = "2026-02-22T00:00:00.000Z"
-        };
+        var entry = MakeEntry("test.txt", "20260222120000");
 
-        var payload = FtpWatcher.CreatePayloadFromEntry(entry);
+        var payload = FileBroker.BuildPayload(entry);
         var json = JsonSerializer.Serialize(payload);
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
 
-        // Internal queue fields must not leak into the wire payload
-        Assert.False(root.TryGetProperty("pendingFileId", out _), "pendingFileId should not be in payload");
+        Assert.False(root.TryGetProperty("id", out _), "id should not be in payload");
         Assert.False(root.TryGetProperty("serverId", out _), "serverId should not be in payload");
         Assert.False(root.TryGetProperty("queuedAt", out _), "queuedAt should not be in payload");
     }
 
     [Fact]
-    public void Source_EmptyName_HostUsedAsSource()
+    public void Source_PassedThrough()
     {
-        // When FtpServerConfig.Name is empty, ForwardFile sets Source = FtpHost.
-        // Verify CreatePayloadFromEntry passes that source value through unchanged.
-        var entry = new PendingFileEntry
-        {
-            Source = "ftp.plantfloor.local", // host used because Name was empty
-            Filename = "data.txt",
-            ContentBase64 = "",
-            Sha256 = "",
-            ModifiedAt = "20260222120000",
-            QueuedAt = "2026-02-22T00:00:00.000Z"
-        };
+        var entry = MakeEntry("data.txt", "20260222120000", source: "ftp.plantfloor.local");
 
-        var payload = FtpWatcher.CreatePayloadFromEntry(entry);
+        var payload = FileBroker.BuildPayload(entry);
         var json = JsonSerializer.Serialize(payload);
         using var doc = JsonDocument.Parse(json);
 
@@ -195,20 +180,11 @@ public class CreatePayloadFromEntryTests
     }
 
     [Fact]
-    public void EmptyModifiedAt_MapsToNullInPayload()
+    public void EmptyFileDate_MapsToNullModifiedAt()
     {
-        // When modifiedAt is unknown (e.g. server doesn't support MDTM or LIST timestamps),
-        // the payload should send null rather than an empty string.
-        var entry = new PendingFileEntry
-        {
-            Filename = "unknown.txt",
-            ContentBase64 = "",
-            Sha256 = "",
-            ModifiedAt = "",
-            QueuedAt = "2026-02-22T00:00:00.000Z"
-        };
+        var entry = MakeEntry("unknown.txt", "");
 
-        var payload = FtpWatcher.CreatePayloadFromEntry(entry);
+        var payload = FileBroker.BuildPayload(entry);
         var json = JsonSerializer.Serialize(payload);
         using var doc = JsonDocument.Parse(json);
 

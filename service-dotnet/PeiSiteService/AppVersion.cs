@@ -2,5 +2,5 @@ namespace PeiSiteService;
 
 internal static class AppVersion
 {
-    public const string Current = "1.2.4";
+    public const string Current = "1.3.0";
 }

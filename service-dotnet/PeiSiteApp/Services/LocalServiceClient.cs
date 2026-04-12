@@ -342,6 +342,78 @@ public class LocalServiceClient : IDisposable
         catch { return false; }
     }
 
+    // --- Queue endpoints ---
+
+    public async Task<QueueResponse?> GetQueueAsync()
+    {
+        try
+        {
+            var response = await _http.GetAsync("/queue");
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<QueueResponse>(json, JsonOptions);
+            }
+            return null;
+        }
+        catch { return null; }
+    }
+
+    public async Task<QueueStatusResponse?> GetQueueStatusAsync()
+    {
+        try
+        {
+            var response = await _http.GetAsync("/queue/status");
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<QueueStatusResponse>(json, JsonOptions);
+            }
+            return null;
+        }
+        catch { return null; }
+    }
+
+    public async Task<bool> QueueRetryAsync(string id)
+    {
+        try
+        {
+            var response = await _http.PostAsync($"/queue/{id}/retry", null);
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    public async Task<bool> QueueClearHistoryAsync()
+    {
+        try
+        {
+            var response = await _http.DeleteAsync("/queue/history");
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    public async Task<bool> QueuePauseAsync()
+    {
+        try
+        {
+            var response = await _http.PostAsync("/queue/pause", null);
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    public async Task<bool> QueueResumeAsync()
+    {
+        try
+        {
+            var response = await _http.PostAsync("/queue/resume", null);
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
     public void Dispose()
     {
         StopPolling();

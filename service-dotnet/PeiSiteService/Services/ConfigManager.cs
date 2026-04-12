@@ -37,7 +37,7 @@ public class ConfigManager
     {
         _logger = logger;
         var programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-        var configDir = Path.Combine(programData, "PEI Site Service");
+        var configDir = Path.Combine(programData, ServicePaths.DataDirName);
         try { Directory.CreateDirectory(configDir); } catch { }
         _configPath = Path.Combine(configDir, "config.json");
         _config = LoadConfig();
@@ -114,7 +114,7 @@ public class ConfigManager
 
             // Rename state file to match the migrated server's ID
             var programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-            var stateDir = Path.Combine(programData, "PEI Site Service");
+            var stateDir = Path.Combine(programData, ServicePaths.DataDirName);
             var oldState = Path.Combine(stateDir, "ftp-state.json");
             var newState = Path.Combine(stateDir, "ftp-state-legacy.json");
             try
@@ -198,7 +198,7 @@ public class ConfigManager
         try
         {
             using var baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, view);
-            using var key = baseKey.OpenSubKey(@"Software\PEI Data Systems\PEI Site App");
+            using var key = baseKey.OpenSubKey(ServicePaths.RegistryKey);
             return key?.GetValue(valueName) as string;
         }
         catch { return null; }
