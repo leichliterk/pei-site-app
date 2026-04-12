@@ -23,12 +23,12 @@ public class SettingsManager
     public SettingsManager()
     {
         var programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-        var configDir = Path.Combine(programData, "PEI Site Service");
+        var configDir = Path.Combine(programData, AppPaths.ServiceDirName);
         try { Directory.CreateDirectory(configDir); } catch { }
         _configPath = Path.Combine(configDir, "config.json");
 
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        var userDir = Path.Combine(appData, "PEI Site App");
+        var userDir = Path.Combine(appData, AppPaths.AppDirName);
         try { Directory.CreateDirectory(userDir); } catch { }
         _userSettingsPath = Path.Combine(userDir, "settings.json");
 
@@ -104,13 +104,13 @@ public class SettingsManager
         {
             // Try 32-bit registry first (WOW6432Node)
             using var baseKey32 = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry32);
-            using var key32 = baseKey32.OpenSubKey(@"Software\PEI Data Systems\PEI Site App");
+            using var key32 = baseKey32.OpenSubKey(AppPaths.RegistryKey);
             var value = key32?.GetValue(valueName) as string;
             if (value != null) return value;
 
             // Try 64-bit registry
             using var baseKey64 = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
-            using var key64 = baseKey64.OpenSubKey(@"Software\PEI Data Systems\PEI Site App");
+            using var key64 = baseKey64.OpenSubKey(AppPaths.RegistryKey);
             return key64?.GetValue(valueName) as string;
         }
         catch { return null; }

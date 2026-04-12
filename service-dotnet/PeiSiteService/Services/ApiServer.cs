@@ -123,6 +123,46 @@ public static class ApiServer
             return new { success = true };
         });
 
+        // --- Queue endpoints ---
+
+        // GET /queue — all entries (active + history), newest-first
+        app.MapGet("/queue", (FileQueue queue) => new { entries = queue.GetAll() });
+
+        // GET /queue/status — broker + queue summary
+        app.MapGet("/queue/status", (FileQueue queue, FileBroker broker) => new
+        {
+            paused = broker.IsPaused,
+            inFlight = broker.IsInFlight,
+            pendingCount = queue.PendingCount
+        });
+
+        // POST /queue/{id}/retry — reset a permanently-failed entry to pending
+        app.MapPost("/queue/{id}/retry", (string id, FileQueue queue) =>
+            queue.RetryFailed(id)
+                ? Results.Ok(new { success = true })
+                : Results.NotFound(new { error = "Entry not found or not permanently failed" }));
+
+        // DELETE /queue/history — clear terminal entries
+        app.MapDelete("/queue/history", (FileQueue queue) =>
+        {
+            queue.ClearHistory();
+            return new { success = true };
+        });
+
+        // POST /queue/pause
+        app.MapPost("/queue/pause", (FileBroker broker) =>
+        {
+            broker.Pause();
+            return new { success = true };
+        });
+
+        // POST /queue/resume
+        app.MapPost("/queue/resume", (FileBroker broker) =>
+        {
+            broker.Resume();
+            return new { success = true };
+        });
+
         // --- FTP endpoints ---
 
         // GET /ftp/status — overall status (enabled + all server statuses)
