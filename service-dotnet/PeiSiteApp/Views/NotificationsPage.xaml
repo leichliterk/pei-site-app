@@ -75,7 +75,7 @@
                     <!-- Size -->
                     <TextBlock FontSize="12" Foreground="#94A3B8" Margin="0,0,0,20">
                         <Run Text="Download size: " />
-                        <Run Text="{Binding OtaSizeDisplay}" />
+                        <Run Text="{Binding OtaSizeDisplay, Mode=OneWay}" />
                     </TextBlock>
 
                     <!-- Confirm state: Install / Later buttons -->

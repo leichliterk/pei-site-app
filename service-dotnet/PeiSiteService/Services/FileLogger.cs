@@ -19,7 +19,7 @@ public class FileLogger
     public FileLogger()
     {
         var programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-        _logDir = Path.Combine(programData, "PEI Site Service", "logs");
+        _logDir = Path.Combine(programData, ServicePaths.DataDirName, "logs");
         try { Directory.CreateDirectory(_logDir); } catch { }
     }
 

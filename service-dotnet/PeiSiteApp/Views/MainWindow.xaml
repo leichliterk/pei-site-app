@@ -21,6 +21,9 @@
         <DataTemplate DataType="{x:Type vm:NotificationsViewModel}">
             <views:NotificationsPage />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:QueueViewModel}">
+            <views:QueuePage />
+        </DataTemplate>
     </Window.Resources>
 
     <DockPanel>
@@ -47,6 +50,26 @@
                             Command="{Binding NavigateHomeCommand}"
                             ToolTip="Home" Margin="0,0,4,0">
                         <TextBlock Text="&#xE80F;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="White" />
+                    </Button>
+                    <!-- Queue button -->
+                    <Button Style="{StaticResource ToolbarIconButton}"
+                            Command="{Binding NavigateQueueCommand}"
+                            ToolTip="Upload Queue" Margin="0,0,4,0">
+                        <Grid>
+                            <TextBlock Text="&#xE896;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="White" />
+                            <!-- Pending badge -->
+                            <Border Background="#F59E0B" CornerRadius="8"
+                                    HorizontalAlignment="Right" VerticalAlignment="Top"
+                                    MinWidth="16" Height="16" Padding="3,0"
+                                    Margin="0,-4,-4,0"
+                                    Visibility="{Binding HasPendingQueue, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="{Binding QueuePendingDisplay}"
+                                           FontSize="9" FontWeight="Bold"
+                                           Foreground="White"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center" />
+                            </Border>
+                        </Grid>
                     </Button>
                     <Button Style="{StaticResource ToolbarIconButton}"
                             Command="{Binding NavigateNotificationsCommand}"

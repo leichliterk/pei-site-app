@@ -5,8 +5,7 @@ namespace PeiSiteService.Services;
 public class FtpWatcherManager
 {
     private readonly Dictionary<string, FtpWatcher> _watchers = new();
-    private readonly WebSocketClient _wsClient;
-    private readonly PendingFileQueue _pendingQueue;
+    private readonly FileQueue _fileQueue;
     private readonly FileLogger _logger;
     private readonly ConfigManager _configManager;
     private readonly object _lock = new();
@@ -14,10 +13,9 @@ public class FtpWatcherManager
     private int _tenantId;
     private bool _enabled;
 
-    public FtpWatcherManager(WebSocketClient wsClient, PendingFileQueue pendingQueue, FileLogger logger, ConfigManager configManager)
+    public FtpWatcherManager(FileQueue fileQueue, FileLogger logger, ConfigManager configManager)
     {
-        _wsClient = wsClient;
-        _pendingQueue = pendingQueue;
+        _fileQueue = fileQueue;
         _logger = logger;
         _configManager = configManager;
     }
@@ -32,7 +30,7 @@ public class FtpWatcherManager
         {
             foreach (var server in ftpConfig.Servers)
             {
-                var watcher = new FtpWatcher(server, _wsClient, _pendingQueue, _siteId, _tenantId, _logger, _configManager.ClearForceFullUpload);
+                var watcher = new FtpWatcher(server, _fileQueue, _siteId, _tenantId, _logger, _configManager.ClearForceFullUpload);
                 _watchers[server.Id] = watcher;
             }
         }
@@ -77,7 +75,7 @@ public class FtpWatcherManager
     {
         lock (_lock)
         {
-            var watcher = new FtpWatcher(server, _wsClient, _pendingQueue, _siteId, _tenantId, _logger, _configManager.ClearForceFullUpload);
+            var watcher = new FtpWatcher(server, _fileQueue, _siteId, _tenantId, _logger, _configManager.ClearForceFullUpload);
             _watchers[server.Id] = watcher;
             if (_enabled) watcher.Start();
             _logger.Log(ServiceLogLevel.Info, $"[FtpWatcherManager] Added server {server.Id}: {server.FtpHost}");
@@ -132,7 +130,7 @@ public class FtpWatcherManager
         try
         {
             var tempConfig = new FtpServerConfig { FtpHost = host, FtpPath = path, Username = username, Password = password };
-            var tempWatcher = new FtpWatcher(tempConfig, _wsClient, _pendingQueue, _siteId, _tenantId, _logger);
+            var tempWatcher = new FtpWatcher(tempConfig, _fileQueue, _siteId, _tenantId, _logger);
             return await tempWatcher.TestConnectionAsync(host, path);
         }
         finally
@@ -147,7 +145,7 @@ public class FtpWatcherManager
         try
         {
             var tempConfig = new FtpServerConfig { FtpHost = host, FtpPath = path, Username = username, Password = password };
-            var tempWatcher = new FtpWatcher(tempConfig, _wsClient, _pendingQueue, _siteId, _tenantId, _logger);
+            var tempWatcher = new FtpWatcher(tempConfig, _fileQueue, _siteId, _tenantId, _logger);
             return await tempWatcher.ListDirectoriesAsync(host, path);
         }
         finally
@@ -156,10 +154,6 @@ public class FtpWatcherManager
         }
     }
 
-    /// <summary>
-    /// Stops watchers targeting the given host and waits for any active poll to finish.
-    /// This prevents concurrent connections to FTP servers that only support one connection.
-    /// </summary>
     private async Task PauseWatchersForHostAsync(string host)
     {
         List<FtpWatcher> matchingWatchers;
@@ -172,26 +166,18 @@ public class FtpWatcherManager
 
         foreach (var watcher in matchingWatchers)
         {
-            watcher.Stop(); // Stop the timer so no new polls start
+            watcher.Stop();
             _logger.Log(ServiceLogLevel.Debug, $"[FtpWatcherManager] Paused watcher {watcher.Id} for host {host}");
         }
 
-        // Wait for any in-progress polls to finish (up to 60 seconds)
         var timeout = DateTime.UtcNow.AddSeconds(60);
         while (matchingWatchers.Any(w => w.IsCurrentlyPolling) && DateTime.UtcNow < timeout)
-        {
             await Task.Delay(500);
-        }
 
         if (matchingWatchers.Any(w => w.IsCurrentlyPolling))
-        {
             _logger.Log(ServiceLogLevel.Warning, $"[FtpWatcherManager] Watcher for {host} still polling after timeout");
-        }
     }
 
-    /// <summary>
-    /// Restarts watchers for the given host after a test/browse operation.
-    /// </summary>
     private void ResumeWatchersForHost(string host)
     {
         if (!_enabled) return;

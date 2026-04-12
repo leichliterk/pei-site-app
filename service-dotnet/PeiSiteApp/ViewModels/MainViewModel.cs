@@ -38,10 +38,24 @@ public partial class MainViewModel : ObservableObject
 
     public string Version { get; }
 
+    [ObservableProperty]
+    private int _queuePendingCount;
+
+    public bool HasPendingQueue => QueuePendingCount > 0;
+    public string QueuePendingDisplay => QueuePendingCount > 99 ? "99+" : QueuePendingCount.ToString();
+
+    partial void OnQueuePendingCountChanged(int value)
+    {
+        OnPropertyChanged(nameof(HasPendingQueue));
+        OnPropertyChanged(nameof(QueuePendingDisplay));
+    }
+
     private HomeViewModel? _homeViewModel;
     private SettingsViewModel? _settingsViewModel;
     private NotificationsViewModel? _notificationsViewModel;
+    private QueueViewModel? _queueViewModel;
     private DispatcherTimer? _notificationPollTimer;
+    private DispatcherTimer? _queueBadgePollTimer;
 
     public MainViewModel(
         SettingsManager settingsManager,
@@ -75,6 +89,12 @@ public partial class MainViewModel : ObservableObject
         _notificationPollTimer.Tick += async (_, _) => await PollNotificationCountAsync();
         _notificationPollTimer.Start();
 
+        // Start queue badge polling (every 5 seconds)
+        _ = PollQueueStatusAsync();
+        _queueBadgePollTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        _queueBadgePollTimer.Tick += async (_, _) => await PollQueueStatusAsync();
+        _queueBadgePollTimer.Start();
+
         // Navigate to home
         NavigateHome();
     }
@@ -84,6 +104,13 @@ public partial class MainViewModel : ObservableObject
         var result = await _localService.GetNotificationsAsync();
         if (result != null)
             UnreadNotificationCount = result.UnreadCount;
+    }
+
+    private async Task PollQueueStatusAsync()
+    {
+        var result = await _localService.GetQueueStatusAsync();
+        if (result != null)
+            QueuePendingCount = result.PendingCount;
     }
 
     [RelayCommand]
@@ -111,6 +138,17 @@ public partial class MainViewModel : ObservableObject
         _ = _notificationsViewModel.LoadAsync();
     }
 
+    [RelayCommand]
+    private void NavigateQueue()
+    {
+        if (_queueViewModel == null)
+        {
+            _queueViewModel = new QueueViewModel(_localService);
+            _queueViewModel.Start();
+        }
+        CurrentPage = _queueViewModel;
+    }
+
     public void RefreshNotificationCount()
     {
         _ = PollNotificationCountAsync();
@@ -127,6 +165,9 @@ public partial class MainViewModel : ObservableObject
     {
         _notificationPollTimer?.Stop();
         _notificationPollTimer = null;
+        _queueBadgePollTimer?.Stop();
+        _queueBadgePollTimer = null;
+        _queueViewModel?.Stop();
         _homeViewModel?.Stop();
         _ftpStatusService.StopPolling();
         _localService.StopPolling();

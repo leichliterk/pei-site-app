@@ -6,7 +6,20 @@
       "mcp__coordinator__blackboard_set",
       "mcp__coordinator__task_list",
       "mcp__coordinator__contract_list",
-      "mcp__coordinator__event_poll"
+      "mcp__coordinator__event_poll",
+      "mcp__coordinator__task_get",
+      "mcp__coordinator__contract_get",
+      "mcp__coordinator__task_update",
+      "Bash(powershell -ExecutionPolicy Bypass -File build.ps1 -Environment Staging -Version 1.3.0)",
+      "Bash(\"C:/Program Files \\(x86\\)/WiX Toolset v3.14/bin/candle.exe\" -ext WixBalExtension \"Bundle.wxs\" -out \"Bundle.wixobj\")",
+      "Bash(\"C:/Program Files \\(x86\\)/WiX Toolset v3.14/bin/candle.exe\" -ext WixBalExtension -dMsiFile=\"PEI Site App - Staging 1.3.0.msi\" \"Bundle.wxs\" -out \"Bundle.wixobj\")",
+      "Bash(\"C:/Program Files \\(x86\\)/WiX Toolset v3.14/bin/light.exe\" -ext WixBalExtension \"Bundle.wixobj\" -out \"PEI Site App - Staging Setup 1.3.0.exe\")",
+      "Bash(\"C:/Program Files \\(x86\\)/WiX Toolset v3.14/bin/candle.exe\" -ext WixFirewallExtension -ext WixUtilExtension \"PEI Site App.wxs\" -out \"PEI Site App.wixobj\")",
+      "Bash(\"C:/Program Files \\(x86\\)/WiX Toolset v3.14/bin/light.exe\" -ext WixFirewallExtension -ext WixUIExtension -ext WixUtilExtension \"PEI Site App.wixobj\" -out \"PEI Site App - Staging 1.3.0.msi\")",
+      "Bash(dotnet publish:*)",
+      "Bash(\"C:/Program Files \\(x86\\)/WiX Toolset v3.14/bin/light.exe\" -ext WixFirewallExtension -ext WixUIExtension -ext WixUtilExtension \"PEI Site App.wixobj\" -out \"PEI Site App 1.3.0.msi\")",
+      "Bash(\"C:/Program Files \\(x86\\)/WiX Toolset v3.14/bin/candle.exe\" -ext WixBalExtension -dMsiFile=\"PEI Site App 1.3.0.msi\" \"Bundle.wxs\" -out \"Bundle.wixobj\")",
+      "Bash(\"C:/Program Files \\(x86\\)/WiX Toolset v3.14/bin/light.exe\" -ext WixBalExtension \"Bundle.wixobj\" -out \"PEI Site App Setup 1.3.0.exe\")"
     ]
   }
 }

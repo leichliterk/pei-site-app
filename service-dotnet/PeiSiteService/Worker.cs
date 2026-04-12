@@ -7,14 +7,16 @@ public class Worker : BackgroundService
 {
     private readonly FileLogger _logger;
     private readonly WebSocketClient _wsClient;
+    private readonly FileBroker _fileBroker;
     private readonly FtpWatcherManager _ftpManager;
     private readonly ConfigManager _configManager;
     private readonly NotificationManager _notificationManager;
 
-    public Worker(FileLogger logger, WebSocketClient wsClient, FtpWatcherManager ftpManager, ConfigManager configManager, NotificationManager notificationManager)
+    public Worker(FileLogger logger, WebSocketClient wsClient, FileBroker fileBroker, FtpWatcherManager ftpManager, ConfigManager configManager, NotificationManager notificationManager)
     {
         _logger = logger;
         _wsClient = wsClient;
+        _fileBroker = fileBroker;
         _ftpManager = ftpManager;
         _configManager = configManager;
         _notificationManager = notificationManager;
@@ -41,6 +43,9 @@ public class Worker : BackgroundService
             // Connect WebSocket
             _logger.Log("[PEI Site Service] Initiating WebSocket connection...");
             _wsClient.Connect();
+
+            // Start file broker (sends queued files as WS connects)
+            _fileBroker.Start();
 
             // Start FTP watchers
             _ftpManager.StartAll();
@@ -69,6 +74,7 @@ public class Worker : BackgroundService
         _logger.Log("[PEI Site Service] Shutting down...");
 
         _ftpManager.StopAll();
+        _fileBroker.Stop();
         await _wsClient.DisconnectAsync();
 
         _logger.Log("[PEI Site Service] Shutdown complete");
@@ -77,8 +83,6 @@ public class Worker : BackgroundService
 
     private async Task WaitForNetworkAsync(CancellationToken ct, int maxAttempts = 30, int delayMs = 2000)
     {
-        // Derive the hostname to check from the configured API URL so staging and
-        // production installs both verify connectivity against the right server.
         var apiUrl = _configManager.GetConfig().ApiUrl;
         string host;
         try { host = new Uri(apiUrl).Host; }
