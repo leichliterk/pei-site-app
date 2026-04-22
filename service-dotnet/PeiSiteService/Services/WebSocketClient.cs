@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using PeiSiteService.Models;
+using PeiSiteService.Plc;
 using SocketIOClient;
 using SocketIOClient.Transport;
 
@@ -26,6 +27,7 @@ public class WebSocketClient : IDisposable
     public event Action<ServiceNotification>? NotificationReceived;
 
     private TaskCompletionSource<bool>? _otaAckSource;
+    private TagBrowserState? _tagBrowserState;
 
     public ConnectionStatus Status
     {
@@ -103,6 +105,7 @@ public class WebSocketClient : IDisposable
             SetStatus(ConnectionStatus.connected);
             EmitServiceStatus();
             EmitFtpStatus();
+            EmitPlcTags();
         };
 
         _socket.OnDisconnected += (s, reason) =>
@@ -386,6 +389,26 @@ public class WebSocketClient : IDisposable
         _logger.Log(ServiceLogLevel.Debug, $"[WebSocketClient] History prepopulated from {sessions.Count} sessions");
     }
 
+    /// <summary>
+    /// Wire up PLC services after the DI container is built.
+    /// Starts a background consumer for plc:snapshot and subscribes to TagsUpdated.
+    /// </summary>
+    public void AttachPlcServices(PlcPollingService pollingService, TagBrowserState tagBrowserState)
+    {
+        _tagBrowserState = tagBrowserState;
+
+        _tagBrowserState.TagsUpdated += EmitPlcTags;
+
+        // Background consumer: read snapshots from the channel and emit to server
+        _ = Task.Run(async () =>
+        {
+            await foreach (var snapshot in pollingService.Snapshots.ReadAllAsync())
+            {
+                EmitPlcSnapshot(snapshot);
+            }
+        });
+    }
+
     private void EmitServiceStatus()
     {
         EmitToServer("service:status", new { state = "running" });
@@ -394,6 +417,41 @@ public class WebSocketClient : IDisposable
     private void EmitFtpStatus()
     {
         EmitToServer("ftp:status", new { paused = _ftpManager.IsPaused, queueDepth = _fileQueue.PendingCount });
+    }
+
+    private void EmitPlcSnapshot(PlcSnapshot snapshot)
+    {
+        EmitToServer("plc:snapshot", new
+        {
+            ipAddress = snapshot.IpAddress,
+            slot = snapshot.Slot,
+            timestamp = snapshot.Timestamp,
+            connected = snapshot.Connected,
+            tags = snapshot.Tags.Select(t => new
+            {
+                name = t.Name,
+                dataType = t.DataType,
+                value = t.Value,
+                displayName = t.DisplayName,
+                unit = t.Unit,
+                error = t.Error,
+                errorMessage = t.ErrorMessage
+            })
+        });
+    }
+
+    private void EmitPlcTags()
+    {
+        if (_tagBrowserState == null) return;
+        EmitToServer("plc:tags", new
+        {
+            tags = _tagBrowserState.Tags.Select(t => new
+            {
+                name = t.Name,
+                dataType = t.DataType,
+                program = t.Program
+            })
+        });
     }
 
     private void SetStatus(ConnectionStatus status)

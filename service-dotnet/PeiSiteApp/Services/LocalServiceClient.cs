@@ -414,6 +414,48 @@ public class LocalServiceClient : IDisposable
         catch { return false; }
     }
 
+    // --- PLC endpoints ---
+
+    public async Task<PlcSettingsModel?> PlcGetSettingsAsync()
+    {
+        try
+        {
+            var response = await _http.GetAsync("/plc/settings");
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<PlcSettingsModel>(json, JsonOptions);
+            }
+            return null;
+        }
+        catch { return null; }
+    }
+
+    public async Task<PlcTagsResponse?> PlcGetTagsAsync()
+    {
+        try
+        {
+            var response = await _http.GetAsync("/plc/tags");
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<PlcTagsResponse>(json, JsonOptions);
+            }
+            return null;
+        }
+        catch { return null; }
+    }
+
+    public async Task<bool> PlcRefreshTagsAsync()
+    {
+        try
+        {
+            var response = await _http.PostAsync("/plc/tags/refresh", null);
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
     public void Dispose()
     {
         StopPolling();

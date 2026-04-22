@@ -1,4 +1,6 @@
+using Microsoft.Extensions.Options;
 using PeiSiteService.Models;
+using PeiSiteService.Plc;
 
 namespace PeiSiteService.Services;
 
@@ -219,6 +221,24 @@ public static class ApiServer
                 return Results.BadRequest(new { success = false, message = "host is required" });
             var result = await mgr.BrowseDirectoryAsync(req.Host, req.Path, req.Username, req.Password);
             return Results.Ok(result);
+        });
+
+        // --- PLC endpoints ---
+
+        // GET /plc/settings — return current PlcSettings
+        app.MapGet("/plc/settings", (IOptionsMonitor<PlcSettings> opts) => opts.CurrentValue);
+
+        // GET /plc/tags — return last discovered tag list
+        app.MapGet("/plc/tags", (TagBrowserState state) => new
+        {
+            tags = state.Tags.Select(t => new { name = t.Name, dataType = t.DataType, program = t.Program })
+        });
+
+        // POST /plc/tags/refresh — trigger an immediate tag browse
+        app.MapPost("/plc/tags/refresh", (TagBrowserService browser) =>
+        {
+            browser.RequestRefresh();
+            return new { success = true };
         });
     }
 }
