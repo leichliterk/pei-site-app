@@ -1,3 +1,5 @@
+using PeiSiteService.Plc;
+
 namespace PeiSiteService.Models;
 
 public class FullConfig
@@ -9,6 +11,8 @@ public class FullConfig
     public ServiceLogLevel LogLevel { get; set; } = ServiceLogLevel.Info;
     public bool FtpEnabled { get; set; }
     public List<FtpServerConfig> FtpServers { get; set; } = new();
+
+    public PlcSettings PlcSettings { get; set; } = new();
 
     // Legacy flat fields — kept for deserializing old config.json files.
     // After migration these are cleared and FtpServers is used instead.

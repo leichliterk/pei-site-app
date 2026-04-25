@@ -16,6 +16,9 @@ public class FileQueue
     private List<QueueEntry> _entries = new();
     private const int MaxHistory = 100;
 
+    /// <summary>Raised when the number of pending entries changes (enqueue or terminal transition).</summary>
+    public event Action? QueueDepthChanged;
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -67,8 +70,9 @@ public class FileQueue
             _entries.Add(entry);
             Save();
             _logger.Log(ServiceLogLevel.Info, $"[FileQueue] Enqueued: {entry.Filename} ({entry.SizeBytes} bytes, sha256={entry.Sha256[..12]}...)");
-            return true;
         }
+        QueueDepthChanged?.Invoke();
+        return true;
     }
 
     // ── Query ─────────────────────────────────────────────────────────────────
@@ -128,6 +132,7 @@ public class FileQueue
             Save();
             _logger.Log(ServiceLogLevel.Info, $"[FileQueue] Success: {e.Filename} (records={recordsInserted})");
         }
+        QueueDepthChanged?.Invoke();
     }
 
     public void MarkFailed(string id, string error)
@@ -156,6 +161,7 @@ public class FileQueue
             }
             Save();
         }
+        QueueDepthChanged?.Invoke();
     }
 
     /// <summary>
