@@ -12,6 +12,9 @@ public class FtpWatcherManager
     private int _siteId;
     private int _tenantId;
     private bool _enabled;
+    private bool _globalPaused;
+
+    public bool IsPaused => _globalPaused;
 
     public FtpWatcherManager(FileQueue fileQueue, FileLogger logger, ConfigManager configManager)
     {
@@ -110,6 +113,38 @@ public class FtpWatcherManager
             _logger.Log(ServiceLogLevel.Info, $"[FtpWatcherManager] Removed server {id}");
             return true;
         }
+    }
+
+    public void PauseAll()
+    {
+        _globalPaused = true;
+        lock (_lock)
+        {
+            foreach (var watcher in _watchers.Values)
+                watcher.Pause();
+        }
+        _logger.Log(ServiceLogLevel.Info, "[FtpWatcherManager] All watchers paused");
+    }
+
+    public void ResumeAll()
+    {
+        _globalPaused = false;
+        lock (_lock)
+        {
+            foreach (var watcher in _watchers.Values)
+                watcher.Resume();
+        }
+        _logger.Log(ServiceLogLevel.Info, "[FtpWatcherManager] All watchers resumed");
+    }
+
+    public void TriggerFullUploadAll()
+    {
+        lock (_lock)
+        {
+            foreach (var watcher in _watchers.Values)
+                watcher.TriggerFullUpload();
+        }
+        _logger.Log(ServiceLogLevel.Info, "[FtpWatcherManager] Full upload triggered on all watchers");
     }
 
     public FtpOverallStatus GetOverallStatus()

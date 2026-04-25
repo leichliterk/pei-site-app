@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Win32;
 using PeiSiteService.Models;
+using PeiSiteService.Plc;
 
 namespace PeiSiteService.Services;
 
@@ -17,6 +18,9 @@ public class ConfigManager
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = true
     };
+
+    /// <summary>Fired whenever PLC settings are updated via UpdatePlcSettings().</summary>
+    public event Action<PlcSettings>? PlcSettingsChanged;
 
     private static readonly FullConfig DefaultConfig = new()
     {
@@ -251,6 +255,23 @@ public class ConfigManager
         }
     }
 
+    // PLC settings
+    public PlcSettings GetPlcSettings()
+    {
+        lock (_lock) { return _config.PlcSettings; }
+    }
+
+    public void UpdatePlcSettings(PlcSettings settings)
+    {
+        lock (_lock)
+        {
+            _config.PlcSettings = settings;
+            SaveConfig(_config);
+            _logger.Log(ServiceLogLevel.Info, $"[ConfigManager] PLC settings updated: enabled={settings.Enabled}, ip={settings.IpAddress}, tags={settings.Tags.Count}");
+        }
+        PlcSettingsChanged?.Invoke(settings);
+    }
+
     // FTP global toggle
     public void SetFtpEnabled(bool enabled)
     {
@@ -362,6 +383,7 @@ public class ConfigManager
             LogLevel = config.LogLevel,
             FtpEnabled = config.FtpEnabled,
             FtpServers = config.FtpServers ?? new(),
+            PlcSettings = config.PlcSettings ?? new PlcSettings(),
             // Keep legacy fields for migration detection
             FtpHost = config.FtpHost ?? "",
             FtpPath = string.IsNullOrEmpty(config.FtpPath) ? "/" : config.FtpPath,
@@ -384,6 +406,20 @@ public class ConfigManager
             FtpHost = s.FtpHost,
             FtpPath = s.FtpPath,
             FtpPollInterval = s.FtpPollInterval
-        }).ToList()
+        }).ToList(),
+        PlcSettings = new PlcSettings
+        {
+            Enabled = c.PlcSettings.Enabled,
+            IpAddress = c.PlcSettings.IpAddress,
+            Slot = c.PlcSettings.Slot,
+            PollingIntervalMs = c.PlcSettings.PollingIntervalMs,
+            Tags = c.PlcSettings.Tags.Select(t => new TagDefinition
+            {
+                Name = t.Name,
+                DataType = t.DataType,
+                DisplayName = t.DisplayName,
+                Unit = t.Unit
+            }).ToList()
+        }
     };
 }

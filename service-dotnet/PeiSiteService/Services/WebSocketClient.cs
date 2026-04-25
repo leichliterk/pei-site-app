@@ -1,5 +1,7 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using PeiSiteService.Models;
+using PeiSiteService.Plc;
 using SocketIOClient;
 using SocketIOClient.Transport;
 
@@ -10,6 +12,8 @@ public class WebSocketClient : IDisposable
     private SocketIOClient.SocketIO? _socket;
     private ServiceConfig _config;
     private readonly FileLogger _logger;
+    private readonly FtpWatcherManager _ftpManager;
+    private readonly FileQueue _fileQueue;
     private readonly object _lock = new();
 
     private ConnectionStatus _status = ConnectionStatus.disconnected;
@@ -23,6 +27,8 @@ public class WebSocketClient : IDisposable
     public event Action<ServiceNotification>? NotificationReceived;
 
     private TaskCompletionSource<bool>? _otaAckSource;
+    private TagBrowserState? _tagBrowserState;
+    private PlcSnapshotState? _snapshotState;
 
     public ConnectionStatus Status
     {
@@ -51,10 +57,15 @@ public class WebSocketClient : IDisposable
         }
     }
 
-    public WebSocketClient(ServiceConfig config, FileLogger logger)
+    public WebSocketClient(ServiceConfig config, FileLogger logger, FtpWatcherManager ftpManager, FileQueue fileQueue)
     {
         _config = config;
         _logger = logger;
+        _ftpManager = ftpManager;
+        _fileQueue = fileQueue;
+
+        // Emit ftp:status whenever queue depth changes (enqueue or terminal transition)
+        _fileQueue.QueueDepthChanged += () => EmitFtpStatus();
     }
 
     public void Connect()
@@ -93,6 +104,9 @@ public class WebSocketClient : IDisposable
             _logger.Log(ServiceLogLevel.Info, "[WebSocketClient] Connected");
             lock (_lock) { _connectedAt = DateTime.UtcNow; }
             SetStatus(ConnectionStatus.connected);
+            EmitServiceStatus();
+            EmitFtpStatus();
+            EmitPlcTags();
         };
 
         _socket.OnDisconnected += (s, reason) =>
@@ -184,6 +198,57 @@ public class WebSocketClient : IDisposable
             catch (Exception ex)
             {
                 _logger.Log(ServiceLogLevel.Error, $"[WebSocketClient] Error parsing notification: {ex.Message}");
+            }
+        });
+
+        _socket.On("service:command", response =>
+        {
+            try
+            {
+                var cmd = response.GetValue<ServiceCommand>();
+                _logger.Log(ServiceLogLevel.Info, $"[WebSocketClient] service:command received: {cmd.Action}");
+                EmitToServer("service:command_ack", new { action = cmd.Action, success = true });
+
+                if (cmd.Action == "stop" || cmd.Action == "restart")
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        await Task.Delay(300); // let ack flush
+                        Environment.Exit(0);
+                    });
+                }
+                // "start" is a no-op — we are already running
+            }
+            catch (Exception ex)
+            {
+                _logger.Log(ServiceLogLevel.Error, $"[WebSocketClient] Error handling service:command: {ex.Message}");
+                try { EmitToServer("service:command_ack", new { action = "unknown", success = false, error = ex.Message }); } catch { }
+            }
+        });
+
+        _socket.On("ftp:command", response =>
+        {
+            try
+            {
+                var cmd = response.GetValue<FtpCommand>();
+                _logger.Log(ServiceLogLevel.Info, $"[WebSocketClient] ftp:command received: {cmd.Action}");
+
+                switch (cmd.Action)
+                {
+                    case "pause":       _ftpManager.PauseAll(); break;
+                    case "resume":      _ftpManager.ResumeAll(); break;
+                    case "full-upload": _ftpManager.TriggerFullUploadAll(); break;
+                    default:
+                        throw new InvalidOperationException($"Unknown ftp:command action: {cmd.Action}");
+                }
+
+                EmitToServer("ftp:command_ack", new { action = cmd.Action, success = true });
+                EmitFtpStatus();
+            }
+            catch (Exception ex)
+            {
+                _logger.Log(ServiceLogLevel.Error, $"[WebSocketClient] Error handling ftp:command: {ex.Message}");
+                try { EmitToServer("ftp:command_ack", new { action = "unknown", success = false, error = ex.Message }); } catch { }
             }
         });
 
@@ -323,6 +388,73 @@ public class WebSocketClient : IDisposable
         }
 
         _logger.Log(ServiceLogLevel.Debug, $"[WebSocketClient] History prepopulated from {sessions.Count} sessions");
+    }
+
+    /// <summary>
+    /// Wire up PLC services after the DI container is built.
+    /// Starts a background consumer for plc:snapshot and subscribes to TagsUpdated.
+    /// </summary>
+    public void AttachPlcServices(PlcPollingService pollingService, TagBrowserState tagBrowserState, PlcSnapshotState snapshotState)
+    {
+        _tagBrowserState = tagBrowserState;
+        _snapshotState = snapshotState;
+
+        _tagBrowserState.TagsUpdated += EmitPlcTags;
+
+        // Background consumer: read snapshots from the channel, cache them, and emit to server
+        _ = Task.Run(async () =>
+        {
+            await foreach (var snapshot in pollingService.Snapshots.ReadAllAsync())
+            {
+                _snapshotState.Update(snapshot);
+                EmitPlcSnapshot(snapshot);
+            }
+        });
+    }
+
+    private void EmitServiceStatus()
+    {
+        EmitToServer("service:status", new { state = "running" });
+    }
+
+    private void EmitFtpStatus()
+    {
+        EmitToServer("ftp:status", new { paused = _ftpManager.IsPaused, queueDepth = _fileQueue.PendingCount });
+    }
+
+    private void EmitPlcSnapshot(PlcSnapshot snapshot)
+    {
+        EmitToServer("plc:snapshot", new
+        {
+            ipAddress = snapshot.IpAddress,
+            slot = snapshot.Slot,
+            timestamp = snapshot.Timestamp,
+            connected = snapshot.Connected,
+            tags = snapshot.Tags.Select(t => new
+            {
+                name = t.Name,
+                dataType = t.DataType,
+                value = t.Value,
+                displayName = t.DisplayName,
+                unit = t.Unit,
+                error = t.Error,
+                errorMessage = t.ErrorMessage
+            })
+        });
+    }
+
+    private void EmitPlcTags()
+    {
+        if (_tagBrowserState == null) return;
+        EmitToServer("plc:tags", new
+        {
+            tags = _tagBrowserState.Tags.Select(t => new
+            {
+                name = t.Name,
+                dataType = t.DataType,
+                program = t.Program
+            })
+        });
     }
 
     private void SetStatus(ConnectionStatus status)

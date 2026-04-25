@@ -152,6 +152,57 @@ public partial class SettingsViewModel : ObservableObject
     private DispatcherTimer? _logPollTimer;
     private DispatcherTimer? _ftpStatusTimer;
 
+    // PLC tab
+    [ObservableProperty]
+    private bool _plcEnabled;
+
+    [ObservableProperty]
+    private string _plcIpAddress = "192.168.1.10";
+
+    [ObservableProperty]
+    private int _plcSlot;
+
+    [ObservableProperty]
+    private int _plcPollingIntervalMs = 500;
+
+    [ObservableProperty]
+    private string _plcSaveMessage = "";
+
+    [ObservableProperty]
+    private bool _plcSaveSuccess;
+
+    [ObservableProperty]
+    private bool _plcIsSaving;
+
+    // PLC Add/Edit Tag dialog
+    [ObservableProperty]
+    private bool _showAddPlcTagDialog;
+
+    [ObservableProperty]
+    private string _plcTagDialogTitle = "Add PLC Tag";
+
+    [ObservableProperty]
+    private string _newPlcTagName = "";
+
+    [ObservableProperty]
+    private string _newPlcTagDataType = "REAL";
+
+    [ObservableProperty]
+    private string _newPlcTagDisplayName = "";
+
+    [ObservableProperty]
+    private string _newPlcTagUnit = "";
+
+    [ObservableProperty]
+    private string _plcTagDialogError = "";
+
+    private PlcTagDefinitionModel? _editingPlcTag;
+
+    public ObservableCollection<PlcTagDefinitionModel> PlcTags { get; } = new();
+
+    public static IReadOnlyList<string> PlcDataTypes { get; } =
+        new[] { "REAL", "BOOL", "DINT", "STRING" };
+
     // Advanced tab — service control
     private const string ServiceName = "PeiSiteService";
 
@@ -668,6 +719,114 @@ public partial class SettingsViewModel : ObservableObject
         _lastLogTimestamp = entries[^1].Timestamp;
     }
 
+    // --- PLC tab commands ---
+
+    private async Task LoadPlcSettingsAsync()
+    {
+        var settings = await _localService.PlcGetSettingsAsync();
+        if (settings == null) return;
+        PlcEnabled = settings.Enabled;
+        PlcIpAddress = settings.IpAddress;
+        PlcSlot = settings.Slot;
+        PlcPollingIntervalMs = settings.PollingIntervalMs;
+        PlcTags.Clear();
+        foreach (var t in settings.Tags)
+            PlcTags.Add(t);
+    }
+
+    [RelayCommand]
+    private async Task SavePlcSettingsAsync()
+    {
+        PlcIsSaving = true;
+        PlcSaveMessage = "";
+        var settings = new PlcSettingsModel
+        {
+            Enabled = PlcEnabled,
+            IpAddress = PlcIpAddress,
+            Slot = PlcSlot,
+            PollingIntervalMs = PlcPollingIntervalMs,
+            Tags = PlcTags.ToList()
+        };
+        var success = await _localService.PlcUpdateSettingsAsync(settings);
+        PlcSaveMessage = success ? "Settings saved." : "Failed to save settings.";
+        PlcSaveSuccess = success;
+        PlcIsSaving = false;
+    }
+
+    [RelayCommand]
+    private void OpenAddPlcTagDialog()
+    {
+        _editingPlcTag = null;
+        PlcTagDialogTitle = "Add PLC Tag";
+        NewPlcTagName = "";
+        NewPlcTagDataType = "REAL";
+        NewPlcTagDisplayName = "";
+        NewPlcTagUnit = "";
+        PlcTagDialogError = "";
+        ShowAddPlcTagDialog = true;
+    }
+
+    [RelayCommand]
+    private void OpenEditPlcTagDialog(PlcTagDefinitionModel tag)
+    {
+        _editingPlcTag = tag;
+        PlcTagDialogTitle = "Edit PLC Tag";
+        NewPlcTagName = tag.Name;
+        NewPlcTagDataType = tag.DataType;
+        NewPlcTagDisplayName = tag.DisplayName ?? "";
+        NewPlcTagUnit = tag.Unit ?? "";
+        PlcTagDialogError = "";
+        ShowAddPlcTagDialog = true;
+    }
+
+    [RelayCommand]
+    private void CloseAddPlcTagDialog()
+    {
+        ShowAddPlcTagDialog = false;
+        _editingPlcTag = null;
+    }
+
+    [RelayCommand]
+    private void ConfirmAddPlcTag()
+    {
+        if (string.IsNullOrWhiteSpace(NewPlcTagName))
+        {
+            PlcTagDialogError = "Tag name is required.";
+            return;
+        }
+
+        if (_editingPlcTag != null)
+        {
+            // Update in-place
+            _editingPlcTag.Name = NewPlcTagName.Trim();
+            _editingPlcTag.DataType = NewPlcTagDataType;
+            _editingPlcTag.DisplayName = string.IsNullOrWhiteSpace(NewPlcTagDisplayName) ? null : NewPlcTagDisplayName.Trim();
+            _editingPlcTag.Unit = string.IsNullOrWhiteSpace(NewPlcTagUnit) ? null : NewPlcTagUnit.Trim();
+            // Force the ItemsControl to refresh by replacing the item
+            int idx = PlcTags.IndexOf(_editingPlcTag);
+            if (idx >= 0) { PlcTags.RemoveAt(idx); PlcTags.Insert(idx, _editingPlcTag); }
+            _editingPlcTag = null;
+        }
+        else
+        {
+            PlcTags.Add(new PlcTagDefinitionModel
+            {
+                Name = NewPlcTagName.Trim(),
+                DataType = NewPlcTagDataType,
+                DisplayName = string.IsNullOrWhiteSpace(NewPlcTagDisplayName) ? null : NewPlcTagDisplayName.Trim(),
+                Unit = string.IsNullOrWhiteSpace(NewPlcTagUnit) ? null : NewPlcTagUnit.Trim()
+            });
+        }
+
+        ShowAddPlcTagDialog = false;
+    }
+
+    [RelayCommand]
+    private void RemovePlcTag(PlcTagDefinitionModel tag)
+    {
+        PlcTags.Remove(tag);
+    }
+
     // --- Advanced tab commands ---
 
     [RelayCommand(CanExecute = nameof(CanControlService))]
@@ -764,7 +923,7 @@ public partial class SettingsViewModel : ObservableObject
         }
     }
 
-    // Tab indices: Site=0, Logging=1, FTP=2, Advanced=3
+    // Tab indices: Site=0, Logging=1, FTP=2, Advanced=3, PLC=4
     partial void OnSelectedTabIndexChanged(int value)
     {
         if (value == 1) StartLogPolling();
@@ -775,6 +934,8 @@ public partial class SettingsViewModel : ObservableObject
 
         if (value == 3) StartServiceStatusPolling();
         else StopServiceStatusPolling();
+
+        if (value == 4) _ = LoadPlcSettingsAsync();
     }
 
     partial void OnConfirmationPhraseChanged(string value) => OnPropertyChanged(nameof(IsFormValid));

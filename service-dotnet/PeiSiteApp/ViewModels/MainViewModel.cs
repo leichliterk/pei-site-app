@@ -54,6 +54,8 @@ public partial class MainViewModel : ObservableObject
     private SettingsViewModel? _settingsViewModel;
     private NotificationsViewModel? _notificationsViewModel;
     private QueueViewModel? _queueViewModel;
+    private ScadaViewModel? _scadaViewModel;
+    private TagBrowserViewModel? _tagBrowserViewModel;
     private DispatcherTimer? _notificationPollTimer;
     private DispatcherTimer? _queueBadgePollTimer;
 
@@ -149,6 +151,25 @@ public partial class MainViewModel : ObservableObject
         CurrentPage = _queueViewModel;
     }
 
+    [RelayCommand]
+    private void NavigateScada()
+    {
+        if (_scadaViewModel == null)
+        {
+            _scadaViewModel = new ScadaViewModel(_localService);
+            _scadaViewModel.Start();
+        }
+        CurrentPage = _scadaViewModel;
+    }
+
+    [RelayCommand]
+    private void NavigateTagBrowser()
+    {
+        _tagBrowserViewModel ??= new TagBrowserViewModel(_localService);
+        CurrentPage = _tagBrowserViewModel;
+        _ = _tagBrowserViewModel.LoadAsync();
+    }
+
     public void RefreshNotificationCount()
     {
         _ = PollNotificationCountAsync();
@@ -168,6 +189,7 @@ public partial class MainViewModel : ObservableObject
         _queueBadgePollTimer?.Stop();
         _queueBadgePollTimer = null;
         _queueViewModel?.Stop();
+        _scadaViewModel?.Stop();
         _homeViewModel?.Stop();
         _ftpStatusService.StopPolling();
         _localService.StopPolling();

@@ -24,6 +24,12 @@
         <DataTemplate DataType="{x:Type vm:QueueViewModel}">
             <views:QueuePage />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:ScadaViewModel}">
+            <views:ScadaPage />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:TagBrowserViewModel}">
+            <views:TagBrowserPage />
+        </DataTemplate>
     </Window.Resources>
 
     <DockPanel>
@@ -70,6 +76,18 @@
                                            VerticalAlignment="Center" />
                             </Border>
                         </Grid>
+                    </Button>
+                    <!-- SCADA Live View button -->
+                    <Button Style="{StaticResource ToolbarIconButton}"
+                            Command="{Binding NavigateScadaCommand}"
+                            ToolTip="SCADA / PLC Live View" Margin="0,0,4,0">
+                        <TextBlock Text="&#xE9D9;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="White" />
+                    </Button>
+                    <!-- Tag Browser button -->
+                    <Button Style="{StaticResource ToolbarIconButton}"
+                            Command="{Binding NavigateTagBrowserCommand}"
+                            ToolTip="PLC Tag Browser" Margin="0,0,4,0">
+                        <TextBlock Text="&#xE8EC;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="White" />
                     </Button>
                     <Button Style="{StaticResource ToolbarIconButton}"
                             Command="{Binding NavigateNotificationsCommand}"

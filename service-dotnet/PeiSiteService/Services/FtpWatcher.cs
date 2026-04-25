@@ -21,11 +21,13 @@ public class FtpWatcher
     private string _lastResult = "never polled";
     private int _filesEnqueued;
     private int _isPolling;
+    private bool _paused;
     private readonly object _lock = new();
 
     public string Id => _serverConfig.Id;
     public string Host => _serverConfig.FtpHost;
     public bool IsCurrentlyPolling => _isPolling == 1;
+    public bool IsPaused { get { lock (_lock) { return _paused; } } }
 
     public FtpWatcher(FtpServerConfig serverConfig, FileQueue fileQueue, int siteId, int tenantId, FileLogger logger, Action<string>? onForceUploadComplete = null)
     {
@@ -93,6 +95,27 @@ public class FtpWatcher
             _pollTimer = null;
             _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] Stopped");
         }
+    }
+
+    public void Pause()
+    {
+        lock (_lock) { _paused = true; }
+        Stop();
+        _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] Paused");
+    }
+
+    public void Resume()
+    {
+        lock (_lock) { _paused = false; }
+        Start();
+        _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] Resumed");
+    }
+
+    public void TriggerFullUpload()
+    {
+        lock (_lock) { _serverConfig.ForceFullUploadOnNextPoll = true; }
+        _ = PollAsync();
+        _logger.Log(ServiceLogLevel.Info, $"[FtpWatcher:{Id}] Full upload triggered");
     }
 
     // ── Raw TCP FTP helpers ──────────────────────────────────────────────────
