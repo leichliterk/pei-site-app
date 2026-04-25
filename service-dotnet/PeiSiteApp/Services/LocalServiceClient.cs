@@ -456,6 +456,31 @@ public class LocalServiceClient : IDisposable
         catch { return false; }
     }
 
+    public async Task<PlcSnapshotResponse?> PlcGetSnapshotAsync()
+    {
+        try
+        {
+            var response = await _http.GetAsync("/plc/snapshot");
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<PlcSnapshotResponse>(json, JsonOptions);
+            }
+            return null;
+        }
+        catch { return null; }
+    }
+
+    public async Task<bool> PlcUpdateSettingsAsync(PlcSettingsModel settings)
+    {
+        try
+        {
+            var response = await _http.PutAsJsonAsync("/plc/settings", settings, JsonOptions);
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
     public void Dispose()
     {
         StopPolling();

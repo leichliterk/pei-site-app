@@ -21,5 +21,6 @@ public record PlcSnapshot(
 public record DiscoveredTag(
     string Name,
     string DataType,
-    string? Program // null = controller-scope, "Program:Main" etc for program-scope
+    string? Program, // null = controller-scope, "Program:Main" etc for program-scope
+    bool IsUdtContainer = false // true = UDT instance that was expanded into members below it
 );

@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
+using PeiSiteService.Services;
 
 namespace PeiSiteService.Plc;
 
@@ -11,14 +11,16 @@ namespace PeiSiteService.Plc;
 /// </summary>
 public class TagBrowserService : BackgroundService
 {
-    private readonly IOptionsMonitor<PlcSettings> _options;
+    private readonly ConfigManager _configManager;
     private readonly TagBrowserState _state;
+    private readonly FileLogger _logger;
     private readonly SemaphoreSlim _refreshSignal = new(0, 1);
 
-    public TagBrowserService(IOptionsMonitor<PlcSettings> options, TagBrowserState state)
+    public TagBrowserService(ConfigManager configManager, TagBrowserState state, FileLogger logger)
     {
-        _options = options;
+        _configManager = configManager;
         _state = state;
+        _logger = logger;
     }
 
     /// <summary>Triggers an immediate browse outside the 5-minute cycle.</summary>
@@ -58,7 +60,7 @@ public class TagBrowserService : BackgroundService
 
     private async Task BrowseAsync(CancellationToken ct)
     {
-        var settings = _options.CurrentValue;
+        var settings = _configManager.GetPlcSettings();
         if (!settings.Enabled || string.IsNullOrWhiteSpace(settings.IpAddress))
             return;
 
@@ -66,16 +68,19 @@ public class TagBrowserService : BackgroundService
 
         try
         {
-            var browser = new CompactLogixTagBrowser(settings.IpAddress, slot);
+            _logger.Log($"[TagBrowser] Starting browse: {settings.IpAddress} slot {slot}");
+            var browser = new CompactLogixTagBrowser(settings.IpAddress, slot, _logger);
             var tags = await browser.BrowseAsync(ct);
             _state.Update(tags);
+            _logger.Log($"[TagBrowser] Browse complete: {tags.Count} total tags");
         }
         catch (OperationCanceledException)
         {
             // Shutdown
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.Log($"[TagBrowser] Browse failed: {ex.GetType().Name}: {ex.Message}");
             // Browse failure is non-fatal — keep the old tag list
         }
     }

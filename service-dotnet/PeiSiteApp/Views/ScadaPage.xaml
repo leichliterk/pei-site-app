@@ -14,6 +14,27 @@
             <Setter Property="Padding" Value="16,12" />
             <Setter Property="Margin" Value="0,0,0,8" />
         </Style>
+
+        <Style x:Key="ActionBtn" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="#E2E8F0" />
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </UserControl.Resources>
 
     <DockPanel>
@@ -45,10 +66,19 @@
             </DockPanel>
         </Border>
 
-        <!-- Status message (disabled / error) -->
+        <!-- Status message (disabled / error) — hidden when empty -->
         <Border DockPanel.Dock="Top" Background="#FFF7ED" BorderBrush="#FED7AA" BorderThickness="0,0,0,1"
-                Padding="24,10"
-                Visibility="{Binding StatusMessage, Converter={StaticResource BoolToVis}}">
+                Padding="24,10">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Visible" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding StatusMessage}" Value="">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
             <TextBlock Text="{Binding StatusMessage}" Foreground="#92400E" FontSize="13" />
         </Border>
 
@@ -73,7 +103,7 @@
                                                Margin="0,2,0,0" />
                                 </StackPanel>
 
-                                <!-- Value -->
+                                <!-- Value + unit -->
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0"
                                             HorizontalAlignment="Right">
                                     <TextBlock Text="{Binding ValueDisplay}" FontSize="20" FontWeight="Bold"
@@ -89,9 +119,23 @@
                                             </Style>
                                         </TextBlock.Style>
                                     </TextBlock>
+                                    <!-- Unit — hidden when null/empty -->
                                     <TextBlock Text="{Binding Unit}" FontSize="11" Foreground="#64748B"
-                                               HorizontalAlignment="Right"
-                                               Visibility="{Binding Unit, Converter={StaticResource BoolToVis}}" />
+                                               HorizontalAlignment="Right">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Unit}" Value="">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Unit}" Value="{x:Null}">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
                                 </StackPanel>
 
                                 <!-- Data type badge -->

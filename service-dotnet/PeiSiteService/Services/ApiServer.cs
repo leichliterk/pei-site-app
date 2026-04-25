@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Options;
 using PeiSiteService.Models;
 using PeiSiteService.Plc;
 
@@ -225,13 +224,20 @@ public static class ApiServer
 
         // --- PLC endpoints ---
 
-        // GET /plc/settings — return current PlcSettings
-        app.MapGet("/plc/settings", (IOptionsMonitor<PlcSettings> opts) => opts.CurrentValue);
+        // GET /plc/settings — return current PlcSettings from ConfigManager
+        app.MapGet("/plc/settings", (ConfigManager configManager) => configManager.GetPlcSettings());
+
+        // PUT /plc/settings — persist to ProgramData/config.json via ConfigManager (survives reinstall)
+        app.MapPut("/plc/settings", (PlcSettings incoming, ConfigManager configManager) =>
+        {
+            configManager.UpdatePlcSettings(incoming);
+            return Results.Ok(new { success = true });
+        });
 
         // GET /plc/tags — return last discovered tag list
         app.MapGet("/plc/tags", (TagBrowserState state) => new
         {
-            tags = state.Tags.Select(t => new { name = t.Name, dataType = t.DataType, program = t.Program })
+            tags = state.Tags.Select(t => new { name = t.Name, dataType = t.DataType, program = t.Program, isUdtContainer = t.IsUdtContainer })
         });
 
         // POST /plc/tags/refresh — trigger an immediate tag browse
@@ -239,6 +245,30 @@ public static class ApiServer
         {
             browser.RequestRefresh();
             return new { success = true };
+        });
+
+        // GET /plc/snapshot — return the latest polled snapshot (null if none yet)
+        app.MapGet("/plc/snapshot", (PlcSnapshotState state) =>
+        {
+            var s = state.Latest;
+            if (s == null) return Results.Ok(new { connected = false, tags = Array.Empty<object>(), timestamp = (DateTimeOffset?)null, ipAddress = "", slot = 0 });
+            return Results.Ok(new
+            {
+                connected = s.Connected,
+                ipAddress = s.IpAddress,
+                slot = s.Slot,
+                timestamp = s.Timestamp,
+                tags = s.Tags.Select(t => new
+                {
+                    name = t.Name,
+                    dataType = t.DataType,
+                    value = t.Value,
+                    displayName = t.DisplayName,
+                    unit = t.Unit,
+                    error = t.Error,
+                    errorMessage = t.ErrorMessage
+                })
+            });
         });
     }
 }

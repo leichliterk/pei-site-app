@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Options;
+using PeiSiteService.Services;
 
 namespace PeiSiteService.Plc;
 
@@ -8,11 +8,11 @@ namespace PeiSiteService.Plc;
 /// </summary>
 public class PlcTagReaderFactory
 {
-    private readonly IOptionsMonitor<PlcSettings> _options;
+    private readonly ConfigManager _configManager;
 
-    public PlcTagReaderFactory(IOptionsMonitor<PlcSettings> options)
+    public PlcTagReaderFactory(ConfigManager configManager)
     {
-        _options = options;
+        _configManager = configManager;
     }
 
     /// <summary>
@@ -22,7 +22,7 @@ public class PlcTagReaderFactory
     /// </summary>
     public async Task<(CompactLogixTagReader? reader, int resolvedSlot)> CreateAsync(CancellationToken ct)
     {
-        var settings = _options.CurrentValue;
+        var settings = _configManager.GetPlcSettings();
 
         if (!settings.Enabled || string.IsNullOrWhiteSpace(settings.IpAddress))
             return (null, -1);

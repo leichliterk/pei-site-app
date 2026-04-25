@@ -6,14 +6,14 @@
   <Product Id="*"
            Name="PEI Site App"
            Language="1033"
-           Version="1.3.1"
+           Version="1.4.9"
            Manufacturer="PEI Data Systems"
            UpgradeCode="57f48daa-3001-40a9-9dab-5a20450fd982">
 
     <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine"
              Platform="x64"
              Description="PEI Site App Installer"
-             Comments="Installs PEI Site App v1.3.1" />
+             Comments="Installs PEI Site App v1.4.9" />
 
     <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
     <MediaTemplate EmbedCab="yes" />
@@ -105,6 +105,9 @@
               Name="pei-site-service.exe"
               Source="..\..\service-dotnet\PeiSiteService\bin\Release\net8.0-windows\win-x64\publish\pei-site-service.exe"
               KeyPath="yes" />
+        <File Id="AppSettings_json"
+              Name="appsettings.json"
+              Source="..\..\service-dotnet\PeiSiteService\appsettings.json" />
         <fire:FirewallException Id="ServiceFirewall"
                                 Name="PEI Site Service"
                                 Scope="localSubnet"

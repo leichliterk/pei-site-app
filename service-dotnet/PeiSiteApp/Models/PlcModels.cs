@@ -39,6 +39,7 @@ public class PlcDiscoveredTag
     [JsonPropertyName("name")] public string Name { get; set; } = "";
     [JsonPropertyName("dataType")] public string DataType { get; set; } = "";
     [JsonPropertyName("program")] public string? Program { get; set; }
+    [JsonPropertyName("isUdtContainer")] public bool IsUdtContainer { get; set; }
 
     public string Scope => Program != null ? Program : "Controller";
 }

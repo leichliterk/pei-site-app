@@ -63,14 +63,19 @@ public partial class ScadaViewModel : ObservableObject
         if (!settings.Enabled)
         {
             StatusMessage = "PLC polling is disabled. Enable it in Settings.";
+            IsConnected = false;
             Tags.Clear();
             return;
         }
 
         StatusMessage = "";
+
+        var snapshot = await _localService.PlcGetSnapshotAsync();
+        if (snapshot != null)
+            ApplySnapshot(snapshot);
     }
 
-    // Called by the view when a plc:snapshot WebSocket event arrives
+    // Applies a PLC snapshot to the live view (called by poll or WebSocket event)
     public void ApplySnapshot(PlcSnapshotResponse snapshot)
     {
         IsConnected = snapshot.Connected;

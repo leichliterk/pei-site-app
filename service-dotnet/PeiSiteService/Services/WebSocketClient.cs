@@ -28,6 +28,7 @@ public class WebSocketClient : IDisposable
 
     private TaskCompletionSource<bool>? _otaAckSource;
     private TagBrowserState? _tagBrowserState;
+    private PlcSnapshotState? _snapshotState;
 
     public ConnectionStatus Status
     {
@@ -393,17 +394,19 @@ public class WebSocketClient : IDisposable
     /// Wire up PLC services after the DI container is built.
     /// Starts a background consumer for plc:snapshot and subscribes to TagsUpdated.
     /// </summary>
-    public void AttachPlcServices(PlcPollingService pollingService, TagBrowserState tagBrowserState)
+    public void AttachPlcServices(PlcPollingService pollingService, TagBrowserState tagBrowserState, PlcSnapshotState snapshotState)
     {
         _tagBrowserState = tagBrowserState;
+        _snapshotState = snapshotState;
 
         _tagBrowserState.TagsUpdated += EmitPlcTags;
 
-        // Background consumer: read snapshots from the channel and emit to server
+        // Background consumer: read snapshots from the channel, cache them, and emit to server
         _ = Task.Run(async () =>
         {
             await foreach (var snapshot in pollingService.Snapshots.ReadAllAsync())
             {
+                _snapshotState.Update(snapshot);
                 EmitPlcSnapshot(snapshot);
             }
         });

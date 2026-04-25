@@ -61,9 +61,18 @@
         <Border DockPanel.Dock="Top" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="0,0,0,1"
                 Padding="24,8">
             <DockPanel>
-                <Button DockPanel.Dock="Right" Command="{Binding ClearFilterCommand}"
-                        Style="{StaticResource ActionBtn}" Margin="8,0,0,0"
-                        Visibility="{Binding FilterText, Converter={StaticResource BoolToVis}}">
+                <!-- Clear button — hidden when filter is empty -->
+                <Button DockPanel.Dock="Right" Command="{Binding ClearFilterCommand}" Margin="8,0,0,0">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+                            <Setter Property="Visibility" Value="Visible" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding FilterText}" Value="">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
                     <TextBlock Text="Clear" FontSize="12" Foreground="#64748B" />
                 </Button>
                 <Border BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="4"
@@ -71,27 +80,7 @@
                     <TextBox Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
                              BorderThickness="0" Background="Transparent"
                              Foreground="#1E293B" FontSize="13"
-                             VerticalAlignment="Center"
-                             x:Name="FilterBox">
-                        <TextBox.Style>
-                            <Style TargetType="TextBox">
-                                <Style.Triggers>
-                                    <Trigger Property="Text" Value="">
-                                        <Setter Property="Background">
-                                            <Setter.Value>
-                                                <VisualBrush Stretch="None" AlignmentX="Left">
-                                                    <VisualBrush.Visual>
-                                                        <TextBlock Text="Filter tags..." Foreground="#94A3B8"
-                                                                   FontSize="13" Margin="0" />
-                                                    </VisualBrush.Visual>
-                                                </VisualBrush>
-                                            </Setter.Value>
-                                        </Setter>
-                                    </Trigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBox.Style>
-                    </TextBox>
+                             VerticalAlignment="Center" />
                 </Border>
             </DockPanel>
         </Border>
@@ -102,9 +91,18 @@
             <TextBlock Text="Loading..." FontSize="13" Foreground="#64748B" />
         </Border>
 
-        <!-- Status message -->
-        <Border DockPanel.Dock="Top" Padding="24,8"
-                Visibility="{Binding StatusMessage, Converter={StaticResource BoolToVis}}">
+        <!-- Status message — hidden when empty -->
+        <Border DockPanel.Dock="Top" Padding="24,8">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Visible" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding StatusMessage}" Value="">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
             <TextBlock Text="{Binding StatusMessage}" FontSize="13" Foreground="#64748B" />
         </Border>
 
@@ -113,23 +111,89 @@
             <ItemsControl ItemsSource="{Binding Tags}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Border Style="{StaticResource TagRow}">
+                        <Border BorderBrush="#F1F5F9" BorderThickness="0,0,0,1">
+                            <!-- Row background: UDT containers get a subtle header style -->
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="White" />
+                                    <Setter Property="Padding" Value="16,10" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsUdtContainer}" Value="True">
+                                            <Setter Property="Background" Value="#F8FAFC" />
+                                            <Setter Property="Padding" Value="16,6" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+
                             <Grid>
                                 <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="80" />
-                                    <ColumnDefinition Width="140" />
+                                    <ColumnDefinition Width="120" />
+                                    <ColumnDefinition Width="130" />
                                 </Grid.ColumnDefinitions>
 
-                                <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="13"
-                                           Foreground="#1E293B" VerticalAlignment="Center" />
+                                <!-- Indent indicator for UDT members -->
+                                <TextBlock Grid.Column="0" Text="  └ " FontSize="12"
+                                           Foreground="#CBD5E1" VerticalAlignment="Center">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsUdtContainer}" Value="False">
+                                                    <!-- Only show for dotted names (UDT members) -->
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
 
-                                <Border Grid.Column="1" Background="#F1F5F9" CornerRadius="4"
+                                <!-- Tag name -->
+                                <TextBlock Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Text" Value="{Binding Name}" />
+                                            <Setter Property="FontSize" Value="13" />
+                                            <Setter Property="Foreground" Value="#1E293B" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsUdtContainer}" Value="True">
+                                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                                    <Setter Property="Foreground" Value="#334155" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+
+                                <!-- Data type badge -->
+                                <Border Grid.Column="2" CornerRadius="4"
                                         Padding="6,2" VerticalAlignment="Center" HorizontalAlignment="Left">
-                                    <TextBlock Text="{Binding DataType}" FontSize="11" Foreground="#64748B" />
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="#F1F5F9" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsUdtContainer}" Value="True">
+                                                    <Setter Property="Background" Value="#E0F2FE" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <TextBlock Text="{Binding DataType}" FontSize="11">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="#64748B" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsUdtContainer}" Value="True">
+                                                        <Setter Property="Foreground" Value="#0369A1" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
                                 </Border>
 
-                                <TextBlock Grid.Column="2" Text="{Binding Scope}" FontSize="12"
+                                <TextBlock Grid.Column="3" Text="{Binding Scope}" FontSize="12"
                                            Foreground="#94A3B8" VerticalAlignment="Center"
                                            HorizontalAlignment="Right" />
                             </Grid>

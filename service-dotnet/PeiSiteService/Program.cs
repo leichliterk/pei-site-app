@@ -1,6 +1,5 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Microsoft.Extensions.Options;
 using PeiSiteService;
 using PeiSiteService.Plc;
 using PeiSiteService.Services;
@@ -18,10 +17,6 @@ TaskScheduler.UnobservedTaskException += (_, e) =>
 };
 
 var builder = WebApplication.CreateBuilder(args);
-
-// Bind PlcSettings from appsettings.json with hot-reload
-builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
-builder.Services.Configure<PlcSettings>(builder.Configuration.GetSection("PlcSettings"));
 
 // Configure JSON serialization globally (camelCase to match Node.js API)
 builder.Services.ConfigureHttpJsonOptions(options =>
@@ -60,6 +55,7 @@ var wsClient = new WebSocketClient(config.ToServiceConfig(), logger, ftpManager,
 var fileBroker = new FileBroker(fileQueue, wsClient, logger);
 var notificationManager = new NotificationManager();
 var tagBrowserState = new TagBrowserState();
+var plcSnapshotState = new PlcSnapshotState();
 
 builder.Services.AddSingleton(logger);
 builder.Services.AddSingleton(configManager);
@@ -69,6 +65,7 @@ builder.Services.AddSingleton(fileBroker);
 builder.Services.AddSingleton(ftpManager);
 builder.Services.AddSingleton(notificationManager);
 builder.Services.AddSingleton(tagBrowserState);
+builder.Services.AddSingleton(plcSnapshotState);
 builder.Services.AddSingleton<PlcTagReaderFactory>();
 builder.Services.AddSingleton<PlcPollingService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<PlcPollingService>());
@@ -81,7 +78,8 @@ var app = builder.Build();
 // Wire up PLC services to WebSocket client
 wsClient.AttachPlcServices(
     app.Services.GetRequiredService<PlcPollingService>(),
-    tagBrowserState);
+    tagBrowserState,
+    plcSnapshotState);
 
 // Map API endpoints
 ApiServer.MapEndpoints(app);

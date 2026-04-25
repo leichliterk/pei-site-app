@@ -426,6 +426,170 @@
                             </Border>
                         </StackPanel>
                     </TabItem>
+
+                    <!-- PLC Tab -->
+                    <TabItem>
+                        <TabItem.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE9D9;" FontFamily="Segoe MDL2 Assets" FontSize="14" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                <TextBlock Text="PLC" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </TabItem.Header>
+                        <StackPanel Margin="24,16" MaxWidth="600">
+
+                            <TextBlock Text="CompactLogix / ControlLogix" FontSize="16" FontWeight="Medium"
+                                       Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,4" />
+                            <TextBlock Text="Configure EtherNet/IP polling for real-time SCADA data."
+                                       Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,0,0,16" />
+
+                            <!-- Enable -->
+                            <CheckBox IsChecked="{Binding PlcEnabled}" Content="Enable PLC polling"
+                                      FontSize="14" Margin="0,0,0,16" />
+
+                            <!-- IP Address -->
+                            <TextBlock Text="PLC IP Address" Style="{StaticResource FieldLabel}" />
+                            <TextBox Text="{Binding PlcIpAddress, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource InputTextBox}" Margin="0,0,0,12" />
+
+                            <!-- Slot and Interval side-by-side -->
+                            <Grid Margin="0,0,0,16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="16" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Backplane Slot" Style="{StaticResource FieldLabel}" />
+                                    <TextBox Text="{Binding PlcSlot, UpdateSourceTrigger=PropertyChanged}"
+                                             Style="{StaticResource InputTextBox}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Poll Interval (ms)" Style="{StaticResource FieldLabel}" />
+                                    <TextBox Text="{Binding PlcPollingIntervalMs, UpdateSourceTrigger=PropertyChanged}"
+                                             Style="{StaticResource InputTextBox}" />
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Tags header -->
+                            <DockPanel Margin="0,0,0,8">
+                                <Button DockPanel.Dock="Right" Content="+ Add Tag"
+                                        Style="{StaticResource SecondaryButton}"
+                                        Command="{Binding OpenAddPlcTagDialogCommand}" />
+                                <TextBlock Text="Tags to Poll" FontSize="14" FontWeight="Medium"
+                                           Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                            </DockPanel>
+
+                            <!-- Tags list -->
+                            <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="6"
+                                    Margin="0,0,0,16" MinHeight="60">
+                                <ItemsControl ItemsSource="{Binding PlcTags}" Padding="4">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="4,4,4,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="70" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="55" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="{Binding Name}"
+                                                           FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="1" Text="{Binding DataType}"
+                                                           Foreground="{StaticResource TextSecondaryBrush}" FontSize="11"
+                                                           VerticalAlignment="Center" Margin="4,0" />
+                                                <TextBlock Grid.Column="2" Text="{Binding DisplayName}"
+                                                           Foreground="{StaticResource TextSecondaryBrush}" FontSize="11"
+                                                           VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="3" Text="{Binding Unit}"
+                                                           Foreground="{StaticResource TextSecondaryBrush}" FontSize="11"
+                                                           VerticalAlignment="Center" Margin="4,0" />
+                                                <Button Grid.Column="4" Content="&#xE70F;" FontFamily="Segoe MDL2 Assets"
+                                                        FontSize="11" Background="Transparent" BorderThickness="0"
+                                                        Foreground="{StaticResource TextSecondaryBrush}" Padding="4"
+                                                        Cursor="Hand"
+                                                        Command="{Binding DataContext.OpenEditPlcTagDialogCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}" />
+                                                <Button Grid.Column="5" Content="&#xE711;" FontFamily="Segoe MDL2 Assets"
+                                                        FontSize="11" Background="Transparent" BorderThickness="0"
+                                                        Foreground="{StaticResource DangerBrush}" Padding="4"
+                                                        Cursor="Hand"
+                                                        Command="{Binding DataContext.RemovePlcTagCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                    <ItemsControl.Style>
+                                        <Style TargetType="ItemsControl">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding PlcTags.Count, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="0">
+                                                    <Setter Property="Template">
+                                                        <Setter.Value>
+                                                            <ControlTemplate>
+                                                                <TextBlock Text="No tags configured. Add tags to poll from the PLC."
+                                                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                                                           FontSize="12" Margin="12,12" />
+                                                            </ControlTemplate>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ItemsControl.Style>
+                                </ItemsControl>
+                            </Border>
+
+                            <!-- Save -->
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Right" Margin="12,0,0,0" VerticalAlignment="Center"
+                                           FontSize="12">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding PlcSaveMessage}" Value="">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding PlcSaveSuccess}" Value="True">
+                                                    <Setter Property="Foreground" Value="#22C55E" />
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding PlcSaveSuccess}" Value="False">
+                                                    <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                    <Run Text="{Binding PlcSaveMessage, Mode=OneWay}" />
+                                </TextBlock>
+                                <Button Content="Save PLC Settings"
+                                        Command="{Binding SavePlcSettingsCommand}"
+                                        HorizontalAlignment="Left">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding PlcIsSaving}" Value="True">
+                                                    <Setter Property="IsEnabled" Value="False" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                            </DockPanel>
+
+                            <Border Background="#F0F9FF" BorderBrush="#BAE6FD" BorderThickness="1"
+                                    CornerRadius="4" Padding="12,10" Margin="0,16,0,0">
+                                <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="#0369A1">
+                                    Changes are applied immediately — the service hot-reloads appsettings.json when saved.
+                                    The PLC connection will reconnect on the next poll cycle.
+                                </TextBlock>
+                            </Border>
+
+                        </StackPanel>
+                    </TabItem>
+
                 </TabControl>
             </StackPanel>
         </ScrollViewer>
@@ -638,6 +802,58 @@
                         </TreeView.ItemTemplate>
                     </TreeView>
                 </DockPanel>
+            </Border>
+        </Grid>
+
+        <!-- PLC Add Tag Dialog -->
+        <Grid Visibility="{Binding ShowAddPlcTagDialog, Converter={StaticResource BoolToVis}}">
+            <Border Background="#80000000" />
+            <Border Background="White" CornerRadius="8" MaxWidth="420"
+                    VerticalAlignment="Center" HorizontalAlignment="Center" Padding="24">
+                <Border.Effect>
+                    <DropShadowEffect ShadowDepth="4" BlurRadius="16" Opacity="0.2" Color="Black" />
+                </Border.Effect>
+                <StackPanel>
+                    <TextBlock Text="{Binding PlcTagDialogTitle}" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,16" />
+
+                    <TextBlock Text="Tag Name (PLC address)" Style="{StaticResource FieldLabel}" />
+                    <TextBox Text="{Binding NewPlcTagName, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource InputTextBox}" Margin="0,0,0,12" />
+
+                    <TextBlock Text="Data Type" Style="{StaticResource FieldLabel}" />
+                    <ComboBox ItemsSource="{Binding PlcDataTypes}"
+                              SelectedItem="{Binding NewPlcTagDataType}"
+                              Margin="0,0,0,12" Padding="8,6" />
+
+                    <TextBlock Text="Display Name (optional)" Style="{StaticResource FieldLabel}" />
+                    <TextBox Text="{Binding NewPlcTagDisplayName, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource InputTextBox}" Margin="0,0,0,12" />
+
+                    <TextBlock Text="Unit (optional, e.g. °F, PSI)" Style="{StaticResource FieldLabel}" />
+                    <TextBox Text="{Binding NewPlcTagUnit, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource InputTextBox}" Margin="0,0,0,12" />
+
+                    <TextBlock Text="{Binding PlcTagDialogError}" Foreground="{StaticResource DangerBrush}"
+                               FontSize="12" Margin="0,0,0,12"
+                               Visibility="{Binding PlcTagDialogError, Converter={StaticResource NullToVisConverter}, FallbackValue=Collapsed}" />
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="Cancel" Style="{StaticResource SecondaryButton}"
+                                Command="{Binding CloseAddPlcTagDialogCommand}" Margin="0,0,8,0" />
+                        <Button Command="{Binding ConfirmAddPlcTagCommand}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+                                    <Setter Property="Content" Value="Add" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding PlcTagDialogTitle}" Value="Edit PLC Tag">
+                                            <Setter Property="Content" Value="Save" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
             </Border>
         </Grid>
 

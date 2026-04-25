@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace PeiSiteApp.Models;
 
 public class ServiceStatusResponse
@@ -54,12 +56,25 @@ public class FtpServerResponse
 
 public class NotificationDataResponse
 {
+    [JsonPropertyName("ota")]
     public bool Ota { get; set; }
+
+    [JsonPropertyName("release_id")]
     public string? ReleaseId { get; set; }
+
+    [JsonPropertyName("version")]
     public string? Version { get; set; }
+
+    [JsonPropertyName("notes")]
     public string? Notes { get; set; }
+
+    [JsonPropertyName("size")]
     public long? Size { get; set; }
+
+    [JsonPropertyName("sha256")]
     public string? Sha256 { get; set; }
+
+    [JsonPropertyName("download_token")]
     public string? DownloadToken { get; set; }
 }
 

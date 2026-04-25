@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
+using PeiSiteService.Services;
 using System.Threading.Channels;
 
 namespace PeiSiteService.Plc;
@@ -8,12 +8,12 @@ namespace PeiSiteService.Plc;
 /// BackgroundService that polls the PLC at the configured interval and pushes
 /// PlcSnapshot objects into a bounded channel for consumption by WebSocketClient.
 ///
-/// Hot-reload: when appsettings change, an Interlocked flag is set and the poll
-/// loop recreates the reader on the next iteration.
+/// Hot-reload: ConfigManager fires PlcSettingsChanged which sets an Interlocked flag;
+/// the poll loop recreates the reader on the next iteration.
 /// </summary>
 public class PlcPollingService : BackgroundService
 {
-    private readonly IOptionsMonitor<PlcSettings> _options;
+    private readonly ConfigManager _configManager;
     private readonly PlcTagReaderFactory _factory;
     private readonly Channel<PlcSnapshot> _channel;
     private int _settingsChanged = 0; // Interlocked flag
@@ -21,9 +21,9 @@ public class PlcPollingService : BackgroundService
     /// <summary>Consumed by WebSocketClient to emit plc:snapshot events.</summary>
     public ChannelReader<PlcSnapshot> Snapshots => _channel.Reader;
 
-    public PlcPollingService(IOptionsMonitor<PlcSettings> options, PlcTagReaderFactory factory)
+    public PlcPollingService(ConfigManager configManager, PlcTagReaderFactory factory)
     {
-        _options = options;
+        _configManager = configManager;
         _factory = factory;
 
         _channel = Channel.CreateBounded<PlcSnapshot>(new BoundedChannelOptions(256)
@@ -33,7 +33,7 @@ public class PlcPollingService : BackgroundService
             SingleWriter = true
         });
 
-        _options.OnChange(_ => Interlocked.Exchange(ref _settingsChanged, 1));
+        _configManager.PlcSettingsChanged += _ => Interlocked.Exchange(ref _settingsChanged, 1);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -43,7 +43,7 @@ public class PlcPollingService : BackgroundService
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            var settings = _options.CurrentValue;
+            var settings = _configManager.GetPlcSettings();
 
             // Rebuild reader on first run or after settings change
             if (reader == null || Interlocked.Exchange(ref _settingsChanged, 0) == 1)
