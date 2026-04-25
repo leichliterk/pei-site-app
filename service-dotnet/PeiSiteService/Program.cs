@@ -56,6 +56,7 @@ var fileBroker = new FileBroker(fileQueue, wsClient, logger);
 var notificationManager = new NotificationManager();
 var tagBrowserState = new TagBrowserState();
 var plcSnapshotState = new PlcSnapshotState();
+var otaInstaller = new OtaInstaller(logger);
 
 builder.Services.AddSingleton(logger);
 builder.Services.AddSingleton(configManager);
@@ -66,6 +67,7 @@ builder.Services.AddSingleton(ftpManager);
 builder.Services.AddSingleton(notificationManager);
 builder.Services.AddSingleton(tagBrowserState);
 builder.Services.AddSingleton(plcSnapshotState);
+builder.Services.AddSingleton(otaInstaller);
 builder.Services.AddSingleton<PlcTagReaderFactory>();
 builder.Services.AddSingleton<PlcPollingService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<PlcPollingService>());
@@ -80,6 +82,9 @@ wsClient.AttachPlcServices(
     app.Services.GetRequiredService<PlcPollingService>(),
     tagBrowserState,
     plcSnapshotState);
+
+// Wire up OTA installer — streams progress via WebSocket and detects post-install reconnect
+wsClient.AttachOtaInstaller(otaInstaller);
 
 // Map API endpoints
 ApiServer.MapEndpoints(app);

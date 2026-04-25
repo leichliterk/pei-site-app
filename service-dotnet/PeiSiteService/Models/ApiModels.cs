@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace PeiSiteService.Models;
 
 public class ConfigUpdateRequest
@@ -20,6 +22,40 @@ public class SessionInfo
 }
 
 // OTA
+
+/// <summary>
+/// Payload of the server→service  ota:install_command  socket event.
+/// The server constructs the signed download URL and passes it directly
+/// so the service never needs to know the URL scheme.
+/// </summary>
+public class OtaInstallCommand
+{
+    [JsonPropertyName("release_id")]
+    public string ReleaseId { get; set; } = "";
+
+    [JsonPropertyName("download_url")]
+    public string DownloadUrl { get; set; } = "";
+
+    /// <summary>Hex-encoded SHA-256 of the installer exe (optional but recommended).</summary>
+    [JsonPropertyName("sha256")]
+    public string? Sha256 { get; set; }
+
+    /// <summary>Human-readable version string, e.g. "1.5.0".</summary>
+    [JsonPropertyName("version")]
+    public string? Version { get; set; }
+}
+
+/// <summary>
+/// Written to ota-pending.json before the installer launches.
+/// Read back on the next startup to emit ota:installed after the MSI
+/// restarts the service.
+/// </summary>
+public class OtaPendingState
+{
+    public string ReleaseId { get; set; } = "";
+    public string Version   { get; set; } = "";
+    public string StartedAt { get; set; } = "";
+}
 
 public class OtaRespondRequest
 {
