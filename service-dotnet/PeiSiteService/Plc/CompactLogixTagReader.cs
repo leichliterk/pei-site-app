@@ -7,7 +7,7 @@ namespace PeiSiteService.Plc;
 /// Reads a configured list of tags from a single CompactLogix/ControlLogix PLC.
 /// All tags are read concurrently via Task.WhenAll.
 /// </summary>
-public class CompactLogixTagReader
+public class CompactLogixTagReader : IPlcTagReader
 {
     private readonly string _ipAddress;
     private readonly int _slot;
@@ -89,6 +89,8 @@ public class CompactLogixTagReader
         await tag.ReadAsync(ct);
         return tag.Value;
     }
+
+    public void Dispose() { /* libplctag tags are disposed in ReadTypedAsync using blocks */ }
 
     private async Task<string> ReadStringAsync(string tagName, CancellationToken ct)
     {

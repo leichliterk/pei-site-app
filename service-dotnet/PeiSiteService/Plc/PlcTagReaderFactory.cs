@@ -3,8 +3,9 @@ using PeiSiteService.Services;
 namespace PeiSiteService.Plc;
 
 /// <summary>
-/// Builds a CompactLogixTagReader from the current PlcSettings.
-/// Also handles the Slot=-1 auto-discover flow by delegating to CompactLogixSlotScanner.
+/// Builds the correct IPlcTagReader for the current PlcSettings:
+///   ControlLogix → CompactLogixTagReader (uses libplctag, slot auto-discover supported)
+///   ModbusTcp    → ModbusTcpReader       (uses FluentModbus)
 /// </summary>
 public class PlcTagReaderFactory
 {
@@ -15,28 +16,41 @@ public class PlcTagReaderFactory
         _configManager = configManager;
     }
 
-    /// <summary>
-    /// Creates a reader for the current settings.
-    /// If Slot is -1, scans slots 0-7 to find the first responding CPU.
-    /// Returns null when PLC is disabled or IP is empty.
-    /// </summary>
-    public async Task<(CompactLogixTagReader? reader, int resolvedSlot)> CreateAsync(CancellationToken ct)
+    /// <summary>Returns null when PLC is disabled or IP is empty.</summary>
+    public async Task<IPlcTagReader?> CreateAsync(CancellationToken ct)
     {
         var settings = _configManager.GetPlcSettings();
 
         if (!settings.Enabled || string.IsNullOrWhiteSpace(settings.IpAddress))
-            return (null, -1);
+            return null;
 
+        return settings.ConnectionType switch
+        {
+            PlcConnectionType.ModbusTcp    => CreateModbusReader(settings),
+            _                              => await CreateControlLogixReaderAsync(settings, ct)
+        };
+    }
+
+    private static IPlcTagReader CreateModbusReader(PlcSettings settings)
+    {
+        return new ModbusTcpReader(
+            settings.IpAddress,
+            settings.ModbusPort,
+            (byte)Math.Clamp(settings.ModbusUnitId, 0, 255),
+            settings.Tags);
+    }
+
+    private static async Task<IPlcTagReader?> CreateControlLogixReaderAsync(
+        PlcSettings settings, CancellationToken ct)
+    {
         int slot = settings.Slot;
 
         if (slot == -1)
         {
             slot = await CompactLogixSlotScanner.FindFirstSlotAsync(settings.IpAddress, ct);
-            if (slot < 0)
-                return (null, -1);
+            if (slot < 0) return null;
         }
 
-        var reader = new CompactLogixTagReader(settings.IpAddress, slot, settings.Tags);
-        return (reader, slot);
+        return new CompactLogixTagReader(settings.IpAddress, slot, settings.Tags);
     }
 }

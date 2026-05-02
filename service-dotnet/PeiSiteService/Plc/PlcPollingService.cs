@@ -38,8 +38,7 @@ public class PlcPollingService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        CompactLogixTagReader? reader = null;
-        int resolvedSlot = -1;
+        IPlcTagReader? reader = null;
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -48,7 +47,8 @@ public class PlcPollingService : BackgroundService
             // Rebuild reader on first run or after settings change
             if (reader == null || Interlocked.Exchange(ref _settingsChanged, 0) == 1)
             {
-                (reader, resolvedSlot) = await _factory.CreateAsync(stoppingToken);
+                reader?.Dispose();
+                reader = await _factory.CreateAsync(stoppingToken);
             }
 
             if (!settings.Enabled || reader == null)
@@ -73,7 +73,7 @@ public class PlcPollingService : BackgroundService
             {
                 // Read failure — emit a disconnected snapshot so UI reflects the state
                 var errorSnapshot = new PlcSnapshot(
-                    settings.IpAddress, resolvedSlot,
+                    settings.IpAddress, settings.Slot,
                     DateTimeOffset.UtcNow, false,
                     Array.Empty<TagSnapshot>());
                 await _channel.Writer.WriteAsync(errorSnapshot, stoppingToken);
@@ -81,6 +81,8 @@ public class PlcPollingService : BackgroundService
 
             await DelayAsync(settings.PollingIntervalMs, stoppingToken);
         }
+
+        reader?.Dispose();
 
         _channel.Writer.Complete();
     }

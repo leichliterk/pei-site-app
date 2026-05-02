@@ -405,20 +405,27 @@ public class ConfigManager
             Name = s.Name,
             FtpHost = s.FtpHost,
             FtpPath = s.FtpPath,
-            FtpPollInterval = s.FtpPollInterval
+            FtpPollInterval = s.FtpPollInterval,
+            Username = s.Username,
+            Password = s.Password,
+            ForceFullUploadOnNextPoll = s.ForceFullUploadOnNextPoll
         }).ToList(),
         PlcSettings = new PlcSettings
         {
             Enabled = c.PlcSettings.Enabled,
+            ConnectionType = c.PlcSettings.ConnectionType,
             IpAddress = c.PlcSettings.IpAddress,
             Slot = c.PlcSettings.Slot,
+            ModbusPort = c.PlcSettings.ModbusPort,
+            ModbusUnitId = c.PlcSettings.ModbusUnitId,
             PollingIntervalMs = c.PlcSettings.PollingIntervalMs,
             Tags = c.PlcSettings.Tags.Select(t => new TagDefinition
             {
                 Name = t.Name,
                 DataType = t.DataType,
                 DisplayName = t.DisplayName,
-                Unit = t.Unit
+                Unit = t.Unit,
+                Multiplier = t.Multiplier
             }).ToList()
         }
     };
