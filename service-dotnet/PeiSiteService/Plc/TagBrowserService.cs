@@ -64,6 +64,14 @@ public class TagBrowserService : BackgroundService
         if (!settings.Enabled || string.IsNullOrWhiteSpace(settings.IpAddress))
             return;
 
+        // Modbus TCP has no network-discoverable tag database.
+        // Tags are configured manually in Settings; nothing to browse.
+        if (settings.ConnectionType == PlcConnectionType.ModbusTcp)
+        {
+            _logger.Log("[TagBrowser] Skipping browse — Modbus TCP does not support auto-discovery");
+            return;
+        }
+
         int slot = settings.Slot >= 0 ? settings.Slot : 0;
 
         try

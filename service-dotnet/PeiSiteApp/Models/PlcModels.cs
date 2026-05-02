@@ -52,8 +52,11 @@ public class PlcTagsResponse
 public class PlcSettingsModel
 {
     [JsonPropertyName("enabled")] public bool Enabled { get; set; }
+    [JsonPropertyName("connectionType")] public string ConnectionType { get; set; } = "ControlLogix";
     [JsonPropertyName("ipAddress")] public string IpAddress { get; set; } = "";
     [JsonPropertyName("slot")] public int Slot { get; set; }
+    [JsonPropertyName("modbusPort")] public int ModbusPort { get; set; } = 502;
+    [JsonPropertyName("modbusUnitId")] public int ModbusUnitId { get; set; } = 1;
     [JsonPropertyName("pollingIntervalMs")] public int PollingIntervalMs { get; set; } = 500;
     [JsonPropertyName("tags")] public List<PlcTagDefinitionModel> Tags { get; set; } = new();
 }
@@ -64,4 +67,5 @@ public class PlcTagDefinitionModel
     [JsonPropertyName("dataType")] public string DataType { get; set; } = "REAL";
     [JsonPropertyName("displayName")] public string? DisplayName { get; set; }
     [JsonPropertyName("unit")] public string? Unit { get; set; }
+    [JsonPropertyName("multiplier")] public double Multiplier { get; set; } = 1.0;
 }

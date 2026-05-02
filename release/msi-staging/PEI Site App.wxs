@@ -6,7 +6,7 @@
   <Product Id="*"
            Name="PEI Site App - Staging"
            Language="1033"
-           Version="1.4.10"
+           Version="1.4.15"
            Manufacturer="PEI Data Systems"
            UpgradeCode="57f48daa-3001-40a9-9dab-5a20450fd982">
 

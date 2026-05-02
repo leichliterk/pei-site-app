@@ -2,7 +2,7 @@ namespace PeiSiteApp.Models;
 
 public class AppSettings
 {
-    public string Version { get; set; } = "1.4.10";
+    public string Version { get; set; } = "1.4.15";
     public string AppName { get; set; } = "PEI Site App";
     public int SiteNumber { get; set; } = 1000;
     public string SiteName { get; set; } = "";
