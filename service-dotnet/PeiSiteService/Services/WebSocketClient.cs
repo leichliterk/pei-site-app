@@ -29,6 +29,7 @@ public class WebSocketClient : IDisposable
     private TaskCompletionSource<bool>? _otaAckSource;
     private TagBrowserState? _tagBrowserState;
     private PlcSnapshotState? _snapshotState;
+    private OtaInstaller? _otaInstaller;
 
     public ConnectionStatus Status
     {
@@ -107,6 +108,15 @@ public class WebSocketClient : IDisposable
             EmitServiceStatus();
             EmitFtpStatus();
             EmitPlcTags();
+
+            // If the service was restarted by a just-completed OTA install, report success.
+            var pending = _otaInstaller?.StartupPending;
+            if (pending != null)
+            {
+                _logger.Log(ServiceLogLevel.Info,
+                    $"[WebSocketClient] Emitting ota:installed for release '{pending.ReleaseId}' → v{AppVersion.Current}");
+                EmitToServer("ota:installed", new { release_id = pending.ReleaseId, version = AppVersion.Current });
+            }
         };
 
         _socket.OnDisconnected += (s, reason) =>
@@ -249,6 +259,30 @@ public class WebSocketClient : IDisposable
             {
                 _logger.Log(ServiceLogLevel.Error, $"[WebSocketClient] Error handling ftp:command: {ex.Message}");
                 try { EmitToServer("ftp:command_ack", new { action = "unknown", success = false, error = ex.Message }); } catch { }
+            }
+        });
+
+        _socket.On("ota:install_command", response =>
+        {
+            try
+            {
+                var cmd = response.GetValue<OtaInstallCommand>();
+                _logger.Log(ServiceLogLevel.Info,
+                    $"[WebSocketClient] ota:install_command received: release='{cmd.ReleaseId}' version='{cmd.Version}'");
+
+                if (_otaInstaller == null)
+                {
+                    _logger.Log(ServiceLogLevel.Warning,
+                        "[WebSocketClient] OtaInstaller not attached — ignoring install command");
+                    return;
+                }
+
+                _otaInstaller.StartInstall(cmd);
+            }
+            catch (Exception ex)
+            {
+                _logger.Log(ServiceLogLevel.Error,
+                    $"[WebSocketClient] Error handling ota:install_command: {ex.Message}");
             }
         });
 
@@ -410,6 +444,21 @@ public class WebSocketClient : IDisposable
                 EmitPlcSnapshot(snapshot);
             }
         });
+    }
+
+    /// <summary>
+    /// Wire up OtaInstaller so install progress is streamed to the server via WebSocket.
+    /// Must be called after the DI container is built.
+    /// </summary>
+    public void AttachOtaInstaller(OtaInstaller installer)
+    {
+        _otaInstaller = installer;
+
+        installer.PhaseChanged += (releaseId, phase, message) =>
+            EmitToServer("ota:install_status", new { release_id = releaseId, phase, message });
+
+        installer.ProgressLine += (releaseId, line) =>
+            EmitToServer("ota:install_progress", new { release_id = releaseId, line });
     }
 
     private void EmitServiceStatus()

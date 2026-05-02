@@ -104,6 +104,12 @@ public static class ApiServer
             return new { success = true };
         });
 
+        // GET /ota/install-status — current unattended install state (for WPF app polling)
+        app.MapGet("/ota/install-status", (OtaInstaller installer) => new
+        {
+            isInstalling = installer.IsInstalling
+        });
+
         // --- Notification endpoints ---
 
         // GET /notifications

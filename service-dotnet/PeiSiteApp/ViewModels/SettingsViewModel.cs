@@ -157,10 +157,19 @@ public partial class SettingsViewModel : ObservableObject
     private bool _plcEnabled;
 
     [ObservableProperty]
+    private string _plcConnectionType = "ControlLogix";
+
+    [ObservableProperty]
     private string _plcIpAddress = "192.168.1.10";
 
     [ObservableProperty]
     private int _plcSlot;
+
+    [ObservableProperty]
+    private int _modbusTcpPort = 502;
+
+    [ObservableProperty]
+    private int _modbusTcpUnitId = 1;
 
     [ObservableProperty]
     private int _plcPollingIntervalMs = 500;
@@ -194,14 +203,42 @@ public partial class SettingsViewModel : ObservableObject
     private string _newPlcTagUnit = "";
 
     [ObservableProperty]
+    private string _newPlcTagMultiplier = "1";
+
+    [ObservableProperty]
     private string _plcTagDialogError = "";
+
+    /// <summary>Show the Multiplier field only for Modbus BCD_INT_16 tags.</summary>
+    public bool ShowMultiplierField => IsModbusTcp && NewPlcTagDataType == "BCD_INT_16";
 
     private PlcTagDefinitionModel? _editingPlcTag;
 
     public ObservableCollection<PlcTagDefinitionModel> PlcTags { get; } = new();
 
-    public static IReadOnlyList<string> PlcDataTypes { get; } =
+    public static IReadOnlyList<string> ControlLogixDataTypes { get; } =
         new[] { "REAL", "BOOL", "DINT", "STRING" };
+
+    public static IReadOnlyList<string> ModbusDataTypes { get; } =
+        new[] { "FLOAT32", "UINT16", "INT16", "UINT32", "INT32", "BOOL", "BCD_INT_16" };
+
+    /// <summary>Options list for the PLC Type ComboBox.</summary>
+    public static IReadOnlyList<PlcConnectionTypeOption> PlcConnectionTypeOptions { get; } = new[]
+    {
+        new PlcConnectionTypeOption("ControlLogix", "Allen-Bradley CompactLogix / ControlLogix"),
+        new PlcConnectionTypeOption("ModbusTcp",    "Modbus TCP  (Host Engineering, etc.)")
+    };
+
+    public bool IsControlLogix => PlcConnectionType == "ControlLogix";
+    public bool IsModbusTcp    => PlcConnectionType == "ModbusTcp";
+
+    /// <summary>Data type choices appropriate to the selected PLC protocol.</summary>
+    public IReadOnlyList<string> CurrentPlcDataTypes =>
+        IsModbusTcp ? ModbusDataTypes : ControlLogixDataTypes;
+
+    /// <summary>Label shown above the tag-name field in the Add/Edit dialog.</summary>
+    public string PlcTagNameLabel => IsModbusTcp
+        ? "Register Address  (e.g. 40001 = holding reg 0,  30001 = input reg 0)"
+        : "Tag Name  (PLC address, e.g. FLR_1.MMBTU.RATE.VLU.SCL)";
 
     // Advanced tab — service control
     private const string ServiceName = "PeiSiteService";
@@ -726,8 +763,12 @@ public partial class SettingsViewModel : ObservableObject
         var settings = await _localService.PlcGetSettingsAsync();
         if (settings == null) return;
         PlcEnabled = settings.Enabled;
+        PlcConnectionType = string.IsNullOrEmpty(settings.ConnectionType)
+            ? "ControlLogix" : settings.ConnectionType;
         PlcIpAddress = settings.IpAddress;
         PlcSlot = settings.Slot;
+        ModbusTcpPort = settings.ModbusPort > 0 ? settings.ModbusPort : 502;
+        ModbusTcpUnitId = settings.ModbusUnitId;
         PlcPollingIntervalMs = settings.PollingIntervalMs;
         PlcTags.Clear();
         foreach (var t in settings.Tags)
@@ -742,8 +783,11 @@ public partial class SettingsViewModel : ObservableObject
         var settings = new PlcSettingsModel
         {
             Enabled = PlcEnabled,
+            ConnectionType = PlcConnectionType,
             IpAddress = PlcIpAddress,
             Slot = PlcSlot,
+            ModbusPort = ModbusTcpPort,
+            ModbusUnitId = ModbusTcpUnitId,
             PollingIntervalMs = PlcPollingIntervalMs,
             Tags = PlcTags.ToList()
         };
@@ -759,9 +803,10 @@ public partial class SettingsViewModel : ObservableObject
         _editingPlcTag = null;
         PlcTagDialogTitle = "Add PLC Tag";
         NewPlcTagName = "";
-        NewPlcTagDataType = "REAL";
+        NewPlcTagDataType = IsModbusTcp ? "FLOAT32" : "REAL";
         NewPlcTagDisplayName = "";
         NewPlcTagUnit = "";
+        NewPlcTagMultiplier = "1";
         PlcTagDialogError = "";
         ShowAddPlcTagDialog = true;
     }
@@ -775,6 +820,7 @@ public partial class SettingsViewModel : ObservableObject
         NewPlcTagDataType = tag.DataType;
         NewPlcTagDisplayName = tag.DisplayName ?? "";
         NewPlcTagUnit = tag.Unit ?? "";
+        NewPlcTagMultiplier = tag.Multiplier.ToString("G");
         PlcTagDialogError = "";
         ShowAddPlcTagDialog = true;
     }
@@ -795,6 +841,17 @@ public partial class SettingsViewModel : ObservableObject
             return;
         }
 
+        double multiplier = 1.0;
+        if (ShowMultiplierField && !string.IsNullOrWhiteSpace(NewPlcTagMultiplier))
+        {
+            if (!double.TryParse(NewPlcTagMultiplier, System.Globalization.NumberStyles.Any,
+                    System.Globalization.CultureInfo.InvariantCulture, out multiplier) || multiplier == 0)
+            {
+                PlcTagDialogError = "Multiplier must be a non-zero number (e.g. 0.1, 0.01).";
+                return;
+            }
+        }
+
         if (_editingPlcTag != null)
         {
             // Update in-place
@@ -802,6 +859,7 @@ public partial class SettingsViewModel : ObservableObject
             _editingPlcTag.DataType = NewPlcTagDataType;
             _editingPlcTag.DisplayName = string.IsNullOrWhiteSpace(NewPlcTagDisplayName) ? null : NewPlcTagDisplayName.Trim();
             _editingPlcTag.Unit = string.IsNullOrWhiteSpace(NewPlcTagUnit) ? null : NewPlcTagUnit.Trim();
+            _editingPlcTag.Multiplier = multiplier;
             // Force the ItemsControl to refresh by replacing the item
             int idx = PlcTags.IndexOf(_editingPlcTag);
             if (idx >= 0) { PlcTags.RemoveAt(idx); PlcTags.Insert(idx, _editingPlcTag); }
@@ -814,7 +872,8 @@ public partial class SettingsViewModel : ObservableObject
                 Name = NewPlcTagName.Trim(),
                 DataType = NewPlcTagDataType,
                 DisplayName = string.IsNullOrWhiteSpace(NewPlcTagDisplayName) ? null : NewPlcTagDisplayName.Trim(),
-                Unit = string.IsNullOrWhiteSpace(NewPlcTagUnit) ? null : NewPlcTagUnit.Trim()
+                Unit = string.IsNullOrWhiteSpace(NewPlcTagUnit) ? null : NewPlcTagUnit.Trim(),
+                Multiplier = multiplier
             });
         }
 
@@ -938,6 +997,23 @@ public partial class SettingsViewModel : ObservableObject
         if (value == 4) _ = LoadPlcSettingsAsync();
     }
 
+    partial void OnPlcConnectionTypeChanged(string value)
+    {
+        OnPropertyChanged(nameof(IsControlLogix));
+        OnPropertyChanged(nameof(IsModbusTcp));
+        OnPropertyChanged(nameof(CurrentPlcDataTypes));
+        OnPropertyChanged(nameof(PlcTagNameLabel));
+        // Reset dialog data type to a valid default when protocol changes
+        NewPlcTagDataType = IsModbusTcp ? "FLOAT32" : "REAL";
+        OnPropertyChanged(nameof(ShowMultiplierField));
+    }
+
+    partial void OnNewPlcTagDataTypeChanged(string value)
+    {
+        OnPropertyChanged(nameof(ShowMultiplierField));
+        if (!ShowMultiplierField) NewPlcTagMultiplier = "1";
+    }
+
     partial void OnConfirmationPhraseChanged(string value) => OnPropertyChanged(nameof(IsFormValid));
     partial void OnNewSiteNumberInputChanged(string value) => OnPropertyChanged(nameof(IsFormValid));
     partial void OnTenantConfirmationPhraseChanged(string value) => OnPropertyChanged(nameof(IsTenantFormValid));
@@ -945,3 +1021,6 @@ public partial class SettingsViewModel : ObservableObject
     partial void OnDialogServerNameChanged(string value) => OnPropertyChanged(nameof(IsFtpDialogSaveEnabled));
     partial void OnDialogFtpHostChanged(string value) => OnPropertyChanged(nameof(IsFtpDialogSaveEnabled));
 }
+
+/// <summary>Item model for the PLC Type ComboBox.</summary>
+public record PlcConnectionTypeOption(string Value, string Display);

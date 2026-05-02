@@ -34,9 +34,13 @@ public class FullConfig
         Servers = FtpServers.Select(s => new FtpServerConfig
         {
             Id = s.Id,
+            Name = s.Name,
             FtpHost = s.FtpHost,
             FtpPath = s.FtpPath,
-            FtpPollInterval = s.FtpPollInterval
+            FtpPollInterval = s.FtpPollInterval,
+            Username = s.Username,
+            Password = s.Password,
+            ForceFullUploadOnNextPoll = s.ForceFullUploadOnNextPoll
         }).ToList()
     };
 }
