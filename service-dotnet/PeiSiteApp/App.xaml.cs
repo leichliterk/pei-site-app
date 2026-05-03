@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows;
 using Hardcodet.Wpf.TaskbarNotification;
+using Microsoft.Extensions.Logging;
 using PeiSiteApp.Services;
 using PeiSiteApp.ViewModels;
 using PeiSiteApp.Views;
@@ -58,9 +59,10 @@ public partial class App : Application
         };
 
         // Initialize services
+        var loggerFactory = LoggerFactory.Create(b => b.AddDebug());
         var settingsManager = new SettingsManager();
-        var localService = new LocalServiceClient();
-        var siteApiService = new SiteApiService(settingsManager.Settings.ApiUrl);
+        var localService = new LocalServiceClient(loggerFactory.CreateLogger<LocalServiceClient>());
+        var siteApiService = new SiteApiService(settingsManager.Settings.ApiUrl, loggerFactory.CreateLogger<SiteApiService>());
         var ftpStatusService = new FtpStatusService(localService);
 
         // Create main view model
