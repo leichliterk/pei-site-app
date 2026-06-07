@@ -89,6 +89,7 @@ public class NotificationResponse
     public string ReceivedAt { get; set; } = "";
 
     public bool IsOta => Data?.Ota == true;
+    public bool HasOtaNotes => IsOta && !string.IsNullOrEmpty(Data?.Notes);
 }
 
 public class NotificationsResponse
