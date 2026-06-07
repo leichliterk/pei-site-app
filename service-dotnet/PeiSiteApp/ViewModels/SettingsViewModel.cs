@@ -183,6 +183,8 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _plcIsSaving;
 
+    private CancellationTokenSource? _plcSaveMessageCts;
+
     // PLC Add/Edit Tag dialog
     [ObservableProperty]
     private bool _showAddPlcTagDialog;
@@ -795,6 +797,18 @@ public partial class SettingsViewModel : ObservableObject
         PlcSaveMessage = success ? "Settings saved." : "Failed to save settings.";
         PlcSaveSuccess = success;
         PlcIsSaving = false;
+
+        // Cancel any previous auto-clear, then schedule a new one
+        _plcSaveMessageCts?.Cancel();
+        _plcSaveMessageCts?.Dispose();
+        _plcSaveMessageCts = new CancellationTokenSource();
+        var delay = success ? TimeSpan.FromSeconds(5) : TimeSpan.FromSeconds(10);
+        var cts = _plcSaveMessageCts;
+        _ = Task.Delay(delay, cts.Token).ContinueWith(t =>
+        {
+            if (!t.IsCanceled)
+                System.Windows.Application.Current.Dispatcher.Invoke(() => PlcSaveMessage = "");
+        }, TaskScheduler.Default);
     }
 
     [RelayCommand]

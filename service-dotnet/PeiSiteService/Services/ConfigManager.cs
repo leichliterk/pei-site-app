@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using Microsoft.Win32;
 using PeiSiteService.Models;
 using PeiSiteService.Plc;
@@ -16,7 +17,11 @@ public class ConfigManager
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = true
+        WriteIndented = true,
+        // Accept enum values as strings (e.g. "info") in addition to integers.
+        // SettingsManager writes logLevel as a lowercase string; without this converter
+        // any string form would throw JsonException and wipe the entire config on restart.
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
     };
 
     /// <summary>Fired whenever PLC settings are updated via UpdatePlcSettings().</summary>
