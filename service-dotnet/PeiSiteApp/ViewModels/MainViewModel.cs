@@ -71,7 +71,7 @@ public partial class MainViewModel : ObservableObject
         _ftpStatusService = ftpStatusService;
 
         var settings = settingsManager.Settings;
-        SiteNumber = settings.SiteNumber.ToString();
+        SiteNumber = settings.SiteNumber;
         SiteName = settings.SiteName;
         WindowTitle = settings.AppName;
         Version = $"v{settings.Version}";
@@ -178,7 +178,7 @@ public partial class MainViewModel : ObservableObject
     public void UpdateSiteInfo()
     {
         var settings = _settingsManager.Settings;
-        SiteNumber = settings.SiteNumber.ToString();
+        SiteNumber = settings.SiteNumber;
         SiteName = settings.SiteName;
     }
 

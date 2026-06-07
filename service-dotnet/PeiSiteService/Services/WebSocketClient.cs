@@ -378,7 +378,7 @@ public class WebSocketClient : IDisposable
             }
             if (updates.ApiUrl != null) _config.ApiUrl = updates.ApiUrl;
             if (updates.ApiKey != null) _config.ApiKey = updates.ApiKey;
-            if (updates.SiteId.HasValue) _config.SiteId = updates.SiteId.Value;
+            if (updates.SiteId != null) _config.SiteId = updates.SiteId;
             if (updates.TenantId.HasValue) _config.TenantId = updates.TenantId.Value;
         }
 

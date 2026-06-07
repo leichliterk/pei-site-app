@@ -6,7 +6,7 @@ public class FullConfig
 {
     public string ApiUrl { get; set; } = "";
     public string ApiKey { get; set; } = "";
-    public int SiteId { get; set; }
+    public string SiteId { get; set; } = "";
     public int TenantId { get; set; }
     public ServiceLogLevel LogLevel { get; set; } = ServiceLogLevel.Info;
     public bool FtpEnabled { get; set; }

@@ -113,7 +113,7 @@ public class MdtmToIso8601Tests
 public class BuildPayloadTests
 {
     private static QueueEntry MakeEntry(string filename, string fileDate, string source = "Plant Floor FTP",
-        string content = "", string sha256 = "", int siteId = 1978, int tenantId = 1001) => new()
+        string content = "", string sha256 = "", string siteId = "1978", int tenantId = 1001) => new()
     {
         Id = "test-id",
         ServerId = "srv1",
@@ -147,7 +147,7 @@ public class BuildPayloadTests
         Assert.Equal("base64", root.GetProperty("encoding").GetString());
         Assert.Equal(3L, root.GetProperty("size").GetInt64());
         Assert.Equal("Plant Floor FTP", root.GetProperty("source").GetString());
-        Assert.Equal(1978, root.GetProperty("siteId").GetInt32());
+        Assert.Equal("1978", root.GetProperty("siteId").GetString());
         Assert.Equal(1001, root.GetProperty("tenantId").GetInt32());
         Assert.Equal("2026-02-22T12:00:00.000Z", root.GetProperty("modifiedAt").GetString());
     }

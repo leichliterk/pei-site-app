@@ -8,7 +8,7 @@ public class UptimeResponse
     public int TenantId { get; set; }
 
     [JsonPropertyName("site_id")]
-    public int SiteId { get; set; }
+    public string SiteId { get; set; } = "";
 
     public int Days { get; set; }
 

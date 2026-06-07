@@ -10,7 +10,7 @@ public class FtpWatcher
 {
     private FtpServerConfig _serverConfig;
     private readonly FileQueue _fileQueue;
-    private readonly int _siteId;
+    private readonly string _siteId;
     private readonly int _tenantId;
     private readonly FileLogger _logger;
 
@@ -29,7 +29,7 @@ public class FtpWatcher
     public bool IsCurrentlyPolling => _isPolling == 1;
     public bool IsPaused { get { lock (_lock) { return _paused; } } }
 
-    public FtpWatcher(FtpServerConfig serverConfig, FileQueue fileQueue, int siteId, int tenantId, FileLogger logger, Action<string>? onForceUploadComplete = null)
+    public FtpWatcher(FtpServerConfig serverConfig, FileQueue fileQueue, string siteId, int tenantId, FileLogger logger, Action<string>? onForceUploadComplete = null)
     {
         _serverConfig = serverConfig;
         _fileQueue = fileQueue;

@@ -9,7 +9,7 @@ public class FtpWatcherManager
     private readonly FileLogger _logger;
     private readonly ConfigManager _configManager;
     private readonly object _lock = new();
-    private int _siteId;
+    private string _siteId = "";
     private int _tenantId;
     private bool _enabled;
     private bool _globalPaused;
@@ -23,7 +23,7 @@ public class FtpWatcherManager
         _configManager = configManager;
     }
 
-    public void Initialize(FtpConfig ftpConfig, int siteId, int tenantId)
+    public void Initialize(FtpConfig ftpConfig, string siteId, int tenantId)
     {
         _siteId = siteId;
         _tenantId = tenantId;

@@ -26,7 +26,7 @@ public partial class SettingsViewModel : ObservableObject
     private string _tenantId = "";
 
     [ObservableProperty]
-    private int _siteNumber;
+    private string _siteNumber = "";
 
     [ObservableProperty]
     private string _siteNameMessage = "";
@@ -269,7 +269,7 @@ public partial class SettingsViewModel : ObservableObject
     {
         get
         {
-            if (!int.TryParse(NewSiteNumberInput, out _)) return false;
+            if (string.IsNullOrWhiteSpace(NewSiteNumberInput)) return false;
             return ConfirmationPhrase.Equals("change site number", StringComparison.OrdinalIgnoreCase);
         }
     }
@@ -308,7 +308,7 @@ public partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private async Task SaveSiteNameAsync()
     {
-        if (string.IsNullOrWhiteSpace(TenantId) || SiteNumber == 0)
+        if (string.IsNullOrWhiteSpace(TenantId) || string.IsNullOrWhiteSpace(SiteNumber))
         {
             SiteNameMessage = "Missing tenant ID or site number";
             SiteNameSuccess = false;
@@ -410,7 +410,7 @@ public partial class SettingsViewModel : ObservableObject
     private void EditSiteNumber()
     {
         ShowSiteNumberDialog = true;
-        NewSiteNumberInput = SiteNumber.ToString();
+        NewSiteNumberInput = SiteNumber;
         ConfirmationPhrase = "";
         ErrorMessage = "";
     }
@@ -429,9 +429,9 @@ public partial class SettingsViewModel : ObservableObject
     {
         ErrorMessage = "";
 
-        if (!int.TryParse(NewSiteNumberInput, out var parsedNumber))
+        if (string.IsNullOrWhiteSpace(NewSiteNumberInput))
         {
-            ErrorMessage = "Please enter a valid number";
+            ErrorMessage = "Please enter a site ID";
             return;
         }
 
@@ -442,15 +442,15 @@ public partial class SettingsViewModel : ObservableObject
         }
 
         var oldSiteNumber = SiteNumber;
-        SiteNumber = parsedNumber;
-        _settingsManager.UpdateSiteNumber(parsedNumber);
+        SiteNumber = NewSiteNumberInput;
+        _settingsManager.UpdateSiteNumber(NewSiteNumberInput);
         _mainViewModel.UpdateSiteInfo();
 
-        await _localService.UpdateConfigAsync(new { siteId = parsedNumber });
+        await _localService.UpdateConfigAsync(new { siteId = NewSiteNumberInput });
 
         if (!string.IsNullOrWhiteSpace(TenantId) && int.TryParse(TenantId, out var tenantId))
         {
-            await _siteApiService.UpdateSiteIdAsync(tenantId, oldSiteNumber, parsedNumber);
+            await _siteApiService.UpdateSiteIdAsync(tenantId, oldSiteNumber, NewSiteNumberInput);
         }
 
         CloseDialog();

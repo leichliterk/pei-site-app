@@ -55,8 +55,8 @@ public class SettingsManager
                         settings.ApiKey = CredentialProtection.TryUnprotect(apiKeyProtected.GetString()!) ?? settings.ApiKey;
                     else if (config.TryGetValue("apiKey", out var apiKey) && apiKey.ValueKind == JsonValueKind.String)
                         settings.ApiKey = apiKey.GetString()!;
-                    if (config.TryGetValue("siteId", out var siteId) && siteId.ValueKind == JsonValueKind.Number)
-                        settings.SiteNumber = siteId.GetInt32();
+                    if (config.TryGetValue("siteId", out var siteId) && siteId.ValueKind == JsonValueKind.String)
+                        settings.SiteNumber = siteId.GetString()!;
                     if (config.TryGetValue("tenantId", out var tenantId) && tenantId.ValueKind == JsonValueKind.Number)
                         settings.TenantId = tenantId.GetInt32();
                     if (config.TryGetValue("logLevel", out var logLevel) && logLevel.ValueKind == JsonValueKind.String)
@@ -71,8 +71,8 @@ public class SettingsManager
         var regTenantId = ReadRegistryValue("TenantId");
         var regSiteName = ReadRegistryValue("SiteName");
 
-        if (regSiteId != null && int.TryParse(regSiteId, out var sid))
-            settings.SiteNumber = sid;
+        if (regSiteId != null)
+            settings.SiteNumber = regSiteId;
         if (regTenantId != null && int.TryParse(regTenantId, out var tid))
             settings.TenantId = tid;
         if (regSiteName != null)
@@ -122,7 +122,7 @@ public class SettingsManager
         SaveUserSettings();
     }
 
-    public void UpdateSiteNumber(int siteNumber)
+    public void UpdateSiteNumber(string siteNumber)
     {
         _settings.SiteNumber = siteNumber;
         SaveServiceConfig();

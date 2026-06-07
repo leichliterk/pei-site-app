@@ -35,7 +35,7 @@ public class ConfigManager
         ApiUrl = "https://pei-web-server-staging.onrender.com/api/data",
 #endif
         ApiKey = "",
-        SiteId = 1000,
+        SiteId = "1000",
         TenantId = 1001,
         LogLevel = ServiceLogLevel.Info,
         FtpEnabled = false,
@@ -172,7 +172,7 @@ public class ConfigManager
                 {
                     ApiUrl = DefaultConfig.ApiUrl,
                     ApiKey = apiKey ?? DefaultConfig.ApiKey,
-                    SiteId = siteId != null && int.TryParse(siteId, out var sid) ? sid : DefaultConfig.SiteId,
+                    SiteId = siteId ?? DefaultConfig.SiteId,
                     TenantId = tenantId != null && int.TryParse(tenantId, out var tid) ? tid : DefaultConfig.TenantId,
                     FtpEnabled = !string.IsNullOrEmpty(ftpHost),
                     FtpServers = new()
@@ -240,8 +240,8 @@ public class ConfigManager
                         _config.ApiUrl = kvp.Value.GetString()!; break;
                     case "apiKey" when kvp.Value.ValueKind == JsonValueKind.String:
                         _config.ApiKey = kvp.Value.GetString()!; break;
-                    case "siteId" when kvp.Value.ValueKind == JsonValueKind.Number:
-                        _config.SiteId = kvp.Value.GetInt32(); break;
+                    case "siteId" when kvp.Value.ValueKind == JsonValueKind.String:
+                        _config.SiteId = kvp.Value.GetString()!; break;
                     case "tenantId" when kvp.Value.ValueKind == JsonValueKind.Number:
                         _config.TenantId = kvp.Value.GetInt32(); break;
                 }
@@ -383,7 +383,7 @@ public class ConfigManager
         {
             ApiUrl = string.IsNullOrEmpty(config.ApiUrl) ? DefaultConfig.ApiUrl : config.ApiUrl,
             ApiKey = string.IsNullOrEmpty(config.ApiKey) ? DefaultConfig.ApiKey : config.ApiKey,
-            SiteId = config.SiteId == 0 ? DefaultConfig.SiteId : config.SiteId,
+            SiteId = string.IsNullOrEmpty(config.SiteId) ? DefaultConfig.SiteId : config.SiteId,
             TenantId = config.TenantId == 0 ? DefaultConfig.TenantId : config.TenantId,
             LogLevel = config.LogLevel,
             FtpEnabled = config.FtpEnabled,

@@ -24,7 +24,7 @@ public class SiteApiService : IDisposable
         _http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
     }
 
-    public async Task<bool> UpdateSiteNameAsync(int tenantId, int siteId, string siteName)
+    public async Task<bool> UpdateSiteNameAsync(int tenantId, string siteId, string siteName)
     {
         var url = $"{_apiUrl}/site/updateSiteName/{tenantId}/{siteId}";
         try
@@ -41,12 +41,12 @@ public class SiteApiService : IDisposable
         }
     }
 
-    public async Task<bool> UpdateSiteIdAsync(int tenantId, int oldSiteId, int newSiteId)
+    public async Task<bool> UpdateSiteIdAsync(int tenantId, string oldSiteId, string newSiteId)
     {
         var url = $"{_apiUrl}/site/updateSiteId/{tenantId}/{oldSiteId}";
         try
         {
-            var response = await _http.PostAsJsonAsync(url, new { newSiteId = newSiteId.ToString() });
+            var response = await _http.PostAsJsonAsync(url, new { newSiteId });
             if (!response.IsSuccessStatusCode)
                 _logger.LogWarning("POST {Url} returned {Status}", url, (int)response.StatusCode);
             return response.IsSuccessStatusCode;
@@ -58,7 +58,7 @@ public class SiteApiService : IDisposable
         }
     }
 
-    public async Task<UptimeResponse?> GetUptimeAsync(int tenantId, int siteId, int days = 7)
+    public async Task<UptimeResponse?> GetUptimeAsync(int tenantId, string siteId, int days = 7)
     {
         var url = $"{_apiUrl}/site/uptime/{tenantId}/{siteId}?days={days}";
         try

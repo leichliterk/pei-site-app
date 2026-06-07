@@ -10,7 +10,7 @@ public class PendingFileEntry
     public string Encoding { get; set; } = "base64";
     public long Size { get; set; }
     public string Source { get; set; } = "";
-    public int SiteId { get; set; }
+    public string SiteId { get; set; } = "";
     public int TenantId { get; set; }
     public string ModifiedAt { get; set; } = "";  // FTP server's MDTM timestamp (YYYYMMDDHHmmss), or local time if server doesn't support MDTM
     public string QueuedAt { get; set; } = "";

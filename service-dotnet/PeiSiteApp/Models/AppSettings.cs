@@ -4,7 +4,7 @@ public class AppSettings
 {
     public string Version { get; set; } = "1.4.15";
     public string AppName { get; set; } = "PEI Site App";
-    public int SiteNumber { get; set; } = 1000;
+    public string SiteNumber { get; set; } = "1000";
     public string SiteName { get; set; } = "";
 #if PRODUCTION
     public string ApiUrl { get; set; } = "https://pei-web-server.onrender.com/api/data";
