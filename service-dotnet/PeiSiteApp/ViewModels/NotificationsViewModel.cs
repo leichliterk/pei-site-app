@@ -18,6 +18,11 @@ public partial class NotificationsViewModel : ObservableObject
     [ObservableProperty] private bool _isLoading;
     [ObservableProperty] private string _emptyMessage = "No notifications";
 
+    // Release notes dialog state
+    [ObservableProperty] private bool _showReleaseNotesDialog;
+    [ObservableProperty] private string _releaseNotesVersion = "";
+    [ObservableProperty] private string _releaseNotesText = "";
+
     // OTA dialog state
     [ObservableProperty] private bool _showOtaDialog;
     [ObservableProperty] private NotificationResponse? _currentOtaNotification;
@@ -77,6 +82,19 @@ public partial class NotificationsViewModel : ObservableObject
         await _localService.MarkAllNotificationsReadAsync();
         await LoadAsync();
     }
+
+    // --- Release notes ---
+
+    [RelayCommand]
+    private void OpenReleaseNotesDialog(NotificationResponse notification)
+    {
+        ReleaseNotesVersion = notification.Data?.Version ?? "";
+        ReleaseNotesText = notification.Data?.Notes ?? "";
+        ShowReleaseNotesDialog = true;
+    }
+
+    [RelayCommand]
+    private void CloseReleaseNotesDialog() => ShowReleaseNotesDialog = false;
 
     // --- OTA ---
 

@@ -2,6 +2,7 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using PeiSiteApp.Models;
 
 namespace PeiSiteApp.Services;
@@ -10,6 +11,7 @@ public class LocalServiceClient : IDisposable
 {
     private const string BaseUrl = "http://127.0.0.1:47836";
     private readonly HttpClient _http;
+    private readonly ILogger<LocalServiceClient> _logger;
     private Timer? _pollTimer;
     private bool _isPolling;
 
@@ -23,14 +25,154 @@ public class LocalServiceClient : IDisposable
 
     public event Action<ServiceStatusResponse?>? StatusChanged;
 
-    public LocalServiceClient()
+    public LocalServiceClient(ILogger<LocalServiceClient> logger)
     {
+        _logger = logger;
         _http = new HttpClient
         {
             BaseAddress = new Uri(BaseUrl),
             Timeout = TimeSpan.FromSeconds(30)
         };
     }
+
+    // -------------------------------------------------------------------------
+    // Private helpers — eliminate repetitive try/catch boilerplate
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// GET endpoint, deserialize JSON response. Logs at Warning — use for
+    /// user-triggered calls. Background polls use FetchStatusAsync directly.
+    /// </summary>
+    private async Task<T?> GetJsonAsync<T>(string url)
+    {
+        try
+        {
+            var response = await _http.GetAsync(url);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("GET {Url} returned {Status}", url, (int)response.StatusCode);
+                return default;
+            }
+            var json = await response.Content.ReadAsStringAsync();
+            try
+            {
+                return JsonSerializer.Deserialize<T>(json, JsonOptions);
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogWarning(ex, "Failed to deserialize response from GET {Url}", url);
+                return default;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "GET {Url} failed", url);
+            return default;
+        }
+    }
+
+    /// <summary>POST with optional JSON body, returns success flag.</summary>
+    private async Task<bool> PostAsync(string url, object? body = null)
+    {
+        try
+        {
+            var response = body == null
+                ? await _http.PostAsync(url, null)
+                : await _http.PostAsJsonAsync(url, body);
+            if (!response.IsSuccessStatusCode)
+                _logger.LogWarning("POST {Url} returned {Status}", url, (int)response.StatusCode);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "POST {Url} failed", url);
+            return false;
+        }
+    }
+
+    /// <summary>PUT with JSON body, returns success flag.</summary>
+    private async Task<bool> PutJsonAsync(string url, object body)
+    {
+        try
+        {
+            var response = await _http.PutAsJsonAsync(url, body);
+            if (!response.IsSuccessStatusCode)
+                _logger.LogWarning("PUT {Url} returned {Status}", url, (int)response.StatusCode);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "PUT {Url} failed", url);
+            return false;
+        }
+    }
+
+    /// <summary>PUT with typed JSON body (uses custom JsonOptions).</summary>
+    private async Task<bool> PutJsonAsync<T>(string url, T body)
+    {
+        try
+        {
+            var response = await _http.PutAsJsonAsync(url, body, JsonOptions);
+            if (!response.IsSuccessStatusCode)
+                _logger.LogWarning("PUT {Url} returned {Status}", url, (int)response.StatusCode);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "PUT {Url} failed", url);
+            return false;
+        }
+    }
+
+    /// <summary>DELETE, returns success flag.</summary>
+    private async Task<bool> DeleteAsync(string url)
+    {
+        try
+        {
+            var response = await _http.DeleteAsync(url);
+            if (!response.IsSuccessStatusCode)
+                _logger.LogWarning("DELETE {Url} returned {Status}", url, (int)response.StatusCode);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "DELETE {Url} failed", url);
+            return false;
+        }
+    }
+
+    /// <summary>POST with JSON body, deserialize response.</summary>
+    private async Task<T?> PostJsonAsync<T>(string url, object body)
+    {
+        try
+        {
+            var response = await _http.PostAsJsonAsync(url, body);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("POST {Url} returned {Status}", url, (int)response.StatusCode);
+                return default;
+            }
+            var json = await response.Content.ReadAsStringAsync();
+            try
+            {
+                return JsonSerializer.Deserialize<T>(json, JsonOptions);
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogWarning(ex, "Failed to deserialize response from POST {Url}", url);
+                return default;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "POST {Url} failed", url);
+            return default;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Health / status polling (Debug level — these run every second)
+    // -------------------------------------------------------------------------
 
     public async Task<bool> CheckHealthAsync()
     {
@@ -40,8 +182,9 @@ public class LocalServiceClient : IDisposable
             IsServiceAvailable = response.IsSuccessStatusCode;
             return IsServiceAvailable;
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogDebug(ex, "Health check failed");
             IsServiceAvailable = false;
             return false;
         }
@@ -52,10 +195,8 @@ public class LocalServiceClient : IDisposable
         if (_isPolling) return;
         _isPolling = true;
 
-        // Initial fetch
         _ = FetchStatusAsync();
 
-        // Poll every second
         _pollTimer = new Timer(async _ =>
         {
             await FetchStatusAsync();
@@ -77,154 +218,86 @@ public class LocalServiceClient : IDisposable
             if (response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync();
-                var status = JsonSerializer.Deserialize<ServiceStatusResponse>(json, JsonOptions);
-                IsServiceAvailable = true;
-                CurrentStatus = status;
-                StatusChanged?.Invoke(status);
+                try
+                {
+                    var status = JsonSerializer.Deserialize<ServiceStatusResponse>(json, JsonOptions);
+                    IsServiceAvailable = true;
+                    CurrentStatus = status;
+                    StatusChanged?.Invoke(status);
+                }
+                catch (JsonException ex)
+                {
+                    _logger.LogWarning(ex, "Failed to deserialize /status response");
+                    IsServiceAvailable = false;
+                    CurrentStatus = null;
+                    StatusChanged?.Invoke(null);
+                }
             }
             else
             {
+                _logger.LogDebug("/status returned {Status}", (int)response.StatusCode);
                 IsServiceAvailable = false;
                 CurrentStatus = null;
                 StatusChanged?.Invoke(null);
             }
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogDebug(ex, "/status poll failed");
             IsServiceAvailable = false;
             CurrentStatus = null;
             StatusChanged?.Invoke(null);
         }
     }
 
-    public async Task<bool> ForceReconnectAsync()
-    {
-        try
-        {
-            var response = await _http.PostAsync("/reconnect", new StringContent("{}", Encoding.UTF8, "application/json"));
-            return response.IsSuccessStatusCode;
-        }
-        catch { return false; }
-    }
+    // -------------------------------------------------------------------------
+    // Config / misc
+    // -------------------------------------------------------------------------
 
-    public async Task<bool> UpdateConfigAsync(object config)
-    {
-        try
-        {
-            var response = await _http.PostAsJsonAsync("/config", config);
-            return response.IsSuccessStatusCode;
-        }
-        catch { return false; }
-    }
+    public Task<bool> ForceReconnectAsync()
+        => PostAsync("/reconnect", new { });
+
+    public Task<bool> UpdateConfigAsync(object config)
+        => PostAsync("/config", config);
 
     public async Task<bool> PrepopulateHistoryAsync(List<UptimeSession> sessions)
     {
-        try
-        {
-            var payload = new { sessions = sessions.Select(s => new { connected_at = s.ConnectedAt, disconnected_at = s.DisconnectedAt }).ToList() };
-            var response = await _http.PostAsJsonAsync("/prepopulate-history", payload);
-            return response.IsSuccessStatusCode;
-        }
-        catch { return false; }
+        var payload = new { sessions = sessions.Select(s => new { connected_at = s.ConnectedAt, disconnected_at = s.DisconnectedAt }).ToList() };
+        return await PostAsync("/prepopulate-history", payload);
     }
 
-    // --- Log endpoints ---
+    public Task<bool> SetLogLevelAsync(string level)
+        => PutJsonAsync("/log-level", new { level });
+
+    // -------------------------------------------------------------------------
+    // Logs
+    // -------------------------------------------------------------------------
 
     public async Task<List<LogEntry>?> GetLogsAsync(string? since = null)
     {
-        try
-        {
-            var url = since != null ? $"/logs?since={Uri.EscapeDataString(since)}" : "/logs";
-            var response = await _http.GetAsync(url);
-            if (response.IsSuccessStatusCode)
-            {
-                var json = await response.Content.ReadAsStringAsync();
-                var result = JsonSerializer.Deserialize<LogsResponse>(json, JsonOptions);
-                return result?.Entries;
-            }
-            return null;
-        }
-        catch { return null; }
+        var url = since != null ? $"/logs?since={Uri.EscapeDataString(since)}" : "/logs";
+        var result = await GetJsonAsync<LogsResponse>(url);
+        return result?.Entries;
     }
 
-    // --- FTP endpoints ---
+    // -------------------------------------------------------------------------
+    // FTP
+    // -------------------------------------------------------------------------
 
-    public async Task<FtpOverallStatusResponse?> FtpGetStatusAsync()
-    {
-        try
-        {
-            var response = await _http.GetAsync("/ftp/status");
-            if (response.IsSuccessStatusCode)
-            {
-                var json = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<FtpOverallStatusResponse>(json, JsonOptions);
-            }
-            return null;
-        }
-        catch { return null; }
-    }
+    public Task<FtpOverallStatusResponse?> FtpGetStatusAsync()
+        => GetJsonAsync<FtpOverallStatusResponse>("/ftp/status");
 
-    public async Task<bool> FtpSetEnabledAsync(bool enabled)
-    {
-        try
-        {
-            var response = await _http.PutAsJsonAsync("/ftp/enabled", new { enabled });
-            return response.IsSuccessStatusCode;
-        }
-        catch { return false; }
-    }
+    public Task<bool> FtpSetEnabledAsync(bool enabled)
+        => PutJsonAsync("/ftp/enabled", new { enabled });
 
-    public async Task<FtpServerResponse?> FtpAddServerAsync(string name, string host, string path, int pollInterval, string username = "", string password = "")
-    {
-        try
-        {
-            var response = await _http.PostAsJsonAsync("/ftp/servers", new
-            {
-                name,
-                ftpHost = host,
-                ftpPath = path,
-                ftpPollInterval = pollInterval,
-                username,
-                password
-            });
-            if (response.IsSuccessStatusCode)
-            {
-                var json = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<FtpServerResponse>(json, JsonOptions);
-            }
-            return null;
-        }
-        catch { return null; }
-    }
+    public Task<FtpServerResponse?> FtpAddServerAsync(string name, string host, string path, int pollInterval, string username = "", string password = "")
+        => PostJsonAsync<FtpServerResponse>("/ftp/servers", new { name, ftpHost = host, ftpPath = path, ftpPollInterval = pollInterval, username, password });
 
-    public async Task<bool> FtpUpdateServerAsync(string id, string name, string host, string path, int pollInterval, string username = "", string password = "", bool forceFullUploadOnNextPoll = false)
-    {
-        try
-        {
-            var response = await _http.PutAsJsonAsync($"/ftp/servers/{id}", new
-            {
-                name,
-                ftpHost = host,
-                ftpPath = path,
-                ftpPollInterval = pollInterval,
-                username,
-                password,
-                forceFullUploadOnNextPoll
-            });
-            return response.IsSuccessStatusCode;
-        }
-        catch { return false; }
-    }
+    public Task<bool> FtpUpdateServerAsync(string id, string name, string host, string path, int pollInterval, string username = "", string password = "", bool forceFullUploadOnNextPoll = false)
+        => PutJsonAsync($"/ftp/servers/{id}", new { name, ftpHost = host, ftpPath = path, ftpPollInterval = pollInterval, username, password, forceFullUploadOnNextPoll });
 
-    public async Task<bool> FtpDeleteServerAsync(string id)
-    {
-        try
-        {
-            var response = await _http.DeleteAsync($"/ftp/servers/{id}");
-            return response.IsSuccessStatusCode;
-        }
-        catch { return false; }
-    }
+    public Task<bool> FtpDeleteServerAsync(string id)
+        => DeleteAsync($"/ftp/servers/{id}");
 
     public async Task<FtpTestResult> FtpTestConnectionAsync(string host, string path, string username = "", string password = "")
     {
@@ -235,9 +308,19 @@ public class LocalServiceClient : IDisposable
             if (response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync(cts.Token);
-                return JsonSerializer.Deserialize<FtpTestResult>(json, JsonOptions) ?? new FtpTestResult { Success = false, Message = "Invalid response" };
+                try
+                {
+                    return JsonSerializer.Deserialize<FtpTestResult>(json, JsonOptions)
+                        ?? new FtpTestResult { Success = false, Message = "Empty response" };
+                }
+                catch (JsonException ex)
+                {
+                    _logger.LogWarning(ex, "Failed to deserialize /ftp/test response");
+                    return new FtpTestResult { Success = false, Message = "Invalid response from service" };
+                }
             }
-            return new FtpTestResult { Success = false, Message = "Service returned error" };
+            _logger.LogWarning("POST /ftp/test returned {Status}", (int)response.StatusCode);
+            return new FtpTestResult { Success = false, Message = $"Service returned {(int)response.StatusCode}" };
         }
         catch (OperationCanceledException)
         {
@@ -245,6 +328,7 @@ public class LocalServiceClient : IDisposable
         }
         catch (Exception ex)
         {
+            _logger.LogWarning(ex, "POST /ftp/test failed");
             return new FtpTestResult { Success = false, Message = ex.Message };
         }
     }
@@ -258,10 +342,19 @@ public class LocalServiceClient : IDisposable
             if (response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync(cts.Token);
-                return JsonSerializer.Deserialize<FtpBrowseResponse>(json, JsonOptions)
-                    ?? new FtpBrowseResponse { Success = false, Message = "Invalid response" };
+                try
+                {
+                    return JsonSerializer.Deserialize<FtpBrowseResponse>(json, JsonOptions)
+                        ?? new FtpBrowseResponse { Success = false, Message = "Empty response" };
+                }
+                catch (JsonException ex)
+                {
+                    _logger.LogWarning(ex, "Failed to deserialize /ftp/browse response");
+                    return new FtpBrowseResponse { Success = false, Message = "Invalid response from service" };
+                }
             }
-            return new FtpBrowseResponse { Success = false, Message = "Service returned error" };
+            _logger.LogWarning("POST /ftp/browse returned {Status}", (int)response.StatusCode);
+            return new FtpBrowseResponse { Success = false, Message = $"Service returned {(int)response.StatusCode}" };
         }
         catch (OperationCanceledException)
         {
@@ -269,217 +362,76 @@ public class LocalServiceClient : IDisposable
         }
         catch (Exception ex)
         {
+            _logger.LogWarning(ex, "POST /ftp/browse failed");
             return new FtpBrowseResponse { Success = false, Message = ex.Message };
         }
     }
 
-    public async Task<bool> SetLogLevelAsync(string level)
-    {
-        try
-        {
-            var response = await _http.PutAsJsonAsync("/log-level", new { level });
-            return response.IsSuccessStatusCode;
-        }
-        catch { return false; }
-    }
+    // -------------------------------------------------------------------------
+    // OTA
+    // -------------------------------------------------------------------------
 
-    // --- OTA endpoints ---
+    public Task<bool> OtaRespondAsync(string releaseId, bool accepted)
+        => PostAsync("/ota/respond", new { releaseId, accepted });
 
-    public async Task<bool> OtaRespondAsync(string releaseId, bool accepted)
-    {
-        try
-        {
-            var response = await _http.PostAsJsonAsync("/ota/respond", new { releaseId, accepted });
-            return response.IsSuccessStatusCode;
-        }
-        catch { return false; }
-    }
+    public Task<bool> OtaInstalledAsync(string releaseId, string version)
+        => PostAsync("/ota/installed", new { releaseId, version });
 
-    public async Task<bool> OtaInstalledAsync(string releaseId, string version)
-    {
-        try
-        {
-            var response = await _http.PostAsJsonAsync("/ota/installed", new { releaseId, version });
-            return response.IsSuccessStatusCode;
-        }
-        catch { return false; }
-    }
+    // -------------------------------------------------------------------------
+    // Notifications
+    // -------------------------------------------------------------------------
 
-    // --- Notification endpoints ---
+    public Task<NotificationsResponse?> GetNotificationsAsync()
+        => GetJsonAsync<NotificationsResponse>("/notifications");
 
-    public async Task<NotificationsResponse?> GetNotificationsAsync()
-    {
-        try
-        {
-            var response = await _http.GetAsync("/notifications");
-            if (response.IsSuccessStatusCode)
-            {
-                var json = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<NotificationsResponse>(json, JsonOptions);
-            }
-            return null;
-        }
-        catch { return null; }
-    }
+    public Task<bool> MarkNotificationReadAsync(string id)
+        => PostAsync($"/notifications/{id}/read");
 
-    public async Task<bool> MarkNotificationReadAsync(string id)
-    {
-        try
-        {
-            var response = await _http.PostAsync($"/notifications/{id}/read", null);
-            return response.IsSuccessStatusCode;
-        }
-        catch { return false; }
-    }
+    public Task<bool> MarkAllNotificationsReadAsync()
+        => PostAsync("/notifications/read-all");
 
-    public async Task<bool> MarkAllNotificationsReadAsync()
-    {
-        try
-        {
-            var response = await _http.PostAsync("/notifications/read-all", null);
-            return response.IsSuccessStatusCode;
-        }
-        catch { return false; }
-    }
+    // -------------------------------------------------------------------------
+    // Queue
+    // -------------------------------------------------------------------------
 
-    // --- Queue endpoints ---
+    public Task<QueueResponse?> GetQueueAsync()
+        => GetJsonAsync<QueueResponse>("/queue");
 
-    public async Task<QueueResponse?> GetQueueAsync()
-    {
-        try
-        {
-            var response = await _http.GetAsync("/queue");
-            if (response.IsSuccessStatusCode)
-            {
-                var json = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<QueueResponse>(json, JsonOptions);
-            }
-            return null;
-        }
-        catch { return null; }
-    }
+    public Task<QueueStatusResponse?> GetQueueStatusAsync()
+        => GetJsonAsync<QueueStatusResponse>("/queue/status");
 
-    public async Task<QueueStatusResponse?> GetQueueStatusAsync()
-    {
-        try
-        {
-            var response = await _http.GetAsync("/queue/status");
-            if (response.IsSuccessStatusCode)
-            {
-                var json = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<QueueStatusResponse>(json, JsonOptions);
-            }
-            return null;
-        }
-        catch { return null; }
-    }
+    public Task<bool> QueueRetryAsync(string id)
+        => PostAsync($"/queue/{id}/retry");
 
-    public async Task<bool> QueueRetryAsync(string id)
-    {
-        try
-        {
-            var response = await _http.PostAsync($"/queue/{id}/retry", null);
-            return response.IsSuccessStatusCode;
-        }
-        catch { return false; }
-    }
+    public Task<bool> QueueClearHistoryAsync()
+        => DeleteAsync("/queue/history");
 
-    public async Task<bool> QueueClearHistoryAsync()
-    {
-        try
-        {
-            var response = await _http.DeleteAsync("/queue/history");
-            return response.IsSuccessStatusCode;
-        }
-        catch { return false; }
-    }
+    public Task<bool> QueuePauseAsync()
+        => PostAsync("/queue/pause");
 
-    public async Task<bool> QueuePauseAsync()
-    {
-        try
-        {
-            var response = await _http.PostAsync("/queue/pause", null);
-            return response.IsSuccessStatusCode;
-        }
-        catch { return false; }
-    }
+    public Task<bool> QueueResumeAsync()
+        => PostAsync("/queue/resume");
 
-    public async Task<bool> QueueResumeAsync()
-    {
-        try
-        {
-            var response = await _http.PostAsync("/queue/resume", null);
-            return response.IsSuccessStatusCode;
-        }
-        catch { return false; }
-    }
+    // -------------------------------------------------------------------------
+    // PLC
+    // -------------------------------------------------------------------------
 
-    // --- PLC endpoints ---
+    public Task<PlcSettingsModel?> PlcGetSettingsAsync()
+        => GetJsonAsync<PlcSettingsModel>("/plc/settings");
 
-    public async Task<PlcSettingsModel?> PlcGetSettingsAsync()
-    {
-        try
-        {
-            var response = await _http.GetAsync("/plc/settings");
-            if (response.IsSuccessStatusCode)
-            {
-                var json = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<PlcSettingsModel>(json, JsonOptions);
-            }
-            return null;
-        }
-        catch { return null; }
-    }
+    public Task<PlcTagsResponse?> PlcGetTagsAsync()
+        => GetJsonAsync<PlcTagsResponse>("/plc/tags");
 
-    public async Task<PlcTagsResponse?> PlcGetTagsAsync()
-    {
-        try
-        {
-            var response = await _http.GetAsync("/plc/tags");
-            if (response.IsSuccessStatusCode)
-            {
-                var json = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<PlcTagsResponse>(json, JsonOptions);
-            }
-            return null;
-        }
-        catch { return null; }
-    }
+    public Task<bool> PlcRefreshTagsAsync()
+        => PostAsync("/plc/tags/refresh");
 
-    public async Task<bool> PlcRefreshTagsAsync()
-    {
-        try
-        {
-            var response = await _http.PostAsync("/plc/tags/refresh", null);
-            return response.IsSuccessStatusCode;
-        }
-        catch { return false; }
-    }
+    public Task<PlcSnapshotResponse?> PlcGetSnapshotAsync()
+        => GetJsonAsync<PlcSnapshotResponse>("/plc/snapshot");
 
-    public async Task<PlcSnapshotResponse?> PlcGetSnapshotAsync()
-    {
-        try
-        {
-            var response = await _http.GetAsync("/plc/snapshot");
-            if (response.IsSuccessStatusCode)
-            {
-                var json = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<PlcSnapshotResponse>(json, JsonOptions);
-            }
-            return null;
-        }
-        catch { return null; }
-    }
+    public Task<bool> PlcUpdateSettingsAsync(PlcSettingsModel settings)
+        => PutJsonAsync("/plc/settings", settings);
 
-    public async Task<bool> PlcUpdateSettingsAsync(PlcSettingsModel settings)
-    {
-        try
-        {
-            var response = await _http.PutAsJsonAsync("/plc/settings", settings, JsonOptions);
-            return response.IsSuccessStatusCode;
-        }
-        catch { return false; }
-    }
+    // -------------------------------------------------------------------------
 
     public void Dispose()
     {
