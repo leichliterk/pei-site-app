@@ -257,13 +257,14 @@ public static class ApiServer
         app.MapGet("/plc/snapshot", (PlcSnapshotState state) =>
         {
             var s = state.Latest;
-            if (s == null) return Results.Ok(new { connected = false, tags = Array.Empty<object>(), timestamp = (DateTimeOffset?)null, ipAddress = "", slot = 0 });
+            if (s == null) return Results.Ok(new { connected = false, tags = Array.Empty<object>(), timestamp = (DateTimeOffset?)null, ipAddress = "", slot = 0, snapshot_interval = 0 });
             return Results.Ok(new
             {
                 connected = s.Connected,
                 ipAddress = s.IpAddress,
                 slot = s.Slot,
                 timestamp = s.Timestamp,
+                snapshot_interval = s.SnapshotIntervalMs,
                 tags = s.Tags.Select(t => new
                 {
                     name = t.Name,

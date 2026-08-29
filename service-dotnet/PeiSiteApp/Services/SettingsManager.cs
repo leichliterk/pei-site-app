@@ -55,8 +55,13 @@ public class SettingsManager
                         settings.ApiKey = CredentialProtection.TryUnprotect(apiKeyProtected.GetString()!) ?? settings.ApiKey;
                     else if (config.TryGetValue("apiKey", out var apiKey) && apiKey.ValueKind == JsonValueKind.String)
                         settings.ApiKey = apiKey.GetString()!;
-                    if (config.TryGetValue("siteId", out var siteId) && siteId.ValueKind == JsonValueKind.String)
-                        settings.SiteNumber = siteId.GetString()!;
+                    if (config.TryGetValue("siteId", out var siteId))
+                    {
+                        if (siteId.ValueKind == JsonValueKind.String)
+                            settings.SiteNumber = siteId.GetString()!;
+                        else if (siteId.ValueKind == JsonValueKind.Number)
+                            settings.SiteNumber = siteId.GetInt32().ToString();
+                    }
                     if (config.TryGetValue("tenantId", out var tenantId) && tenantId.ValueKind == JsonValueKind.Number)
                         settings.TenantId = tenantId.GetInt32();
                     if (config.TryGetValue("logLevel", out var logLevel) && logLevel.ValueKind == JsonValueKind.String)

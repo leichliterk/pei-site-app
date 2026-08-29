@@ -15,7 +15,8 @@ public record PlcSnapshot(
     int Slot,
     DateTimeOffset Timestamp,
     bool Connected,
-    IReadOnlyList<TagSnapshot> Tags
+    IReadOnlyList<TagSnapshot> Tags,
+    int SnapshotIntervalMs = 0
 );
 
 public record DiscoveredTag(

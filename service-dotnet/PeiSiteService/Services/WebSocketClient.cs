@@ -479,6 +479,7 @@ public class WebSocketClient : IDisposable
             slot = snapshot.Slot,
             timestamp = snapshot.Timestamp,
             connected = snapshot.Connected,
+            snapshot_interval = snapshot.SnapshotIntervalMs,
             tags = snapshot.Tags.Select(t => new
             {
                 name = t.Name,

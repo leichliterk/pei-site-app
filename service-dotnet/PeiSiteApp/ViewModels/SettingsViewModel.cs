@@ -765,8 +765,14 @@ public partial class SettingsViewModel : ObservableObject
         var settings = await _localService.PlcGetSettingsAsync();
         if (settings == null) return;
         PlcEnabled = settings.Enabled;
-        PlcConnectionType = string.IsNullOrEmpty(settings.ConnectionType)
-            ? "ControlLogix" : settings.ConnectionType;
+        // Service serializes enum as camelCase ("modbusTcp"); ComboBox values are PascalCase.
+        var ct = settings.ConnectionType;
+        PlcConnectionType = ct switch
+        {
+            "modbusTcp" or "ModbusTcp" => "ModbusTcp",
+            "controlLogix" or "ControlLogix" => "ControlLogix",
+            _ => "ControlLogix"
+        };
         PlcIpAddress = settings.IpAddress;
         PlcSlot = settings.Slot;
         ModbusTcpPort = settings.ModbusPort > 0 ? settings.ModbusPort : 502;

@@ -22,6 +22,7 @@ public class QueueEntry
     public string Category { get; set; } = "ftp";
     public string ContentBase64 { get; set; } = "";
     public string Encoding { get; set; } = "base64";
+    [System.Text.Json.Serialization.JsonConverter(typeof(SiteIdConverter))]
     public string SiteId { get; set; } = "";
     public int TenantId { get; set; }
 

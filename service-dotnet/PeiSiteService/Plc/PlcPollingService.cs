@@ -63,7 +63,7 @@ public class PlcPollingService : BackgroundService
                 readCt.CancelAfter(TimeSpan.FromSeconds(10));
 
                 var snapshot = await reader.ReadAllAsync(readCt.Token);
-                await _channel.Writer.WriteAsync(snapshot, stoppingToken);
+                await _channel.Writer.WriteAsync(snapshot with { SnapshotIntervalMs = settings.PollingIntervalMs }, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -75,7 +75,8 @@ public class PlcPollingService : BackgroundService
                 var errorSnapshot = new PlcSnapshot(
                     settings.IpAddress, settings.Slot,
                     DateTimeOffset.UtcNow, false,
-                    Array.Empty<TagSnapshot>());
+                    Array.Empty<TagSnapshot>(),
+                    settings.PollingIntervalMs);
                 await _channel.Writer.WriteAsync(errorSnapshot, stoppingToken);
             }
 

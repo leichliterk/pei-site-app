@@ -19,7 +19,10 @@
       "Bash(dotnet publish:*)",
       "Bash(\"C:/Program Files \\(x86\\)/WiX Toolset v3.14/bin/light.exe\" -ext WixFirewallExtension -ext WixUIExtension -ext WixUtilExtension \"PEI Site App.wixobj\" -out \"PEI Site App 1.3.0.msi\")",
       "Bash(\"C:/Program Files \\(x86\\)/WiX Toolset v3.14/bin/candle.exe\" -ext WixBalExtension -dMsiFile=\"PEI Site App 1.3.0.msi\" \"Bundle.wxs\" -out \"Bundle.wixobj\")",
-      "Bash(\"C:/Program Files \\(x86\\)/WiX Toolset v3.14/bin/light.exe\" -ext WixBalExtension \"Bundle.wixobj\" -out \"PEI Site App Setup 1.3.0.exe\")"
+      "Bash(\"C:/Program Files \\(x86\\)/WiX Toolset v3.14/bin/light.exe\" -ext WixBalExtension \"Bundle.wixobj\" -out \"PEI Site App Setup 1.3.0.exe\")",
+      "Bash(\"/c/Program Files \\(x86\\)/WiX Toolset v3.14/bin/light.exe\" -ext WixFirewallExtension -ext WixUIExtension -ext WixUtilExtension \"PEI Site App.wixobj\" -out \"PEI Site App - Staging 1.4.19.msi\")",
+      "Bash(\"/c/Program Files \\(x86\\)/WiX Toolset v3.14/bin/candle.exe\" -ext WixBalExtension -dMsiFile=\"PEI Site App - Staging 1.4.19.msi\" \"Bundle.wxs\" -out \"Bundle.wixobj\")",
+      "Bash(\"/c/Program Files \\(x86\\)/WiX Toolset v3.14/bin/light.exe\" -ext WixBalExtension \"Bundle.wixobj\" -out \"PEI Site App - Staging Setup 1.4.19.exe\")"
     ]
   }
 }
